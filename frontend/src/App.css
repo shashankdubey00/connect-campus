@@ -1,0 +1,43 @@
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0e1a 0%, #0f1a2e 50%, #0a1a1a 100%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Animated background elements */
+.app::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(0, 100, 200, 0.1) 0%, transparent 70%);
+  animation: rotate 20s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app::after {
+  content: '';
+  position: fixed;
+  top: 50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(0, 200, 100, 0.1) 0%, transparent 70%);
+  animation: rotate 25s linear infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
