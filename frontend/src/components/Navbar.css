@@ -252,11 +252,11 @@
 
 @media (max-width: 768px) {
   .navbar {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
   }
 
   .navbar-scrolled {
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
   }
 
   .navbar-links {
@@ -273,16 +273,18 @@
 
   .mobile-menu {
     display: flex;
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
   }
 
   .logo-text {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
   }
 
   .mobile-nav-link,
   .mobile-nav-btn {
-    font-size: 1rem;
-    padding: 0.8rem 1.5rem;
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
   }
 }
 
@@ -300,14 +302,293 @@
   }
 
   .mobile-menu {
-    padding: 1rem 1.25rem;
-    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    gap: 0.4rem;
   }
 
   .mobile-nav-link,
   .mobile-nav-btn {
-    font-size: 0.95rem;
-    padding: 0.75rem 1.25rem;
+    font-size: 0.75rem;
+    padding: 0.45rem 0.75rem;
+  }
+}
+
+/* Profile Menu Styles */
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-menu-container {
+  position: relative;
+}
+
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid rgba(0, 168, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.profile-avatar:hover {
+  border-color: #00a8ff;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(0, 168, 255, 0.5);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: rgba(20, 25, 40, 0.98);
+  border: 2px solid rgba(0, 168, 255, 0.3);
+  border-radius: 12px;
+  min-width: 250px;
+  box-shadow: 0 10px 40px rgba(0, 168, 255, 0.2);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  animation: slideDown 0.3s ease;
+}
+
+.profile-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(0, 168, 255, 0.2);
+}
+
+.profile-dropdown-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(0, 168, 255, 0.5);
+}
+
+.profile-dropdown-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-dropdown-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-dropdown-name {
+  color: #e0e0e0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-email {
+  color: #b0b0b0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-divider {
+  height: 1px;
+  background: rgba(0, 168, 255, 0.2);
+  margin: 0.5rem 0;
+}
+
+.profile-dropdown-menu {
+  padding: 0.5rem 0;
+}
+
+.profile-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  color: #e0e0e0;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.profile-dropdown-item:hover {
+  background: rgba(0, 168, 255, 0.1);
+  color: #00a8ff;
+}
+
+.profile-dropdown-item.logout-item {
+  color: #ff6b6b;
+  border-top: 1px solid rgba(0, 168, 255, 0.2);
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.profile-dropdown-item.logout-item:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff4444;
+}
+
+/* Google Button */
+.google-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+}
+
+.google-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Mobile Profile Section */
+.mobile-profile-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 168, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.mobile-profile-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(0, 168, 255, 0.5);
+}
+
+.mobile-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mobile-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-profile-name {
+  color: #e0e0e0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-profile-email {
+  color: #b0b0b0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-nav-btn.logout-btn {
+  background: rgba(255, 107, 107, 0.1);
+  border: 2px solid rgba(255, 107, 107, 0.3);
+  color: #ff6b6b;
+}
+
+.mobile-nav-btn.logout-btn:hover {
+  background: rgba(255, 107, 107, 0.2);
+  border-color: rgba(255, 107, 107, 0.5);
+}
+
+.mobile-nav-btn.google-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.mobile-nav-btn.google-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+  .navbar-right {
+    gap: 0.75rem;
+  }
+
+  .profile-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .google-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .profile-dropdown {
+    min-width: 220px;
+    right: -10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .google-btn {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .profile-dropdown {
+    min-width: 200px;
+    right: -15px;
+  }
+
+  .mobile-profile-section {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .mobile-profile-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mobile-profile-name {
+    font-size: 0.8rem;
+  }
+
+  .mobile-profile-email {
+    font-size: 0.7rem;
   }
 }
 

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import CollegeProfileModal from './CollegeProfileModal'
 import './Hero.css'
 
-const Hero = () => {
+const Hero = ({ collegeFromState, openModalFromState }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -12,8 +13,22 @@ const Hero = () => {
   const [districts, setDistricts] = useState([])
   const [loadingStates, setLoadingStates] = useState(false)
   const [loadingDistricts, setLoadingDistricts] = useState(false)
+  const [selectedCollege, setSelectedCollege] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const searchRef = useRef(null)
   const suggestionsRef = useRef(null)
+
+  // Handle opening modal from state (after auth redirect)
+  useEffect(() => {
+    if (openModalFromState && collegeFromState) {
+      setSelectedCollege(collegeFromState)
+      setIsModalOpen(true)
+      // Scroll to top on mobile
+      if (window.innerWidth <= 768) {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+  }, [openModalFromState, collegeFromState])
 
   // Fetch states on component mount
   useEffect(() => {
@@ -127,17 +142,38 @@ const Hero = () => {
   const handleSearch = (e) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      // Handle search submission
-      console.log('Searching for:', searchQuery)
-      setShowSuggestions(false)
+      // If there's a single matching suggestion, open it
+      if (suggestions.length === 1) {
+        openCollegeModal(suggestions[0])
+      } else if (suggestions.length > 0) {
+        // If multiple suggestions, open the first one
+        openCollegeModal(suggestions[0])
+      } else {
+        // If no suggestions, just close dropdown
+        setShowSuggestions(false)
+      }
     }
   }
 
   const handleSuggestionClick = (college) => {
     setSearchQuery(college.name)
     setShowSuggestions(false)
-    // You can navigate to college page or handle selection here
-    console.log('Selected college:', college)
+    openCollegeModal(college)
+  }
+
+  const openCollegeModal = (college) => {
+    setSelectedCollege(college)
+    setIsModalOpen(true)
+    setShowSuggestions(false)
+    // Scroll to top on mobile to ensure modal is visible
+    if (window.innerWidth <= 768) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const closeCollegeModal = () => {
+    setIsModalOpen(false)
+    setSelectedCollege(null)
   }
 
   const handleInputChange = (e) => {
@@ -282,6 +318,13 @@ const Hero = () => {
         <div className="floating-circle circle-2"></div>
         <div className="floating-circle circle-3"></div>
       </div>
+
+      {/* College Profile Modal */}
+      <CollegeProfileModal
+        college={selectedCollege}
+        isOpen={isModalOpen}
+        onClose={closeCollegeModal}
+      />
     </section>
   )
 }
