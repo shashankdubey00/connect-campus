@@ -129,8 +129,38 @@
   gap: 20px;
 }
 
+.navbar-back-btn {
+  position: absolute;
+  left: 20px;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text-active);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  z-index: 1000;
+}
+
+.navbar-back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.navbar-back-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--sidebar-text-active);
+}
+
 .header-logo {
   flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .app-title {
@@ -160,17 +190,21 @@
   max-width: 600px;
   position: relative;
   z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .header-search-form {
   display: flex;
-  gap: 0.5rem;
+  gap: 1rem;
   background: rgba(20, 25, 40, 0.8);
   border: 2px solid rgba(0, 168, 255, 0.3);
   border-radius: 50px;
-  padding: 0.4rem 0.4rem 0.4rem 1.2rem;
+  padding: 0.5rem 0.5rem 0.5rem 1.5rem;
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
+  max-width: 500px;
+  width: 100%;
 }
 
 .header-search-form:focus-within {
@@ -185,14 +219,14 @@
   border: none;
   outline: none;
   color: #e0e0e0;
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.8rem 0;
 }
 
 .header-search-input::placeholder {
   color: #888;
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   opacity: 1;
 }
 
@@ -200,8 +234,8 @@
   background: linear-gradient(135deg, #00a8ff 0%, #00d4aa 100%);
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -220,11 +254,25 @@
   transform: scale(0.95);
 }
 
+.header-search-button .spinner {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .header-suggestions-dropdown {
   position: absolute;
   top: calc(100% + 0.5rem);
-  left: 0;
   right: 0;
+  min-width: 100%;
+  max-width: 500px;
   background: rgba(20, 25, 40, 0.98);
   border: 2px solid rgba(0, 168, 255, 0.3);
   border-radius: 12px;
@@ -599,8 +647,8 @@
   flex-direction: column;
   border-right: 1px solid var(--panel-border);
   margin-left: 80px;
-  margin-top: 110px;
-  height: calc(100vh - 110px);
+  margin-top: 60px;
+  height: calc(100vh - 60px);
   transition: transform 0.3s ease;
 }
 
@@ -610,12 +658,66 @@
   border-bottom: 1px solid var(--panel-border);
 }
 
+.panel-header-with-search {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.panel-header-with-search h2 {
+  color: var(--panel-text);
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+  text-transform: lowercase;
+  flex-shrink: 0;
+}
+
 .panel-header h2 {
   color: var(--panel-text);
   font-size: 20px;
   font-weight: 500;
   margin: 0;
   text-transform: lowercase;
+}
+
+.panel-header-search {
+  flex: 1;
+  position: relative;
+  max-width: 300px;
+}
+
+.panel-search-input {
+  width: 100%;
+  background-color: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  padding: 8px 40px 8px 16px;
+  color: var(--panel-text);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.panel-search-input:focus {
+  border-color: var(--btn-primary);
+  box-shadow: 0 0 0 2px rgba(0, 168, 255, 0.1);
+}
+
+.panel-search-input::placeholder {
+  color: var(--panel-text-secondary);
+}
+
+.panel-search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--panel-text-secondary);
+  pointer-events: none;
+  font-size: 16px;
 }
 
 .empty-chat-list {
@@ -734,7 +836,7 @@
   position: absolute;
   bottom: 0;
   right: 0;
-  background-color: var(--verified-badge);
+  background-color: transparent;
   color: #fff;
   font-size: 12px;
   width: 18px;
@@ -744,6 +846,34 @@
   align-items: center;
   justify-content: center;
   border: 2px solid var(--panel-bg);
+  overflow: hidden;
+}
+
+.verified-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.verified-badge-small {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: transparent;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--panel-bg);
+  overflow: hidden;
+}
+
+.verified-badge-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .panel-item-info {
@@ -782,6 +912,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  min-height: 20px;
 }
 
 .panel-item-message,
@@ -824,7 +955,7 @@
   position: fixed;
   left: 480px;
   right: 0;
-  top: 110px;
+  top: 60px;
   bottom: 0;
   transition: transform 0.3s ease;
 }
@@ -886,6 +1017,44 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.college-profile-back-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  z-index: 10;
+  background-color: transparent;
+}
+
+.college-profile-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--right-text);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.college-profile-back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.college-profile-back-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--right-text);
+}
+
+.college-profile-content-new {
   overflow-y: auto;
   background-color: var(--right-bg);
 }
@@ -1105,6 +1274,12 @@
   background-color: var(--right-bg);
   border-radius: 50%;
   padding: 4px;
+}
+
+.verified-badge-center img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Name and location section */
@@ -1360,6 +1535,36 @@
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--right-border);
+  transition: all 0.3s ease;
+}
+
+.chat-header-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--right-text);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.chat-header-back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-header-back-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--right-text);
+}
+
+.chat-header-bar.action-menu-active {
+  background-color: var(--panel-header-bg);
 }
 
 .chat-header-bar .back-btn {
@@ -1372,6 +1577,11 @@
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.chat-header-avatar:hover {
+  opacity: 0.8;
 }
 
 .chat-header-avatar img {
@@ -1383,6 +1593,11 @@
 .chat-header-info {
   flex: 1;
   min-width: 0;
+  transition: opacity 0.2s;
+}
+
+.chat-header-info:hover {
+  opacity: 0.8;
 }
 
 .chat-header-info h3 {
@@ -1403,6 +1618,91 @@
 .chat-header-actions {
   display: flex;
   gap: 8px;
+}
+
+/* Action Menu (WhatsApp-style) */
+.chat-header-actions-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.action-menu-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--right-text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+.action-menu-btn:hover {
+  background-color: var(--panel-item-hover);
+}
+
+.action-menu-btn:active {
+  transform: scale(0.95);
+}
+
+.action-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.action-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.action-menu-close {
+  margin-left: auto;
+  min-width: auto;
+  padding: 8px;
+}
+
+.action-menu-close .action-label {
+  display: none;
+}
+
+.action-menu-close .action-icon {
+  font-size: 18px;
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+  .chat-header-actions-menu {
+    gap: 12px;
+    padding: 8px 0;
+  }
+
+  .action-menu-btn {
+    min-width: 70px;
+    padding: 10px 8px;
+  }
+
+  .action-icon {
+    font-size: 24px;
+  }
+
+  .action-label {
+    font-size: 10px;
+  }
+
+  .message-content {
+    touch-action: pan-y;
+  }
 }
 
 .action-btn {
@@ -1478,6 +1778,14 @@
   padding: 8px 12px;
   border-radius: 8px;
   position: relative;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+
+.message.selected .message-content {
+  background-color: rgba(0, 168, 255, 0.2) !important;
+  border: 2px solid rgba(0, 168, 255, 0.5) !important;
 }
 
 .own-message .message-content {
@@ -1707,6 +2015,13 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+}
+
+.verified-badge-blue-inline img {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .verified-badge-profile {
@@ -2192,6 +2507,45 @@
   .chat-top-header {
     padding-left: 20px;
     padding-right: 20px;
+    justify-content: space-between;
+  }
+
+  .header-logo {
+    flex-shrink: 0;
+  }
+
+  .app-title {
+    font-size: 16px;
+  }
+
+  .header-search-wrapper {
+    max-width: 250px;
+    flex: 0 1 auto;
+  }
+
+  .header-search-form {
+    max-width: 100%;
+    padding: 0.4rem 0.4rem 0.4rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .header-search-input {
+    font-size: 0.9rem;
+    padding: 0.5rem 0;
+  }
+
+  .header-search-input::placeholder {
+    font-size: 0.9rem;
+  }
+
+  .header-search-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .header-search-button svg {
+    width: 18px;
+    height: 18px;
   }
 
   .middle-panel {
@@ -2449,6 +2803,47 @@
   display: flex;
   flex-direction: column;
   background-color: var(--panel-bg);
+}
+
+.search-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--panel-border);
+  background-color: var(--panel-header-bg);
+}
+
+.search-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--panel-text);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.search-back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.search-back-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--panel-text);
+}
+
+.search-page-title {
+  color: var(--panel-text);
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+  text-transform: lowercase;
 }
 
 /* Center Search (Initial State) */

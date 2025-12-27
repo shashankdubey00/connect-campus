@@ -2,6 +2,7 @@ import express from 'express';
 import Message from '../models/Message.js';
 import { protect } from '../middleware/authMiddleware.js';
 import UserProfile from '../models/UserProfile.js';
+import College from '../../models/College.js';
 
 const router = express.Router();
 
@@ -14,27 +15,9 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     // Decode collegeId from URL
     const decodedCollegeId = decodeURIComponent(collegeId);
 
-    // Verify user belongs to this college
-    const userProfile = await UserProfile.findOne({ userId: req.user.userId });
-    const userCollegeId = userProfile?.college?.aisheCode || userProfile?.college?.name;
-
-    if (!userCollegeId) {
-      return res.status(403).json({
-        success: false,
-        message: 'You must belong to a college to view messages',
-      });
-    }
-
-    // Compare college IDs (handle both encoded and decoded)
-    if (decodedCollegeId !== userCollegeId && collegeId !== userCollegeId) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only view messages from your own college',
-      });
-    }
-
-    // Use the user's college ID for query (most reliable)
-    const queryCollegeId = userCollegeId;
+    // Allow users to view messages from any college
+    // Use the requested college ID for query
+    const queryCollegeId = decodedCollegeId;
 
     // Build query
     const query = { collegeId: queryCollegeId };
@@ -65,6 +48,72 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching messages',
+      error: error.message,
+    });
+  }
+});
+
+// Get all colleges where user has sent or received messages
+router.get('/user/colleges', protect, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find all distinct collegeIds where messages exist
+    // Since users can see all college chats, get all colleges with messages
+    const collegeIds = await Message.distinct('collegeId');
+
+    // If no messages found, return empty array
+    if (collegeIds.length === 0) {
+      return res.json({
+        success: true,
+        colleges: []
+      });
+    }
+
+    // Fetch college details for each collegeId
+    const colleges = await College.find({
+      $or: [
+        { aisheCode: { $in: collegeIds } },
+        { name: { $in: collegeIds } }
+      ]
+    }).lean();
+
+    // Get last message for each college
+    const collegesWithMessages = await Promise.all(
+      colleges.map(async (college) => {
+        const collegeId = college.aisheCode || college.name;
+        
+        // Get last message for this college
+        const lastMessage = await Message.findOne({ collegeId })
+          .sort({ timestamp: -1 })
+          .lean();
+
+        return {
+          id: college._id.toString(),
+          aisheCode: college.aisheCode,
+          name: college.name,
+          state: college.state,
+          district: college.district,
+          logo: college.logo,
+          lastMessage: lastMessage ? {
+            text: lastMessage.text,
+            timestamp: lastMessage.timestamp,
+            senderId: lastMessage.senderId.toString(),
+            senderName: lastMessage.senderName
+          } : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      colleges: collegesWithMessages
+    });
+  } catch (error) {
+    console.error('Error fetching user colleges:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching colleges with messages',
       error: error.message,
     });
   }

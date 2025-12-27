@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
-import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners } from '../services/socketService'
-import { fetchMessages } from '../services/messageService'
+import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom } from '../services/socketService'
+import { fetchMessages, fetchUserCollegesWithMessages } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege } from '../services/profileService'
 import './Chat.css'
@@ -46,6 +46,7 @@ const Chat = () => {
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
+  const navigationHistory = useRef([]) // Track navigation history for back button
 
   // Load user data and connect Socket.IO
   useEffect(() => {
@@ -63,7 +64,21 @@ const Chat = () => {
             const socketInstance = connectSocket();
             
             if (socketInstance) {
-              // Set up Socket.IO listeners
+              // Wait for connection to be established
+              socketInstance.once('connect', () => {
+                console.log('✅ Socket.IO connected on initial load')
+                
+                // Set up Socket.IO listeners
+                onJoinedRoom((data) => {
+                  console.log('✅ Joined college room:', data);
+                });
+                
+                onSocketError((error) => {
+                  console.error('Socket error:', error);
+                });
+              })
+              
+              // Set up listeners even if not connected yet
               onJoinedRoom((data) => {
                 console.log('✅ Joined college room:', data);
               });
@@ -71,9 +86,8 @@ const Chat = () => {
               onSocketError((error) => {
                 console.error('Socket error:', error);
               });
-
-              // Listen for new messages to update chat list
-              // This will be set up after handleNewMessage is defined
+            } else {
+              console.log('Socket.IO connection will be retried when needed')
             }
           } catch (socketError) {
             console.log('Socket.IO connection will be retried later:', socketError.message)
@@ -82,6 +96,14 @@ const Chat = () => {
           // Load user's college chat
           if (data.user?.profile?.college) {
             loadUserCollegeChat(data.user.profile.college);
+          }
+
+          // Load all colleges with messages (for chats section)
+          if (activeSection === 'chats') {
+            // Will be loaded via handleSectionChange or directly here
+            setTimeout(() => {
+              // Load after a short delay to ensure state is ready
+            }, 100)
           }
 
           // Load verification status (optional, don't block on error)
@@ -186,16 +208,51 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Use ref to track if navigation state has been handled for current location
+  const navigationStateHandled = useRef(null)
+
   // Handle college from navigation state (after user is loaded)
   useEffect(() => {
-    if (user && !isLoading && location.state?.college && location.state?.openCollegeChat) {
+    // Only handle navigation state once when user is loaded
+    if (!user || isLoading) {
+      return
+    }
+
+    // Check if we have navigation state to handle
+    const hasNavigationState = location.state?.college && location.state?.openCollegeChat
+    
+    if (!hasNavigationState) {
+      // Reset when there's no navigation state
+      navigationStateHandled.current = null
+      return
+    }
+
+    // Create a unique key for this navigation state using location.key (changes on navigation)
+    const locationKey = location.key || location.pathname
+    const collegeId = location.state.college?.aisheCode || location.state.college?.name || 'unknown'
+    const navigationKey = `${collegeId}-${locationKey}`
+    
+    // Only handle if we haven't handled this specific navigation state yet
+    if (navigationStateHandled.current === navigationKey) {
+      return
+    }
+
+    // Mark as handled immediately to prevent re-running
+    navigationStateHandled.current = navigationKey
+
+    // Don't open chat if we're currently viewing a profile (search or right panel)
+    const isViewingProfile = (activeSection === 'search' && selectedCollegeInSearch) || 
+                             (view === 'college-profile' && selectedCollege)
+    
+    if (!isViewingProfile) {
       const college = location.state.college
       console.log('Opening college chat from navigation:', college)
       handleOpenCollegeChat(college)
-      // Clear the state to prevent reopening on re-render
-      window.history.replaceState({}, document.title)
     }
-  }, [user, isLoading, location.state])
+    
+    // Clear the state to prevent reopening on re-render
+    window.history.replaceState({}, document.title)
+  }, [user, isLoading, location.key, location.pathname]) // Include location.key to detect navigation changes
 
   // Fetch states
   const fetchStates = async () => {
@@ -254,20 +311,20 @@ const Chat = () => {
 
   // Handle college suggestion click
   const handleCollegeSuggestionClick = (college) => {
-    setCollegeSearchQuery(college.name)
-    setShowCollegeSuggestions(false)
-    
-    // Save to recent searches
-    const recent = [college, ...recentCollegeSearches.filter(c => c.aisheCode !== college.aisheCode)].slice(0, 5)
-    setRecentCollegeSearches(recent)
-    localStorage.setItem('recentCollegeSearches', JSON.stringify(recent))
-    
-    // If in search view, show profile in search panel
+    // If in search view, show profile in search panel (don't save state for this)
     if (activeSection === 'search') {
+      setCollegeSearchQuery(college.name)
+      setShowCollegeSuggestions(false)
       setSelectedCollegeInSearch(college)
       setSearchBarAtTop(true)
+      
+      // Save to recent searches
+      const recent = [college, ...recentCollegeSearches.filter(c => c.aisheCode !== college.aisheCode)].slice(0, 5)
+      setRecentCollegeSearches(recent)
+      localStorage.setItem('recentCollegeSearches', JSON.stringify(recent))
     } else {
-      // Otherwise, open college profile in main chat section
+      // Otherwise, open college profile in main chat section (save state)
+      saveNavigationState()
       handleViewCollegeProfile(college)
     }
   }
@@ -392,12 +449,188 @@ const Chat = () => {
     setTotalUnreadCount(total)
   }, [chats])
 
+  // Load all colleges with messages
+  const loadAllCollegesWithMessages = useCallback(async () => {
+    try {
+      const response = await fetchUserCollegesWithMessages()
+      if (response.success && response.colleges) {
+        // Convert colleges to chat format
+        const newChats = response.colleges.map(college => {
+          const collegeId = college.aisheCode || college.name
+          const collegeName = college.name || 'College Chat'
+          const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+          
+          return {
+            id: `college-${collegeId}`,
+            type: 'college',
+            collegeId: collegeId,
+            name: collegeName,
+            lastMessage: college.lastMessage?.text || 'No messages yet',
+            timestamp: college.lastMessage?.timestamp ? formatChatTimestamp(college.lastMessage.timestamp) : '',
+            unreadCount: unreadCounts[collegeId] || 0,
+            onlineCount: 0,
+            avatar: collegeLogo,
+            college: {
+              id: college.id,
+              aisheCode: college.aisheCode,
+              name: college.name,
+              state: college.state,
+              district: college.district,
+              logo: college.logo
+            },
+            lastMessageTime: college.lastMessage?.timestamp || null
+          }
+        })
+
+        // Merge with existing chats, updating existing ones and adding new ones
+        setChats(prev => {
+          const existingMap = new Map(prev.map(c => [c.id, c]))
+          
+          // Update existing chats or add new ones
+          newChats.forEach(newChat => {
+            const existing = existingMap.get(newChat.id)
+            if (existing) {
+              // Update existing chat with latest message info, but preserve unread count
+              existingMap.set(newChat.id, {
+                ...existing,
+                lastMessage: newChat.lastMessage,
+                timestamp: newChat.timestamp,
+                lastMessageTime: newChat.lastMessageTime,
+                avatar: newChat.avatar,
+                college: newChat.college
+              })
+            } else {
+              // Add new chat
+              existingMap.set(newChat.id, newChat)
+            }
+          })
+          
+          // Convert back to array and sort by last message time
+          const combined = Array.from(existingMap.values()).sort((a, b) => {
+            const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
+            const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
+            return timeB - timeA // Most recent first
+          })
+          
+          return combined
+        })
+      }
+    } catch (error) {
+      console.error('Error loading colleges with messages:', error)
+    }
+  }, [unreadCounts])
+
+  // Load all colleges with messages when component mounts and user is loaded
+  useEffect(() => {
+    if (user && activeSection === 'chats' && !isLoading) {
+      loadAllCollegesWithMessages()
+    }
+  }, [user, activeSection, isLoading, loadAllCollegesWithMessages])
+
+  // Save current navigation state to history
+  const saveNavigationState = () => {
+    const currentState = {
+      activeSection,
+      view,
+      selectedChat: selectedChat ? { id: selectedChat.id, collegeId: selectedChat.collegeId } : null,
+      selectedCollege: selectedCollege ? { id: selectedCollege.id, aisheCode: selectedCollege.aisheCode, name: selectedCollege.name } : null,
+      selectedCollegeInSearch: selectedCollegeInSearch ? { id: selectedCollegeInSearch.id, aisheCode: selectedCollegeInSearch.aisheCode, name: selectedCollegeInSearch.name } : null,
+      isSearchActive,
+      searchBarAtTop,
+      showChatList
+    }
+    navigationHistory.current.push(currentState)
+    // Keep only last 10 states to prevent memory issues
+    if (navigationHistory.current.length > 10) {
+      navigationHistory.current.shift()
+    }
+  }
+
+  // Navigate back to previous page
+  const navigateBack = () => {
+    if (navigationHistory.current.length > 0) {
+      const previousState = navigationHistory.current.pop()
+      
+      // Restore previous state
+      setActiveSection(previousState.activeSection)
+      setView(previousState.view)
+      
+      // Restore selectedChat if it exists in current chats
+      if (previousState.selectedChat) {
+        const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
+        setSelectedChat(restoredChat || null)
+      } else {
+        setSelectedChat(null)
+      }
+      
+      // Restore selectedCollege - try to find it from chats or keep the saved reference
+      if (previousState.selectedCollege) {
+        // Try to find college from chats first
+        const chatWithCollege = chats.find(c => 
+          c.college && (
+            c.college.aisheCode === previousState.selectedCollege.aisheCode ||
+            c.college.name === previousState.selectedCollege.name
+          )
+        )
+        if (chatWithCollege && chatWithCollege.college) {
+          setSelectedCollege(chatWithCollege.college)
+        } else {
+          // Use the saved college data
+          setSelectedCollege(previousState.selectedCollege)
+        }
+      } else {
+        setSelectedCollege(null)
+      }
+      
+      setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
+      setIsSearchActive(previousState.isSearchActive || false)
+      setSearchBarAtTop(previousState.searchBarAtTop || false)
+      setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
+      
+      // If going back to chats, load messages
+      if (previousState.activeSection === 'chats') {
+        loadAllCollegesWithMessages()
+      }
+    } else {
+      // If no history, go to home
+      navigateToHome()
+    }
+  }
+
+  // Helper function to navigate to home page
+  const navigateToHome = () => {
+    setActiveSection('chats')
+    setView('list')
+    setSelectedChat(null)
+    setSelectedCollege(null)
+    setSelectedCollegeInSearch(null)
+    setIsSearchActive(false)
+    setSearchBarAtTop(false)
+    setCollegeSearchQuery('')
+    setShowCollegeSuggestions(false)
+    if (isMobileView) {
+      setShowChatList(true)
+    }
+    loadAllCollegesWithMessages()
+  }
+
   // Handle section change
   const handleSectionChange = (section) => {
     setActiveSection(section)
     setView('list')
     setSelectedChat(null)
     setSelectedCollege(null)
+    
+    // Show chat list on mobile when switching to chats section
+    if (section === 'chats' && isMobileView) {
+      setShowChatList(true)
+    }
+    
+    // Load all colleges with messages when switching to chats section
+    if (section === 'chats') {
+      loadAllCollegesWithMessages()
+    }
+    
     if (section !== 'search') {
       setIsSearchActive(false)
       setSearchBarAtTop(false)
@@ -409,6 +642,7 @@ const Chat = () => {
 
   // Handle chat selection
   const handleChatSelect = (chat) => {
+    saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
     
     // Reset unread count for this chat
@@ -441,6 +675,7 @@ const Chat = () => {
 
   // Handle college profile view
   const handleViewCollegeProfile = (college) => {
+    saveNavigationState() // Save current state before navigating
     setSelectedCollege(college)
     setView('college-profile')
     if (isMobileView) {
@@ -450,6 +685,7 @@ const Chat = () => {
 
   // Handle join live chat
   const handleJoinLiveChat = (college) => {
+    saveNavigationState() // Save current state before navigating
     const collegeId = college.aisheCode || college.name || college.id
     // Find chat in the actual chats state
     const chat = chats.find(c => 
@@ -475,13 +711,13 @@ const Chat = () => {
     try {
       const response = await leaveCollege(college)
       if (response.success) {
-        // Remove the college chat from the list
-        setChats(prev => prev.filter(c => c.collegeId !== (college.aisheCode || college.name)))
-        // Clear selected chat if it's the one being left
-        if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
-          setSelectedChat(null)
-          setView('list')
-        }
+        // Don't remove the college chat from the list - keep it accessible
+        // User can still view and participate in the chat even after unfollowing
+        // Clear selected chat if it's the one being left (optional)
+        // if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
+        //   setSelectedChat(null)
+        //   setView('list')
+        // }
       }
       return response
     } catch (error) {
@@ -492,6 +728,7 @@ const Chat = () => {
 
   // Handle profile click
   const handleProfileClick = () => {
+    saveNavigationState() // Save current state before navigating
     setView('student-profile')
     if (isMobileView) {
       setShowChatList(false)
@@ -554,6 +791,13 @@ const Chat = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
+  // Helper function to truncate message preview
+  const truncateMessage = (text, maxLength = 50) => {
+    if (!text) return 'No messages yet'
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength) + '...'
+  }
+
   // Load user's college chat
   const loadUserCollegeChat = async (college) => {
     if (!college?.aisheCode && !college?.name) return
@@ -596,40 +840,29 @@ const Chat = () => {
     }
   }
 
-  // Handle new message - update chat list
-  const handleNewMessage = useCallback((message) => {
-    const collegeId = message.collegeId
-    
+  // Update chat list when message is sent or received
+  const updateChatListOnMessage = useCallback((collegeId, messageText, messageTimestamp, isOwnMessage = false) => {
     setChats(prev => {
       const chatIndex = prev.findIndex(c => c.collegeId === collegeId)
       
       if (chatIndex === -1) {
-        // Chat doesn't exist, create it
-        const college = user?.profile?.college
-        if (college && (college.aisheCode === collegeId || college.name === collegeId)) {
-          const collegeName = college.name || 'College Chat'
-          const collegeLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+        // Chat doesn't exist, try to find college data
+        const existingChat = prev.find(c => c.college?.aisheCode === collegeId || c.college?.name === collegeId)
+        if (existingChat) {
+          // Use existing chat data
+          const updatedChats = [...prev]
+          const chat = { ...existingChat }
+          chat.lastMessage = truncateMessage(messageText)
+          chat.timestamp = formatChatTimestamp(messageTimestamp)
+          chat.lastMessageTime = messageTimestamp
+          chat.unreadCount = isOwnMessage || selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0)
           
-          const newChat = {
-            id: `college-${collegeId}`,
-            type: 'college',
-            collegeId: collegeId,
-            name: collegeName,
-            lastMessage: message.text,
-            timestamp: formatChatTimestamp(message.timestamp),
-            unreadCount: selectedChat?.collegeId === collegeId ? 0 : 1,
-            onlineCount: 0,
-            avatar: collegeLogo,
-            college: college,
-            lastMessageTime: message.timestamp
-          }
-          
-          return [newChat, ...prev].sort((a, b) => {
-            const timeA = a.lastMessageTime || a.timestamp || 0
-            const timeB = b.lastMessageTime || b.timestamp || 0
-            return new Date(timeB) - new Date(timeA)
-          })
+          // Move to top
+          updatedChats.splice(prev.findIndex(c => c.id === existingChat.id), 1)
+          updatedChats.unshift(chat)
+          return updatedChats
         }
+        // If still not found, return unchanged (chat will be created when opened)
         return prev
       }
       
@@ -638,29 +871,44 @@ const Chat = () => {
       const chat = { ...updatedChats[chatIndex] }
       
       // Update last message and timestamp
-      chat.lastMessage = message.text
-      chat.timestamp = formatChatTimestamp(message.timestamp)
-      chat.lastMessageTime = message.timestamp
+      chat.lastMessage = truncateMessage(messageText)
+      chat.timestamp = formatChatTimestamp(messageTimestamp)
+      chat.lastMessageTime = messageTimestamp
       
-      // Increment unread count if chat is not currently open
-      if (selectedChat?.collegeId !== collegeId) {
+      // Only increment unread count if:
+      // 1. Message is not from current user
+      // 2. Chat is not currently open
+      if (!isOwnMessage && selectedChat?.collegeId !== collegeId) {
         chat.unreadCount = (chat.unreadCount || 0) + 1
         setUnreadCounts(prev => ({
           ...prev,
           [collegeId]: (prev[collegeId] || 0) + 1
         }))
       } else {
-        // Reset unread if chat is open
+        // Reset unread if chat is open or message is from user
         chat.unreadCount = 0
+        setUnreadCounts(prev => ({
+          ...prev,
+          [collegeId]: 0
+        }))
       }
       
-      // Move chat to top
+      // Move chat to top (most recent first)
       updatedChats.splice(chatIndex, 1)
       updatedChats.unshift(chat)
       
       return updatedChats
     })
-  }, [user, selectedChat])
+  }, [selectedChat])
+
+  // Handle new message - update chat list
+  const handleNewMessage = useCallback((message) => {
+    const collegeId = message.collegeId
+    const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
+    
+    // Update chat list
+    updateChatListOnMessage(collegeId, message.text, message.timestamp, isOwnMessage)
+  }, [user, updateChatListOnMessage])
 
   // Set up Socket.IO message listener after handleNewMessage is defined
   useEffect(() => {
@@ -674,21 +922,41 @@ const Chat = () => {
     }
   }, [handleNewMessage])
 
-  // Filter chats based on search
-  const filteredChats = chats.filter(chat => 
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ).sort((a, b) => {
-    // Sort by last message time (most recent first)
-    const timeA = a.lastMessageTime || a.timestamp || 0
-    const timeB = b.lastMessageTime || b.timestamp || 0
-    return new Date(timeB) - new Date(timeA)
-  })
+  // Filter and sort chats based on search and last message time
+  const filteredChats = chats
+    .filter(chat => chat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      // Sort by last message time (most recent first)
+      // If both have lastMessageTime, use that
+      // Otherwise fall back to timestamp or 0
+      const timeA = a.lastMessageTime 
+        ? new Date(a.lastMessageTime).getTime() 
+        : (a.timestamp ? new Date(a.timestamp).getTime() : 0)
+      const timeB = b.lastMessageTime 
+        ? new Date(b.lastMessageTime).getTime() 
+        : (b.timestamp ? new Date(b.timestamp).getTime() : 0)
+      
+      // Most recent first
+      if (timeB !== timeA) {
+        return timeB - timeA
+      }
+      
+      // If times are equal, prioritize chats with unread messages
+      return (b.unreadCount || 0) - (a.unreadCount || 0)
+    })
 
   // Render middle panel content based on active section
   const renderMiddlePanel = () => {
     if (activeSection === 'search') {
       return (
         <div className="search-view-container">
+          {/* Search page header with back button and title - only show when search bar is not at top */}
+          {!searchBarAtTop && (
+            <div className="view-header">
+              <button className="back-btn" onClick={navigateBack}>←</button>
+              <h2>Search Colleges</h2>
+            </div>
+          )}
           {!searchBarAtTop && (
             <div className="search-center-container">
               <div className="search-center-form">
@@ -738,12 +1006,16 @@ const Chat = () => {
                     className="search-back-btn"
                     onClick={() => {
                       if (selectedCollegeInSearch) {
+                        // If viewing a college profile, go back to search suggestions
                         setSelectedCollegeInSearch(null)
                         setShowCollegeSuggestions(true)
-                      } else {
-                        setSearchBarAtTop(false)
+                      } else if (collegeSearchQuery.trim().length > 0) {
+                        // If there's a search query, clear it and stay in search mode
                         setCollegeSearchQuery('')
                         setShowCollegeSuggestions(false)
+                      } else {
+                        // If no query, navigate back to previous page
+                        navigateBack()
                       }
                     }}
                   >
@@ -788,7 +1060,8 @@ const Chat = () => {
                     <CollegeProfileView 
                       college={selectedCollegeInSearch} 
                       user={user}
-                      showBackButton={false}
+                      onBack={navigateBack}
+                      showBackButton={true}
                       onJoinChat={() => {
                         // Open chat in the right panel (same chat section)
                         handleJoinLiveChat(selectedCollegeInSearch)
@@ -801,6 +1074,9 @@ const Chat = () => {
                       }}
                       onJoinCampus={async (college) => {
                         try {
+                          // Clear navigation state immediately to prevent auto-opening chat
+                          window.history.replaceState({}, document.title)
+                          
                           // Add student as member of college
                           const response = await joinCollege(college)
                           if (response.success) {
@@ -810,11 +1086,20 @@ const Chat = () => {
                               setUser(userResponse.user)
                             }
                             // Update selected college in search with incremented member count
+                            // Keep the same college object to maintain the profile view
                             const updatedCollege = {
                               ...college,
                               totalMembers: (college.totalMembers || 0) + 1
                             }
+                            // Ensure we stay on the search section and keep the profile view
+                            // Explicitly prevent any navigation to chat
+                            setActiveSection('search')
                             setSelectedCollegeInSearch(updatedCollege)
+                            // Make sure we don't open the chat
+                            if (view === 'live-chat') {
+                              setView('list')
+                            }
+                            // Don't change selectedChat - keep it as is
                             
                             // Add college to chats list in home section if not already there
                             const collegeId = college.aisheCode || college.name
@@ -851,6 +1136,9 @@ const Chat = () => {
                       }}
                       onLeaveCampus={async (college) => {
                         try {
+                          // Clear navigation state immediately to prevent auto-opening chat
+                          window.history.replaceState({}, document.title)
+                          
                           const response = await leaveCollege(college)
                           if (response.success) {
                             // Reload user to get updated college membership info
@@ -859,27 +1147,29 @@ const Chat = () => {
                               setUser(userResponse.user)
                             }
                             // Update selected college in search with decremented member count
+                            // Keep the same college object to maintain the profile view
                             const updatedCollege = {
                               ...college,
                               totalMembers: Math.max((college.totalMembers || 1) - 1, 0)
                             }
+                            // Ensure we stay on the search section and keep the profile view
+                            // Explicitly prevent any navigation to chat
+                            setActiveSection('search')
                             setSelectedCollegeInSearch(updatedCollege)
+                            // Make sure we don't open the chat
+                            if (view === 'live-chat') {
+                              setView('list')
+                            }
+                            // Don't change selectedChat - keep it as is
                             
-                            // Remove college from chats list
-                            const collegeId = college.aisheCode || college.name
-                            setChats(prev => prev.filter(c => 
-                              !(c.type === 'college' && (c.collegeId === collegeId || c.name === college.name))
-                            ))
+                            // Don't remove college from chats list - keep it so user can still access the chat
+                            // Only remove if user explicitly wants to leave the chat
                           }
                           return response
                         } catch (error) {
                           console.error('Error leaving college:', error)
                           return { success: false, message: error.message }
                         }
-                      }}
-                      onBack={() => {
-                        setSelectedCollegeInSearch(null)
-                        setShowCollegeSuggestions(true)
                       }}
                     />
                   </div>
@@ -903,7 +1193,9 @@ const Chat = () => {
                           >
                             <div className="search-result-avatar">
                               <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
-                              {college.isVerified && <span className="verified-badge-small">✓</span>}
+                              <span className="verified-badge-small">
+                                <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                              </span>
                             </div>
                             <div className="search-result-info">
                               <div className="search-result-name">{college.name}</div>
@@ -925,7 +1217,9 @@ const Chat = () => {
                           >
                             <div className="search-result-avatar">
                               <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
-                              {college.isVerified && <span className="verified-badge-small">✓</span>}
+                              <span className="verified-badge-small">
+                                <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                              </span>
                             </div>
                             <div className="search-result-info">
                               <div className="search-result-name">{college.name}</div>
@@ -954,8 +1248,18 @@ const Chat = () => {
     if (activeSection === 'chats') {
       return (
         <>
-          <div className="panel-header">
+          <div className="panel-header panel-header-with-search">
             <h2>all chats</h2>
+            <div className="panel-header-search">
+              <input
+                type="text"
+                className="panel-search-input"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <span className="panel-search-icon">🔍</span>
+            </div>
           </div>
           <div className="panel-list">
             {filteredChats.length === 0 ? (
@@ -973,6 +1277,11 @@ const Chat = () => {
                 >
                   <div className="panel-item-avatar">
                     <img src={chat.avatar} alt={chat.name} />
+                    {chat.type === 'college' && (
+                      <span className="verified-badge">
+                        <img src="/blutick.jpg" alt="Verified" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                      </span>
+                    )}
                     {chat.isOnline && (
                       <span className="online-dot"></span>
                     )}
@@ -987,9 +1296,9 @@ const Chat = () => {
                       </span>
                     </div>
                     <div className="panel-item-preview">
-                      <span className="panel-item-message">{chat.lastMessage || 'No messages yet'}</span>
+                      <span className="panel-item-message">{truncateMessage(chat.lastMessage) || 'No messages yet'}</span>
                       {chat.unreadCount > 0 && (
-                        <span className="panel-item-unread">{chat.unreadCount}</span>
+                        <span className="panel-item-unread">{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</span>
                       )}
                     </div>
                   </div>
@@ -1014,7 +1323,9 @@ const Chat = () => {
               >
                 <div className="panel-item-avatar">
                   <img src={college.logo} alt={college.name} />
-                  {college.isVerified && <span className="verified-badge">✓</span>}
+                  <span className="verified-badge">
+                    <img src="/blutick.jpg" alt="Verified" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                  </span>
                 </div>
                 <div className="panel-item-info">
                   <div className="panel-item-header">
@@ -1040,9 +1351,13 @@ const Chat = () => {
       return <CollegeProfileView 
         college={selectedCollege} 
         user={user}
+        onBack={navigateBack}
         onJoinChat={() => handleJoinLiveChat(selectedCollege)} 
         onJoinCampus={async (college) => {
           try {
+            // Clear navigation state immediately to prevent auto-opening chat
+            window.history.replaceState({}, document.title)
+            
             // Add student as member of college
             const response = await joinCollege(college)
             if (response.success) {
@@ -1052,11 +1367,19 @@ const Chat = () => {
                 setUser(userResponse.user)
               }
               // Update selectedCollege with incremented member count
+              // Keep the same college object to maintain the profile view
               const updatedCollege = {
                 ...college,
                 totalMembers: (college.totalMembers || 0) + 1
               }
+              // Ensure we stay on the college profile view
+              // Explicitly prevent any navigation to chat
+              setView('college-profile')
               setSelectedCollege(updatedCollege)
+              // Make sure we don't open the chat - clear selectedChat if it was set
+              if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
+                // Keep selectedChat as is, but ensure view stays on profile
+              }
               
               // Add college to chats list in home section if not already there
               const collegeId = college.aisheCode || college.name
@@ -1093,6 +1416,9 @@ const Chat = () => {
         }}
         onLeaveCampus={async (college) => {
           try {
+            // Clear navigation state immediately to prevent auto-opening chat
+            window.history.replaceState({}, document.title)
+            
             const response = await leaveCollege(college)
             if (response.success) {
               // Reload user to get updated college membership info
@@ -1101,22 +1427,24 @@ const Chat = () => {
                 setUser(userResponse.user)
               }
               // Update selectedCollege with decremented member count
+              // Keep the same college object to maintain the profile view
               const updatedCollege = {
                 ...college,
                 totalMembers: Math.max((college.totalMembers || 1) - 1, 0)
               }
+              // Ensure we stay on the college profile view
+              // Explicitly prevent any navigation to chat
+              setView('college-profile')
               setSelectedCollege(updatedCollege)
+              // Make sure we don't open the chat
               
-              // Remove college from chats list
-              const collegeId = college.aisheCode || college.name
-              setChats(prev => prev.filter(c => 
-                !(c.type === 'college' && (c.collegeId === collegeId || c.name === college.name))
-              ))
+              // Don't remove college from chats list - keep it so user can still access the chat
+              // Only remove if user explicitly wants to leave the chat
               
-              // Clear selected chat if it's the one being left
+              // Clear selected chat if it's the one being left (but keep profile view)
               if (selectedChat?.collegeId === collegeId) {
                 setSelectedChat(null)
-                setView('list')
+                // Don't change view - stay on profile
               }
             }
             return response
@@ -1125,14 +1453,14 @@ const Chat = () => {
             return { success: false, message: error.message }
           }
         }}
-        onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} 
+        onBack={navigateBack} 
       />
     }
     if (view === 'live-chat' && selectedChat) {
       const college = selectedChat.type === 'college' 
         ? selectedChat.college
         : null
-      return <LiveChatView chat={selectedChat} college={college} user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onViewProfile={() => college && handleViewCollegeProfile(college)} />
+      return <LiveChatView chat={selectedChat} college={college} user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onViewProfile={() => college && handleViewCollegeProfile(college)} onMessageSent={updateChatListOnMessage} />
     }
     if (view === 'student-profile') {
       // Ensure handleLeaveCampus is defined
@@ -1141,11 +1469,12 @@ const Chat = () => {
         try {
           const response = await leaveCollege(college)
           if (response.success) {
-            setChats(prev => prev.filter(c => c.collegeId !== (college.aisheCode || college.name)))
-            if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
-              setSelectedChat(null)
-              setView('list')
-            }
+            // Don't remove college chat - keep it accessible
+            // setChats(prev => prev.filter(c => c.collegeId !== (college.aisheCode || college.name)))
+            // if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
+            //   setSelectedChat(null)
+            //   setView('list')
+            // }
           }
           return response
         } catch (error) {
@@ -1157,7 +1486,7 @@ const Chat = () => {
       return <StudentProfileView 
         user={user} 
         verificationStatus={verificationStatus} 
-        onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} 
+        onBack={navigateBack} 
         onVerificationUpdate={loadVerificationStatus}
         onProfileUpdate={async () => {
           try {
@@ -1173,7 +1502,7 @@ const Chat = () => {
       />
     }
     if (view === 'settings') {
-      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} onLogout={handleLogout} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} />
+      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} onLogout={handleLogout} onBack={navigateBack} />
     }
     return (
       <div className="right-panel-placeholder">
@@ -1213,6 +1542,7 @@ const Chat = () => {
         <div className="header-logo">
           <h1 className="app-title">connect campus</h1>
         </div>
+        {/* Search bar on the right side - same as landing page */}
         {!isMobileView && (
           <div className="header-search-wrapper">
             <form 
@@ -1222,21 +1552,32 @@ const Chat = () => {
               <input
                 type="text"
                 className="header-search-input"
-                placeholder="explore more colleges......"
+                placeholder="search you college...."
                 value={collegeSearchQuery}
-              onChange={(e) => {
-                setCollegeSearchQuery(e.target.value)
-                // Search is handled by useEffect when collegeSearchQuery changes
-              }}
+                onChange={(e) => {
+                  setCollegeSearchQuery(e.target.value)
+                }}
                 onFocus={() => {
                   if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
                     setShowCollegeSuggestions(true)
                   }
                 }}
                 ref={collegeSearchRef}
+                autoComplete="off"
               />
               <button type="submit" className="header-search-button">
-                <span>🔍</span>
+                {loadingCollegeSearch ? (
+                  <svg className="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">
+                      <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
+                      <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite"/>
+                    </circle>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
               </button>
             </form>
             {showCollegeSuggestions && (collegeSuggestions.length > 0 || recentCollegeSearches.length > 0) && (
@@ -1250,7 +1591,9 @@ const Chat = () => {
                     >
                       <div className="suggestion-avatar">
                         <img src={college.logo} alt={college.name} />
-                        {college.isVerified && <span className="verified-badge-small">✓</span>}
+                        <span className="verified-badge-small">
+                          <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                        </span>
                       </div>
                       <div className="suggestion-info">
                         <div className="suggestion-name">{college.name}</div>
@@ -1267,7 +1610,9 @@ const Chat = () => {
                     >
                       <div className="suggestion-avatar">
                         <img src={college.logo} alt={college.name} />
-                        {college.isVerified && <span className="verified-badge-small">✓</span>}
+                        <span className="verified-badge-small">
+                          <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                        </span>
                       </div>
                       <div className="suggestion-info">
                         <div className="suggestion-name">{college.name}</div>
@@ -1292,19 +1637,6 @@ const Chat = () => {
           <div className="profile-name-sidebar">{getUserDisplayName()}</div>
         </div>
         
-        {/* Search Chat Input */}
-        {activeSection === 'chats' && (
-          <div className="sidebar-search-chat">
-            <input
-              type="text"
-              className="sidebar-search-input"
-              placeholder="search chat..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        )}
-        
         <div className="sidebar-divider"></div>
         
         {/* Chat List / Content */}
@@ -1323,7 +1655,12 @@ const Chat = () => {
           </button>
           <button
             className={`sidebar-bottom-item ${activeSection === 'settings' ? 'active' : ''}`}
-            onClick={() => { setActiveSection('settings'); setView('settings'); if (isMobileView) setShowChatList(false) }}
+            onClick={() => { 
+              saveNavigationState() // Save current state before navigating
+              setActiveSection('settings')
+              setView('settings')
+              if (isMobileView) setShowChatList(false)
+            }}
             title="Settings"
           >
             <span className="bottom-item-label">SETTING</span>
@@ -1346,7 +1683,9 @@ const Chat = () => {
         <div className="mobile-bottom-nav">
           <button
             className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
-            onClick={() => { handleSectionChange('chats'); setView('list') }}
+            onClick={() => { 
+              handleSectionChange('chats')
+            }}
             title="Home"
           >
             <span className="mobile-nav-icon">🏠</span>
@@ -1355,6 +1694,7 @@ const Chat = () => {
           <button
             className={`mobile-nav-item ${isSearchActive ? 'active' : ''}`}
             onClick={() => {
+              saveNavigationState() // Save current state before navigating
               setIsSearchActive(true)
               setShowChatList(true)
               setView('list')
@@ -1406,7 +1746,8 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
   const [collegeData, setCollegeData] = useState(college) // Local state for college data
   const [isJoining, setIsJoining] = useState(false)
 
-  // Check if user is a member of this college
+  // Check if user is a member of this college (for UI display only - Join College vs Unfollow button)
+  // Note: Chat access is always available regardless of membership status
   const isMember = user?.profile?.college && (
     user.profile.college.aisheCode === college.aisheCode || 
     user.profile.college.name === college.name
@@ -1432,7 +1773,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
   }
 
   // Handle join campus with member addition
-  const handleJoinCampus = async () => {
+  const handleJoinCampus = async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     if (isJoining || isMember) return // Prevent multiple clicks
     
     setIsJoining(true)
@@ -1452,24 +1797,13 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
           (m.name === userMember.name && m.avatar === userMember.avatar)
         )
         if (!exists) {
-          return [userMember, ...prev]
-        }
-        return prev
-      })
-      
-      // Increment total members count (only if not already counted)
-      setCollegeData(prev => {
-        const currentCount = prev.totalMembers || 0
-        // Check if user is already in members to avoid double counting
-        const userAlreadyInMembers = members.some(m => 
-          m.id === userMember.id || 
-          (m.name === userMember.name && m.avatar === userMember.avatar)
-        )
-        if (!userAlreadyInMembers) {
-          return {
-            ...prev,
-            totalMembers: currentCount + 1
-          }
+          const newMembers = [userMember, ...prev]
+          // Update totalMembers to match actual members count
+          setCollegeData(prevData => ({
+            ...prevData,
+            totalMembers: newMembers.length
+          }))
+          return newMembers
         }
         return prev
       })
@@ -1478,7 +1812,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
   }
 
   // Handle leave campus with member removal
-  const handleLeaveCampus = async () => {
+  const handleLeaveCampus = async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     if (isJoining || !isMember) return // Prevent multiple clicks
     
     setIsJoining(true)
@@ -1489,15 +1827,17 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
         const userId = user?.id || user?._id
         const userName = getUserDisplayName()
         
-        setMembers(prev => prev.filter(m => 
-          m.id !== userId && m.name !== userName
-        ))
-        
-        // Decrement total members count
-        setCollegeData(prev => ({
-          ...prev,
-          totalMembers: Math.max((prev.totalMembers || 1) - 1, 0)
-        }))
+        setMembers(prev => {
+          const newMembers = prev.filter(m => 
+            m.id !== userId && m.name !== userName
+          )
+          // Update totalMembers to match actual members count
+          setCollegeData(prevData => ({
+            ...prevData,
+            totalMembers: newMembers.length
+          }))
+          return newMembers
+        })
       }
     }
     setIsJoining(false)
@@ -1534,6 +1874,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
               }
             }
             setMembers(membersList)
+            // Update totalMembers to match actual members count
+            setCollegeData(prev => ({
+              ...prev,
+              totalMembers: membersList.length
+            }))
           } else {
             // No members returned from API, only show current user if they're a member
             let membersList = []
@@ -1545,6 +1890,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
               })
             }
             setMembers(membersList)
+            // Update totalMembers to match actual members count
+            setCollegeData(prev => ({
+              ...prev,
+              totalMembers: membersList.length
+            }))
           }
         } else {
           // API doesn't exist yet, only show current user if they're a member
@@ -1557,6 +1907,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
             })
           }
           setMembers(membersList)
+          // Update totalMembers to match actual members count
+          setCollegeData(prev => ({
+            ...prev,
+            totalMembers: membersList.length
+          }))
         }
       } catch (error) {
         console.error('Error fetching members:', error)
@@ -1570,6 +1925,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
           })
         }
         setMembers(membersList)
+        // Update totalMembers to match actual members count
+        setCollegeData(prev => ({
+          ...prev,
+          totalMembers: membersList.length
+        }))
       } finally {
         setLoadingMembers(false)
       }
@@ -1591,6 +1951,11 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
         avatar: getUserAvatar()
       }
       setMembers([userMember])
+      // Update totalMembers count to match actual members count
+      setCollegeData(prev => ({
+        ...prev,
+        totalMembers: 1
+      }))
     }
   }, [isMember, user, college])
 
@@ -1603,14 +1968,9 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
         {/* Logo in the middle */}
         <div className="college-logo-center">
           <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=150&background=00a8ff&color=fff`} alt={college.name} />
-          {college.isVerified && (
-            <div className="verified-badge-center" title="Verified College">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
-                <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          )}
+          <div className="verified-badge-center" title="Verified College">
+            <img src="/blutick.jpg" alt="Verified" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+          </div>
         </div>
 
         {/* Full name and location */}
@@ -1622,20 +1982,32 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
         {/* Action Buttons */}
         <div className="college-action-buttons">
           <button 
+            type="button"
             className={isMember ? "btn-join-campus btn-remove-campus" : "btn-join-campus"} 
-            onClick={isMember ? handleLeaveCampus : handleJoinCampus}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (isMember) {
+                handleLeaveCampus(e)
+              } else {
+                handleJoinCampus(e)
+              }
+            }}
             disabled={isJoining}
           >
-            {isMember ? 'Remove College' : 'Join College'}
+            {isMember ? 'Unfollow' : 'Join College'}
           </button>
-          {isMember && (
-            <button 
-              className="btn-join-chat" 
-              onClick={onJoinChat}
-            >
-              Join Chat
-            </button>
-          )}
+          <button 
+            type="button"
+            className="btn-join-chat" 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onJoinChat()
+            }}
+          >
+            Join Chat
+          </button>
         </div>
 
         {/* About Section */}
@@ -1686,12 +2058,25 @@ const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCa
 }
 
 // Live Chat View Component
-const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verificationStatus }) => {
+const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verificationStatus, onMessageSent }) => {
   const [messageInput, setMessageInput] = useState('')
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectedMessage, setSelectedMessage] = useState(null)
+  const [showActionMenu, setShowActionMenu] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const messagesEndRef = useRef(null)
+  const longPressTimer = useRef(null)
   const socket = getSocket()
+
+  // Update mobile detection on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Get college ID
   const collegeId = college?.aisheCode || chat?.collegeId || college?.name
@@ -1754,19 +2139,52 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
     loadMessages()
   }, [collegeId, chat.type, user?.id])
 
-  // Set up Socket.IO listeners for real-time messages
+  // Set up Socket.IO connection and listeners for real-time messages
   useEffect(() => {
     if (!collegeId || chat.type !== 'college') return
+
+    // Ensure socket is connected and join room
+    const setupSocket = async () => {
+      let socketInstance = getSocket()
+      if (!socketInstance || !socketInstance.connected) {
+        try {
+          socketInstance = connectSocket()
+          if (socketInstance) {
+            // Wait for connection
+            socketInstance.once('connect', () => {
+              // Join the college room
+              joinCollegeRoom(collegeId)
+              console.log(`✅ Joined college room: ${collegeId}`)
+            })
+          }
+        } catch (error) {
+          console.error('Failed to connect socket:', error)
+        }
+      } else {
+        // Already connected, join the room
+        joinCollegeRoom(collegeId)
+        console.log(`✅ Joined college room: ${collegeId}`)
+      }
+    }
+
+    setupSocket()
 
     const handleReceiveMessage = (message) => {
       // Only add message if it's for this college
       if (message.collegeId === collegeId) {
         // Check if this message matches an optimistic message (replace it)
         setMessages(prev => {
+          // Check for duplicate messages first
+          const existingIndex = prev.findIndex(m => m.id === message.id)
+          if (existingIndex !== -1) {
+            return prev // Message already exists, don't add duplicate
+          }
+
           const optimisticIndex = prev.findIndex(m => 
             m.isOptimistic && 
             m.text === message.text && 
-            String(m.senderId) === String(message.senderId)
+            String(m.senderId) === String(message.senderId) &&
+            Math.abs(new Date(m.timestamp) - new Date(message.timestamp)) < 5000 // Within 5 seconds
           )
           
           if (optimisticIndex !== -1) {
@@ -1803,16 +2221,25 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
               isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
               timestamp: new Date(message.timestamp)
             }
-            return [...prev, formattedMessage]
+            // Insert message in correct chronological order
+            const newMessages = [...prev, formattedMessage].sort((a, b) => 
+              new Date(a.timestamp) - new Date(b.timestamp)
+            )
+            return newMessages
           }
         })
       }
     }
 
+    // Set up message listener
     onReceiveMessage(handleReceiveMessage)
 
     return () => {
-      // Cleanup is handled by removeAllListeners in parent
+      // Cleanup: remove listener when component unmounts or collegeId changes
+      const socketInstance = getSocket()
+      if (socketInstance) {
+        socketInstance.off('receiveMessage', handleReceiveMessage)
+      }
     }
   }, [collegeId, chat.type, user?.id])
 
@@ -1850,17 +2277,37 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
     setMessageInput('')
 
     // Try to connect socket if not connected
-    let socketInstance = socket
+    let socketInstance = getSocket()
     if (!socketInstance || !socketInstance.connected) {
       try {
         socketInstance = connectSocket()
         if (socketInstance) {
-          // Join room
-          onJoinedRoom((data) => {
-            console.log('✅ Joined college room:', data)
+          // Wait for connection to be established
+          await new Promise((resolve, reject) => {
+            if (socketInstance.connected) {
+              resolve()
+            } else {
+              const timeout = setTimeout(() => {
+                reject(new Error('Socket connection timeout'))
+              }, 5000)
+              
+              socketInstance.once('connect', () => {
+                clearTimeout(timeout)
+                resolve()
+              })
+              
+              socketInstance.once('connect_error', (error) => {
+                clearTimeout(timeout)
+                reject(error)
+              })
+            }
           })
-          socketInstance.emit('joinCollegeRoom', { collegeId })
-          await new Promise(resolve => setTimeout(resolve, 200)) // Wait a bit for join
+          
+          // Join room after connection
+          joinCollegeRoom(collegeId)
+          await new Promise(resolve => setTimeout(resolve, 300)) // Wait a bit for join
+        } else {
+          throw new Error('Failed to create socket instance')
         }
       } catch (error) {
         console.error('Failed to connect socket:', error)
@@ -1872,8 +2319,15 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
 
     // Send message via socket
     try {
+      socketInstance = getSocket()
       if (socketInstance && socketInstance.connected) {
         sendMessage(messageText, collegeId)
+        console.log('✅ Message sent via socket')
+        
+        // Update chat list immediately (optimistic update)
+        if (onMessageSent && collegeId) {
+          onMessageSent(collegeId, messageText, new Date(), true)
+        }
       } else {
         console.error('Socket not connected, cannot send message')
         // Remove optimistic message on error
@@ -1905,34 +2359,164 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
   // Check if college is verified
   const isCollegeVerified = college?.isVerified || false
 
+  // Handle long press on message (mobile and desktop)
+  const handleMessageTouchStart = (e, message) => {
+    longPressTimer.current = setTimeout(() => {
+      setSelectedMessage(message)
+      setShowActionMenu(true)
+      // Add haptic feedback if available (mobile)
+      if (navigator.vibrate && isMobile) {
+        navigator.vibrate(50)
+      }
+    }, 1000) // 1 second
+  }
+
+  const handleMessageTouchEnd = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const handleMessageTouchMove = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  // Handle copy message
+  const handleCopyMessage = () => {
+    if (selectedMessage) {
+      navigator.clipboard.writeText(selectedMessage.text).then(() => {
+        setShowActionMenu(false)
+        setSelectedMessage(null)
+        // Show brief feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([50, 30, 50])
+        }
+      }).catch(err => {
+        console.error('Failed to copy:', err)
+      })
+    }
+  }
+
+  // Handle delete message
+  const handleDeleteMessage = () => {
+    if (selectedMessage) {
+      setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+      setShowActionMenu(false)
+      setSelectedMessage(null)
+      // TODO: Send delete request to backend
+    }
+  }
+
+  // Handle clear all chat
+  const handleClearAllChat = () => {
+    if (window.confirm('Are you sure you want to clear all messages?')) {
+      setMessages([])
+      setShowActionMenu(false)
+      setSelectedMessage(null)
+      // TODO: Send clear all request to backend
+    }
+  }
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showActionMenu && !e.target.closest('.chat-header-actions-menu') && !e.target.closest('.message-content')) {
+        setShowActionMenu(false)
+        setSelectedMessage(null)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showActionMenu])
+
   return (
     <div className="live-chat-view">
-      <div className="chat-header-bar">
-        <div className="chat-header-avatar">
-          <img src={displayAvatar} alt={displayName} />
-        </div>
-        <div className="chat-header-info">
-          <div className="chat-header-name-row">
-            <h3>{displayName}</h3>
-            {isCollegeVerified && (
-              <div className="verified-badge-blue-inline" title="Verified College">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
-                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            )}
-            {!isDirectMessage && verificationStatus?.status === 'verified' && (
-              <div className="verified-badge-blue-inline" title="Verified Student">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
-                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            )}
+      <div className={`chat-header-bar ${showActionMenu ? 'action-menu-active' : ''}`}>
+        {showActionMenu ? (
+          <div className="chat-header-actions-menu">
+            <button 
+              className="action-menu-btn" 
+              onClick={handleCopyMessage}
+              title="Copy"
+            >
+              <span className="action-icon">📋</span>
+              <span className="action-label">Copy</span>
+            </button>
+            <button 
+              className="action-menu-btn" 
+              onClick={handleDeleteMessage}
+              title="Delete"
+            >
+              <span className="action-icon">🗑️</span>
+              <span className="action-label">Delete</span>
+            </button>
+            <button 
+              className="action-menu-btn" 
+              onClick={handleClearAllChat}
+              title="Clear All"
+            >
+              <span className="action-icon">🗑️</span>
+              <span className="action-label">Clear All</span>
+            </button>
+            <button 
+              className="action-menu-btn action-menu-close" 
+              onClick={() => {
+                setShowActionMenu(false)
+                setSelectedMessage(null)
+              }}
+              title="Close"
+            >
+              <span className="action-icon">✕</span>
+            </button>
           </div>
-          <span className="chat-status">{displayStatus}</span>
-        </div>
+        ) : (
+          <>
+            {/* WhatsApp-like back button */}
+            <button 
+              className="chat-header-back-btn"
+              onClick={onBack}
+              title="Back"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div 
+              className="chat-header-avatar" 
+              onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
+              style={!isDirectMessage && college ? { cursor: 'pointer' } : {}}
+            >
+              <img src={displayAvatar} alt={displayName} />
+            </div>
+            <div 
+              className="chat-header-info"
+              onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
+              style={!isDirectMessage && college ? { cursor: 'pointer', flex: 1 } : { flex: 1 }}
+            >
+              <div className="chat-header-name-row">
+                <h3>{displayName}</h3>
+                {!isDirectMessage && (
+                  <div className="verified-badge-blue-inline" title="Verified College">
+                    <img src="/blutick.jpg" alt="Verified" style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                  </div>
+                )}
+                {!isDirectMessage && verificationStatus?.status === 'verified' && (
+                  <div className="verified-badge-blue-inline" title="Verified Student">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                      <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <span className="chat-status">{displayStatus}</span>
+            </div>
+          </>
+        )}
       </div>
       <div className="chat-messages-area">
         {loading ? (
@@ -1952,11 +2536,29 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
                       <span>{message.date}</span>
                     </div>
                   )}
-                  <div className={`message ${message.isOwn ? 'own-message' : 'other-message'}`}>
+                  <div className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''}`}>
                     {!message.isOwn && (
                       <div className="message-sender">{message.sender}</div>
                     )}
-                    <div className="message-content">
+                    <div 
+                      className="message-content"
+                      onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                      onTouchEnd={handleMessageTouchEnd}
+                      onTouchMove={handleMessageTouchMove}
+                      onMouseDown={(e) => {
+                        if (!isMobile) {
+                          handleMessageTouchStart(e, message)
+                        }
+                      }}
+                      onMouseUp={handleMessageTouchEnd}
+                      onMouseLeave={handleMessageTouchEnd}
+                      onContextMenu={(e) => {
+                        if (isMobile) {
+                          e.preventDefault()
+                          handleMessageTouchStart(e, message)
+                        }
+                      }}
+                    >
                       <p>{message.text}</p>
                       <span className="message-time">{message.time}</span>
                     </div>
@@ -1972,7 +2574,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
         <input
           type="text"
           className="chat-input"
-          placeholder="type a message here..... (keyboard)"
+          placeholder="Type a message"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
         />

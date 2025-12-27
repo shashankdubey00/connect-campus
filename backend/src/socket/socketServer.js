@@ -23,42 +23,48 @@ export const initializeSocket = (server) => {
 
   // Connection handler
   io.on('connection', (socket) => {
-    console.log(`✅ User connected: ${socket.user.email} (College: ${socket.collegeId})`);
+    console.log(`✅ User connected: ${socket.user.email} (College: ${socket.collegeId || 'None'})`);
 
-    // Auto-join user to their college room
-    const roomName = `college:${socket.collegeId}`;
-    socket.join(roomName);
-    console.log(`📥 User ${socket.user.email} joined room: ${roomName}`);
+    // Auto-join user to their college room if they belong to one
+    if (socket.collegeId) {
+      const roomName = `college:${socket.collegeId}`;
+      socket.join(roomName);
+      console.log(`📥 User ${socket.user.email} joined room: ${roomName}`);
 
-    // Emit confirmation to client
-    socket.emit('joinedCollegeRoom', {
-      success: true,
-      collegeId: socket.collegeId,
-      roomName: roomName,
-    });
+      // Emit confirmation to client
+      socket.emit('joinedCollegeRoom', {
+        success: true,
+        collegeId: socket.collegeId,
+        roomName: roomName,
+      });
+    } else {
+      // User doesn't belong to a college yet
+      console.log(`⚠️ User ${socket.user.email} connected but doesn't belong to a college yet`);
+    }
 
-    // Handle joinCollegeRoom event (redundant but for explicit joining)
+    // Handle joinCollegeRoom event - allow joining any college room
     socket.on('joinCollegeRoom', (data) => {
       const { collegeId } = data;
-      const room = `college:${collegeId || socket.collegeId}`;
       
-      // Verify user belongs to this college
-      if (collegeId && collegeId !== socket.collegeId) {
+      if (!collegeId) {
         socket.emit('error', {
-          message: 'You can only join your own college room',
+          message: 'College ID is required',
         });
         return;
       }
 
+      const room = `college:${collegeId}`;
       socket.join(room);
+      console.log(`📥 User ${socket.user.email} joined room: ${room}`);
+      
       socket.emit('joinedCollegeRoom', {
         success: true,
-        collegeId: collegeId || socket.collegeId,
+        collegeId: collegeId,
         roomName: room,
       });
     });
 
-    // Handle sendMessage event
+    // Handle sendMessage event - allow sending to any college room
     socket.on('sendMessage', async (data) => {
       try {
         const { text, collegeId } = data;
@@ -71,16 +77,16 @@ export const initializeSocket = (server) => {
           return;
         }
 
-        // Use socket's collegeId or provided collegeId
-        const messageCollegeId = collegeId || socket.collegeId;
-
-        // Verify user belongs to this college
-        if (collegeId && collegeId !== socket.collegeId) {
+        // Validate collegeId
+        if (!collegeId) {
           socket.emit('error', {
-            message: 'You can only send messages to your own college room',
+            message: 'College ID is required',
           });
           return;
         }
+
+        // Use provided collegeId (allow sending to any college)
+        const messageCollegeId = collegeId;
 
         // Get sender name from profile
         const senderName = socket.user.profile?.displayName || 

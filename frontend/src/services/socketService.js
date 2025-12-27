@@ -12,32 +12,31 @@ export const connectSocket = (token = null) => {
     return socket; // Already connected
   }
 
-  // Get token from parameter or cookies
-  let authToken = token;
-  if (!authToken) {
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-    authToken = getCookie('token');
-  }
-
-  if (!authToken) {
-    console.log('No token available for Socket.IO connection - will retry after login');
-    return null;
+  // If socket exists but not connected, disconnect it first
+  if (socket && !socket.connected) {
+    socket.disconnect();
+    socket = null;
   }
 
   const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
-  socket = io(API_BASE_URL, {
-    auth: {
-      token: authToken,
-    },
+  // Socket.IO will automatically send cookies with withCredentials: true
+  // The backend will read the token from cookies (httpOnly cookie)
+  // If token is provided explicitly, use it; otherwise rely on cookies
+  const socketConfig = {
     transports: ['websocket', 'polling'],
-    withCredentials: true,
-  });
+    withCredentials: true, // This sends cookies automatically
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+  };
+
+  // Only add auth token if explicitly provided (for cases where token is passed directly)
+  if (token) {
+    socketConfig.auth = { token };
+  }
+
+  socket = io(API_BASE_URL, socketConfig);
 
   socket.on('connect', () => {
     console.log('✅ Socket.IO connected:', socket.id);
@@ -48,7 +47,8 @@ export const connectSocket = (token = null) => {
   });
 
   socket.on('connect_error', (error) => {
-    console.error('Socket.IO connection error:', error);
+    console.error('Socket.IO connection error:', error.message || error);
+    // Don't return null on error - let reconnection handle it
   });
 
   return socket;
@@ -91,8 +91,19 @@ export const joinCollegeRoom = (collegeId) => {
 export const sendMessage = (text, collegeId) => {
   if (socket?.connected) {
     socket.emit('sendMessage', { text, collegeId });
+    return true;
   } else {
-    console.error('Socket not connected');
+    console.error('Socket not connected, attempting to reconnect...');
+    // Try to reconnect
+    const newSocket = connectSocket();
+    if (newSocket) {
+      newSocket.once('connect', () => {
+        newSocket.emit('sendMessage', { text, collegeId });
+        console.log('✅ Message sent after reconnection');
+      });
+      return true;
+    }
+    return false;
   }
 };
 

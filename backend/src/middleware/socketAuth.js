@@ -42,14 +42,16 @@ export const authenticateSocket = async (socket, next) => {
       profile: userProfile,
     };
 
-    // Get college ID from user profile
+    // Get college ID from user profile (optional - user might not have joined a college yet)
     if (userProfile?.college?.aisheCode) {
       socket.collegeId = userProfile.college.aisheCode;
     } else if (userProfile?.college?.name) {
       // Fallback: use college name if aisheCode not available
       socket.collegeId = userProfile.college.name;
     } else {
-      return next(new Error('Authentication error: User does not belong to a college'));
+      // User doesn't belong to a college yet - allow connection but set collegeId to null
+      // They can join a college room later when they select a college
+      socket.collegeId = null;
     }
 
     next();

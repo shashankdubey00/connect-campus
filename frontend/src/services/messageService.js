@@ -17,4 +17,15 @@ export const fetchMessages = async (collegeId, limit = 50, before = null) => {
   });
 };
 
+/**
+ * Fetch all colleges where user has sent or received messages
+ * @returns {Promise} API response with colleges array
+ */
+export const fetchUserCollegesWithMessages = async () => {
+  return await api('/api/messages/user/colleges', {
+    method: 'GET',
+  });
+};
+
+
 
