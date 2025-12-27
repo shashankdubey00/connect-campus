@@ -38,14 +38,17 @@ const CollegeProfileCard = ({ college }) => {
       navigate('/login', {
         state: {
           college: college,
-          returnPath: '/',
+          returnPath: '/chat',
         },
       });
     } else {
-      // User is authenticated - proceed with joining campus
-      console.log('Join Campus clicked for:', name);
-      // TODO: Implement actual join campus logic here
-      alert(`Joining ${name} campus... (Feature coming soon!)`);
+      // User is authenticated - redirect to chat with college context
+      navigate('/chat', {
+        state: {
+          college: college,
+          openCollegeChat: true,
+        },
+      });
     }
   }
 

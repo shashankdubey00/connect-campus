@@ -47,6 +47,23 @@ const userProfileSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    verification: {
+      status: {
+        type: String,
+        enum: ['pending', 'verified', 'rejected', 'not_submitted'],
+        default: 'not_submitted',
+      },
+      collegeIdImage: {
+        url: String,
+        uploadedAt: Date,
+      },
+      verifiedAt: Date,
+      verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      rejectionReason: String,
+    },
   },
   {
     timestamps: true,
@@ -56,5 +73,6 @@ const userProfileSchema = new mongoose.Schema(
 const UserProfile = mongoose.models.UserProfile || mongoose.model('UserProfile', userProfileSchema);
 
 export default UserProfile;
+
 
 

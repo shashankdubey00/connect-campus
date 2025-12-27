@@ -3,10 +3,13 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
 const api = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Don't set Content-Type for FormData, browser will set it with boundary
+  const isFormData = options.body instanceof FormData;
+  
   const config = {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     },
     credentials: 'include', // Important for cookies
@@ -27,5 +30,6 @@ const api = async (endpoint, options = {}) => {
 };
 
 export default api;
+
 
 

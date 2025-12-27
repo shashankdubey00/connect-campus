@@ -216,6 +216,10 @@ export const verifyAuth = async (req, res) => {
         googleId: user.googleId || null, // Explicitly return null if not set
         hasPassword: !!user.password, // Return boolean indicating if password exists
         profile: userProfile,
+        verification: {
+          status: userProfile?.verification?.status || 'not_submitted',
+          isVerified: userProfile?.verification?.status === 'verified',
+        },
       },
     });
   } catch (error) {
@@ -499,6 +503,63 @@ export const resetPassword = async (req, res) => {
     });
   } catch (error) {
     console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+// Set password for Google users (who don't have a password yet)
+export const setPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    const userId = req.user.userId;
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+      });
+    }
+
+    // Check password strength
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Password must be at least 8 characters and include uppercase, lowercase, number, and special character',
+      });
+    }
+
+    // Find user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Check if user already has a password
+    if (user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password already set. Use change password instead.',
+      });
+    }
+
+    // Set the password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password set successfully',
+    });
+  } catch (error) {
+    console.error('Set password error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',

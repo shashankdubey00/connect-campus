@@ -34,8 +34,16 @@ const Login = () => {
   }, []);
 
   const handleRedirect = () => {
-    if (collegeContext) {
-      // Redirect back to college modal
+    if (returnPath === '/chat' && collegeContext) {
+      // Redirect to chat with college context
+      navigate('/chat', {
+        state: {
+          college: collegeContext,
+          openCollegeChat: true,
+        }
+      });
+    } else if (collegeContext) {
+      // Redirect back to college modal on home page
       navigate('/', { 
         state: { 
           openCollegeModal: true, 
