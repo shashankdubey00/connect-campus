@@ -127,19 +127,27 @@ export const updateProfile = async (req, res) => {
     const userId = req.user.userId;
     const { displayName, bio, firstName, lastName, year, course } = req.body;
 
+    // Validate required fields
+    if (!displayName || !displayName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Display name is required',
+      });
+    }
+
     let userProfile = await UserProfile.findOne({ userId });
 
     if (!userProfile) {
       userProfile = new UserProfile({ userId });
     }
 
-    // Update fields
-    if (displayName !== undefined) userProfile.displayName = displayName;
-    if (bio !== undefined) userProfile.bio = bio;
-    if (firstName !== undefined) userProfile.firstName = firstName;
-    if (lastName !== undefined) userProfile.lastName = lastName;
-    if (year !== undefined) userProfile.year = year;
-    if (course !== undefined) userProfile.course = course;
+    // Update fields (displayName is required, others are optional)
+    userProfile.displayName = displayName.trim();
+    if (bio !== undefined) userProfile.bio = bio.trim() || '';
+    if (firstName !== undefined) userProfile.firstName = firstName.trim() || '';
+    if (lastName !== undefined) userProfile.lastName = lastName.trim() || '';
+    if (year !== undefined) userProfile.year = year || '';
+    if (course !== undefined) userProfile.course = course.trim() || '';
 
     await userProfile.save();
 
@@ -153,6 +161,159 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating profile',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Join a college
+ */
+export const joinCollege = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { aisheCode, name, district, state } = req.body;
+
+    if (!aisheCode || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode and name are required',
+      });
+    }
+
+    let userProfile = await UserProfile.findOne({ userId });
+
+    if (!userProfile) {
+      userProfile = new UserProfile({ userId });
+    }
+
+    // Update college information
+    userProfile.college = {
+      aisheCode,
+      name,
+      district: district || '',
+      state: state || '',
+    };
+
+    await userProfile.save();
+
+    res.json({
+      success: true,
+      message: 'Successfully joined college',
+      profile: userProfile,
+    });
+  } catch (error) {
+    console.error('Error joining college:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error joining college',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Leave a college
+ */
+export const leaveCollege = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { aisheCode } = req.body;
+
+    const userProfile = await UserProfile.findOne({ userId });
+
+    if (!userProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile not found',
+      });
+    }
+
+    // Check if user is a member of this college
+    if (userProfile.college?.aisheCode !== aisheCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'You are not a member of this college',
+      });
+    }
+
+    // Clear college information
+    userProfile.college = undefined;
+
+    await userProfile.save();
+
+    res.json({
+      success: true,
+      message: 'Successfully left college',
+      profile: userProfile,
+    });
+  } catch (error) {
+    console.error('Error leaving college:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error leaving college',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Upload profile picture
+ */
+export const uploadProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
+      });
+    }
+
+    const userId = req.user.userId;
+    const fileUrl = `/uploads/profile-pictures/${req.file.filename}`;
+
+    // Find or create user profile
+    let userProfile = await UserProfile.findOne({ userId });
+
+    if (!userProfile) {
+      userProfile = new UserProfile({
+        userId,
+        profilePicture: fileUrl,
+      });
+    } else {
+      // Delete old profile picture if exists
+      if (userProfile.profilePicture && userProfile.profilePicture.startsWith('/uploads/profile-pictures/')) {
+        const oldFilePath = path.join(__dirname, '../../', userProfile.profilePicture);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      }
+
+      // Update profile picture
+      userProfile.profilePicture = fileUrl;
+    }
+
+    await userProfile.save();
+
+    res.json({
+      success: true,
+      message: 'Profile picture uploaded successfully',
+      profilePicture: userProfile.profilePicture,
+    });
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
+    
+    // Delete uploaded file if there was an error
+    if (req.file) {
+      const filePath = path.join(__dirname, '../../', req.file.path);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading profile picture',
       error: error.message,
     });
   }

@@ -45,10 +45,14 @@ app.use(
 app.use(cookieParser());
 app.use(passport.initialize());
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), 'uploads', 'college-ids');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Create uploads directories if they don't exist
+const collegeIdsDir = path.join(process.cwd(), 'uploads', 'college-ids');
+const profilePicturesDir = path.join(process.cwd(), 'uploads', 'profile-pictures');
+if (!fs.existsSync(collegeIdsDir)) {
+  fs.mkdirSync(collegeIdsDir, { recursive: true });
+}
+if (!fs.existsSync(profilePicturesDir)) {
+  fs.mkdirSync(profilePicturesDir, { recursive: true });
 }
 
 // Serve uploaded files

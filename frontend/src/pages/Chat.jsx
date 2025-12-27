@@ -1,100 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
 import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners } from '../services/socketService'
 import { fetchMessages } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
-import { uploadCollegeId, getVerificationStatus } from '../services/profileService'
+import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege } from '../services/profileService'
 import './Chat.css'
 
-// Dummy data
-const dummyColleges = [
-  {
-    id: 1,
-    name: 'Indian Institute of Technology Delhi',
-    district: 'New Delhi',
-    state: 'Delhi',
-    logo: 'https://ui-avatars.com/api/?name=IIT+Delhi&size=100&background=00a8ff&color=fff',
-    about: 'Premier engineering institute in India, known for excellence in technology and innovation.',
-    totalMembers: 1250,
-    isVerified: true,
-    members: [
-      { id: 1, name: 'Raj Kumar', avatar: 'https://ui-avatars.com/api/?name=Raj+Kumar&size=40&background=e74c3c&color=fff' },
-      { id: 2, name: 'Priya Sharma', avatar: 'https://ui-avatars.com/api/?name=Priya+Sharma&size=40&background=27ae60&color=fff' },
-      { id: 3, name: 'Amit Singh', avatar: 'https://ui-avatars.com/api/?name=Amit+Singh&size=40&background=f39c12&color=fff' },
-      { id: 4, name: 'Sneha Patel', avatar: 'https://ui-avatars.com/api/?name=Sneha+Patel&size=40&background=9b59b6&color=fff' },
-      { id: 5, name: 'Vikram Mehta', avatar: 'https://ui-avatars.com/api/?name=Vikram+Mehta&size=40&background=3498db&color=fff' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Delhi University',
-    district: 'New Delhi',
-    state: 'Delhi',
-    logo: 'https://ui-avatars.com/api/?name=Delhi+University&size=100&background=27ae60&color=fff',
-    about: 'One of the largest universities in India with diverse academic programs.',
-    totalMembers: 3200,
-    isVerified: true,
-    members: [
-      { id: 1, name: 'Anjali Verma', avatar: 'https://ui-avatars.com/api/?name=Anjali+Verma&size=40&background=e74c3c&color=fff' },
-      { id: 2, name: 'Rohit Gupta', avatar: 'https://ui-avatars.com/api/?name=Rohit+Gupta&size=40&background=27ae60&color=fff' }
-    ]
-  }
-]
-
-const dummyChats = [
-  {
-    id: 1,
-    type: 'direct',
-    name: 'Vinamra',
-    lastMessage: 'Hey! How are you doing?',
-    timestamp: '10:30 AM',
-    unreadCount: 2,
-    isOnline: true,
-    avatar: 'https://ui-avatars.com/api/?name=Vinamra&size=50&background=00a8ff&color=fff',
-    college: 'Sagar Institute of Research & Technology'
-  },
-  {
-    id: 2,
-    type: 'direct',
-    name: 'Rahul',
-    lastMessage: 'See you in class tomorrow!',
-    timestamp: '9:15 AM',
-    unreadCount: 0,
-    isOnline: false,
-    avatar: 'https://ui-avatars.com/api/?name=Rahul&size=50&background=e74c3c&color=fff',
-    college: 'Sagar Institute of Research & Technology'
-  },
-  {
-    id: 3,
-    type: 'college',
-    collegeId: 1,
-    name: 'Sagar Institute of Research & Technology',
-    lastMessage: 'Welcome to the community!',
-    timestamp: 'Yesterday',
-    unreadCount: 5,
-    onlineCount: 42,
-    avatar: 'https://ui-avatars.com/api/?name=Sagar+Institute&size=50&background=27ae60&color=fff'
-  }
-]
-
-const dummyMessages = {
-  1: [
-    { id: 1, text: 'Hey! How are you doing?', sender: 'Vinamra', time: '10:30 AM', isOwn: false, date: 'Today' },
-    { id: 2, text: 'I\'m doing great! Thanks for asking.', sender: 'You', time: '10:32 AM', isOwn: true, date: 'Today' },
-    { id: 3, text: 'Want to study together for the exam?', sender: 'Vinamra', time: '10:35 AM', isOwn: false, date: 'Today' }
-  ],
-  2: [
-    { id: 1, text: 'See you in class tomorrow!', sender: 'Rahul', time: '9:15 AM', isOwn: false, date: 'Today' },
-    { id: 2, text: 'Sure! Looking forward to it.', sender: 'You', time: '9:20 AM', isOwn: true, date: 'Today' }
-  ],
-  3: [
-    { id: 1, text: 'Welcome to Sagar Institute community!', sender: 'Admin', time: 'Yesterday 2:00 PM', isOwn: false, date: 'Yesterday' },
-    { id: 2, text: 'Thanks for joining!', sender: 'You', time: 'Yesterday 2:05 PM', isOwn: true, date: 'Yesterday' },
-    { id: 3, text: 'Feel free to ask any questions!', sender: 'Admin', time: 'Yesterday 2:10 PM', isOwn: false, date: 'Yesterday' }
-  ]
-}
 
 const Chat = () => {
   const { theme, toggleTheme } = useTheme()
@@ -113,7 +26,23 @@ const Chat = () => {
     return saved !== null ? JSON.parse(saved) : true
   })
   const [totalUnreadCount, setTotalUnreadCount] = useState(0) // Total unread messages across all chats
-  const [searchQuery, setSearchQuery] = useState('')
+  const [verificationStatus, setVerificationStatus] = useState(null) // User verification status
+  const [searchQuery, setSearchQuery] = useState('') // For filtering chats
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState('') // For college search
+  const [collegeSuggestions, setCollegeSuggestions] = useState([]) // College search suggestions
+  const [showCollegeSuggestions, setShowCollegeSuggestions] = useState(false)
+  const [loadingCollegeSearch, setLoadingCollegeSearch] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false) // For mobile search bar visibility
+  const [isSearchActive, setIsSearchActive] = useState(false) // For search mode in middle panel
+  const [searchBarAtTop, setSearchBarAtTop] = useState(false) // Track if search bar moved to top
+  const [selectedCollegeInSearch, setSelectedCollegeInSearch] = useState(null) // Selected college in search view
+  const [selectedState, setSelectedState] = useState('')
+  const [selectedDistrict, setSelectedDistrict] = useState('')
+  const [states, setStates] = useState([])
+  const [districts, setDistricts] = useState([])
+  const [recentCollegeSearches, setRecentCollegeSearches] = useState([])
+  const collegeSearchRef = useRef(null)
+  const collegeSuggestionsRef = useRef(null)
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
@@ -122,8 +51,10 @@ const Chat = () => {
   useEffect(() => {
     const loadUser = async () => {
       try {
+        console.log('🔄 Loading user data...')
         setIsLoading(true)
         const data = await verifyAuth()
+        console.log('✅ User data loaded:', data.success ? 'Success' : 'Failed')
         if (data.success) {
           setUser(data.user)
           
@@ -195,6 +126,66 @@ const Chat = () => {
 
   // This useEffect will be set up after handleNewMessage is defined
 
+  // Load recent college searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('recentCollegeSearches')
+    if (saved) {
+      try {
+        const recent = JSON.parse(saved)
+        setRecentCollegeSearches(recent.slice(0, 5)) // Top 5
+      } catch (error) {
+        console.error('Error loading recent searches:', error)
+      }
+    }
+  }, [])
+
+  // Fetch states on component mount
+  useEffect(() => {
+    fetchStates()
+  }, [])
+
+  // Fetch districts when state changes
+  useEffect(() => {
+    if (selectedState) {
+      fetchDistricts(selectedState)
+      setSelectedDistrict('')
+    } else {
+      setDistricts([])
+      setSelectedDistrict('')
+    }
+  }, [selectedState])
+
+  // Search colleges when query or filters change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (collegeSearchQuery.trim().length >= 2) {
+        searchColleges(collegeSearchQuery.trim())
+      } else {
+        setCollegeSuggestions([])
+        setShowCollegeSuggestions(false)
+      }
+    }, 300) // Debounce search
+
+    return () => clearTimeout(timeoutId)
+  }, [collegeSearchQuery, selectedState, selectedDistrict])
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        collegeSearchRef.current &&
+        !collegeSearchRef.current.contains(event.target) &&
+        collegeSuggestionsRef.current &&
+        !collegeSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowCollegeSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // Handle college from navigation state (after user is loaded)
   useEffect(() => {
     if (user && !isLoading && location.state?.college && location.state?.openCollegeChat) {
@@ -205,6 +196,95 @@ const Chat = () => {
       window.history.replaceState({}, document.title)
     }
   }, [user, isLoading, location.state])
+
+  // Fetch states
+  const fetchStates = async () => {
+    try {
+      const response = await fetch('/api/colleges/states')
+      const data = await response.json()
+      if (data.success) {
+        setStates(data.states)
+      }
+    } catch (error) {
+      console.error('Error fetching states:', error)
+    }
+  }
+
+  // Fetch districts
+  const fetchDistricts = async (state) => {
+    try {
+      const response = await fetch(`/api/colleges/districts?state=${encodeURIComponent(state)}`)
+      const data = await response.json()
+      if (data.success) {
+        setDistricts(data.districts)
+      }
+    } catch (error) {
+      console.error('Error fetching districts:', error)
+    }
+  }
+
+  // Search colleges
+  const searchColleges = async (query) => {
+    try {
+      setLoadingCollegeSearch(true)
+      const params = new URLSearchParams({ query, limit: '10' })
+      
+      if (selectedState) {
+        params.append('state', selectedState)
+      }
+      
+      if (selectedDistrict) {
+        params.append('district', selectedDistrict)
+      }
+
+      const response = await fetch(`/api/colleges/search?${params}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setCollegeSuggestions(data.colleges)
+        setShowCollegeSuggestions(data.colleges.length > 0)
+      }
+    } catch (error) {
+      console.error('Error searching colleges:', error)
+      setCollegeSuggestions([])
+    } finally {
+      setLoadingCollegeSearch(false)
+    }
+  }
+
+  // Handle college suggestion click
+  const handleCollegeSuggestionClick = (college) => {
+    setCollegeSearchQuery(college.name)
+    setShowCollegeSuggestions(false)
+    
+    // Save to recent searches
+    const recent = [college, ...recentCollegeSearches.filter(c => c.aisheCode !== college.aisheCode)].slice(0, 5)
+    setRecentCollegeSearches(recent)
+    localStorage.setItem('recentCollegeSearches', JSON.stringify(recent))
+    
+    // If in search view, show profile in search panel
+    if (activeSection === 'search') {
+      setSelectedCollegeInSearch(college)
+      setSearchBarAtTop(true)
+    } else {
+      // Otherwise, open college profile in main chat section
+      handleViewCollegeProfile(college)
+    }
+  }
+
+  // Handle college search submit
+  const handleCollegeSearch = (e) => {
+    e.preventDefault()
+    if (collegeSearchQuery.trim()) {
+      if (collegeSuggestions.length === 1) {
+        handleCollegeSuggestionClick(collegeSuggestions[0])
+      } else if (collegeSuggestions.length > 0) {
+        handleCollegeSuggestionClick(collegeSuggestions[0])
+      } else {
+        setShowCollegeSuggestions(false)
+      }
+    }
+  }
 
   // Handle opening college chat from navigation
   const handleOpenCollegeChat = async (college) => {
@@ -318,6 +398,13 @@ const Chat = () => {
     setView('list')
     setSelectedChat(null)
     setSelectedCollege(null)
+    if (section !== 'search') {
+      setIsSearchActive(false)
+      setSearchBarAtTop(false)
+      setCollegeSearchQuery('')
+      setShowCollegeSuggestions(false)
+      setSelectedCollegeInSearch(null)
+    }
   }
 
   // Handle chat selection
@@ -363,10 +450,43 @@ const Chat = () => {
 
   // Handle join live chat
   const handleJoinLiveChat = (college) => {
-    const chat = dummyChats.find(c => c.type === 'college' && c.collegeId === college.id)
+    const collegeId = college.aisheCode || college.name || college.id
+    // Find chat in the actual chats state
+    const chat = chats.find(c => 
+      c.type === 'college' && 
+      (c.collegeId === collegeId || c.name === college.name)
+    )
+    
     if (chat) {
       setSelectedChat(chat)
+      setSelectedCollege(college)
       setView('live-chat')
+      if (isMobileView) {
+        setShowChatList(false)
+      }
+    } else {
+      // If chat doesn't exist, create it and open it
+      handleOpenCollegeChat(college)
+    }
+  }
+
+  // Handle leaving a college
+  const handleLeaveCampus = async (college) => {
+    try {
+      const response = await leaveCollege(college)
+      if (response.success) {
+        // Remove the college chat from the list
+        setChats(prev => prev.filter(c => c.collegeId !== (college.aisheCode || college.name)))
+        // Clear selected chat if it's the one being left
+        if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
+          setSelectedChat(null)
+          setView('list')
+        }
+      }
+      return response
+    } catch (error) {
+      console.error('Error leaving college:', error)
+      throw error
     }
   }
 
@@ -566,6 +686,271 @@ const Chat = () => {
 
   // Render middle panel content based on active section
   const renderMiddlePanel = () => {
+    if (activeSection === 'search') {
+      return (
+        <div className="search-view-container">
+          {!searchBarAtTop && (
+            <div className="search-center-container">
+              <div className="search-center-form">
+                <form 
+                  className="search-center-form-wrapper"
+                  onSubmit={handleCollegeSearch}
+                >
+                  <input
+                    type="text"
+                    className="search-center-input"
+                    placeholder="explore colleges..."
+                    value={collegeSearchQuery}
+                    onChange={(e) => {
+                      setCollegeSearchQuery(e.target.value)
+                      if (e.target.value.trim().length > 0) {
+                        setSearchBarAtTop(true)
+                      }
+                    }}
+                    onFocus={() => {
+                      if (collegeSearchQuery.trim().length > 0) {
+                        setSearchBarAtTop(true)
+                      }
+                      if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
+                        setShowCollegeSuggestions(true)
+                      }
+                    }}
+                    ref={collegeSearchRef}
+                    autoFocus
+                  />
+                  <button type="submit" className="search-center-button">
+                    <span>🔍</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+          
+          {searchBarAtTop && (
+            <>
+              <div className="search-top-bar">
+                <form 
+                  className="search-top-form"
+                  onSubmit={handleCollegeSearch}
+                >
+                  <button 
+                    type="button" 
+                    className="search-back-btn"
+                    onClick={() => {
+                      if (selectedCollegeInSearch) {
+                        setSelectedCollegeInSearch(null)
+                        setShowCollegeSuggestions(true)
+                      } else {
+                        setSearchBarAtTop(false)
+                        setCollegeSearchQuery('')
+                        setShowCollegeSuggestions(false)
+                      }
+                    }}
+                  >
+                    ←
+                  </button>
+                  <input
+                    type="text"
+                    className="search-top-input"
+                    placeholder="explore colleges..."
+                    value={collegeSearchQuery}
+                    onChange={(e) => {
+                      setCollegeSearchQuery(e.target.value)
+                    }}
+                    onFocus={() => {
+                      if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
+                        setShowCollegeSuggestions(true)
+                      }
+                    }}
+                    ref={collegeSearchRef}
+                    autoFocus
+                  />
+                  {collegeSearchQuery && (
+                    <button 
+                      type="button" 
+                      className="search-clear-btn"
+                      onClick={() => {
+                        setCollegeSearchQuery('')
+                        setShowCollegeSuggestions(false)
+                        collegeSearchRef.current?.focus()
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </form>
+              </div>
+              
+              <div className="search-results-container">
+                {selectedCollegeInSearch ? (
+                  // Show college profile in search panel
+                  <div className="search-college-profile">
+                    <CollegeProfileView 
+                      college={selectedCollegeInSearch} 
+                      user={user}
+                      showBackButton={false}
+                      onJoinChat={() => {
+                        // Open chat in the right panel (same chat section)
+                        handleJoinLiveChat(selectedCollegeInSearch)
+                        // Clear search selection to show chat
+                        setSelectedCollegeInSearch(null)
+                        // Keep search section active, chat will show in right panel
+                        if (isMobileView) {
+                          setShowChatList(false)
+                        }
+                      }}
+                      onJoinCampus={async (college) => {
+                        try {
+                          // Add student as member of college
+                          const response = await joinCollege(college)
+                          if (response.success) {
+                            // Reload user to get updated college membership info
+                            const userResponse = await verifyAuth()
+                            if (userResponse.success) {
+                              setUser(userResponse.user)
+                            }
+                            // Update selected college in search with incremented member count
+                            const updatedCollege = {
+                              ...college,
+                              totalMembers: (college.totalMembers || 0) + 1
+                            }
+                            setSelectedCollegeInSearch(updatedCollege)
+                            
+                            // Add college to chats list in home section if not already there
+                            const collegeId = college.aisheCode || college.name
+                            const collegeName = college.name || 'College Chat'
+                            const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+                            
+                            setChats(prev => {
+                              const exists = prev.find(c => 
+                                c.type === 'college' && 
+                                (c.collegeId === collegeId || c.name === collegeName)
+                              )
+                              if (!exists) {
+                                return [{
+                                  id: `college-${collegeId}`,
+                                  type: 'college',
+                                  collegeId: collegeId,
+                                  name: collegeName,
+                                  avatar: collegeLogo,
+                                  lastMessage: 'No messages yet',
+                                  timestamp: '',
+                                  lastMessageTime: new Date(),
+                                  unreadCount: 0,
+                                  college: updatedCollege
+                                }, ...prev]
+                              }
+                              return prev
+                            })
+                          }
+                          return response
+                        } catch (error) {
+                          console.error('Error joining college:', error)
+                          return { success: false, message: error.message }
+                        }
+                      }}
+                      onLeaveCampus={async (college) => {
+                        try {
+                          const response = await leaveCollege(college)
+                          if (response.success) {
+                            // Reload user to get updated college membership info
+                            const userResponse = await verifyAuth()
+                            if (userResponse.success) {
+                              setUser(userResponse.user)
+                            }
+                            // Update selected college in search with decremented member count
+                            const updatedCollege = {
+                              ...college,
+                              totalMembers: Math.max((college.totalMembers || 1) - 1, 0)
+                            }
+                            setSelectedCollegeInSearch(updatedCollege)
+                            
+                            // Remove college from chats list
+                            const collegeId = college.aisheCode || college.name
+                            setChats(prev => prev.filter(c => 
+                              !(c.type === 'college' && (c.collegeId === collegeId || c.name === college.name))
+                            ))
+                          }
+                          return response
+                        } catch (error) {
+                          console.error('Error leaving college:', error)
+                          return { success: false, message: error.message }
+                        }
+                      }}
+                      onBack={() => {
+                        setSelectedCollegeInSearch(null)
+                        setShowCollegeSuggestions(true)
+                      }}
+                    />
+                  </div>
+                ) : loadingCollegeSearch ? (
+                  <div className="search-loading">
+                    <div className="spinner"></div>
+                    <p>Searching colleges...</p>
+                  </div>
+                ) : showCollegeSuggestions && (collegeSuggestions.length > 0 || recentCollegeSearches.length > 0) ? (
+                  <div className="search-results-list">
+                    {collegeSuggestions.length > 0 ? (
+                      <>
+                        <div className="search-results-header">Search Results</div>
+                        {collegeSuggestions.map((college) => (
+                          <div
+                            key={college.aisheCode || college.id}
+                            className="search-result-item"
+                            onClick={() => {
+                              handleCollegeSuggestionClick(college)
+                            }}
+                          >
+                            <div className="search-result-avatar">
+                              <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
+                              {college.isVerified && <span className="verified-badge-small">✓</span>}
+                            </div>
+                            <div className="search-result-info">
+                              <div className="search-result-name">{college.name}</div>
+                              <div className="search-result-location">{college.district}, {college.state}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <div className="search-results-header">Recent Searches</div>
+                        {recentCollegeSearches.slice(0, 5).map((college) => (
+                          <div
+                            key={college.aisheCode || college.id}
+                            className="search-result-item"
+                            onClick={() => {
+                              handleCollegeSuggestionClick(college)
+                            }}
+                          >
+                            <div className="search-result-avatar">
+                              <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
+                              {college.isVerified && <span className="verified-badge-small">✓</span>}
+                            </div>
+                            <div className="search-result-info">
+                              <div className="search-result-name">{college.name}</div>
+                              <div className="search-result-location">{college.district}, {college.state}</div>
+                            </div>
+                            <span className="history-badge">Recent</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ) : collegeSearchQuery.trim().length >= 2 ? (
+                  <div className="search-empty">
+                    <div className="search-empty-icon">🔍</div>
+                    <p className="search-empty-message">No colleges found</p>
+                    <p className="search-empty-hint">Try a different search term</p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          )}
+        </div>
+      )
+    }
+    
     if (activeSection === 'chats') {
       return (
         <>
@@ -652,16 +1037,140 @@ const Chat = () => {
   // Render right panel content
   const renderRightPanel = () => {
     if (view === 'college-profile' && selectedCollege) {
-      return <CollegeProfileView college={selectedCollege} onJoinChat={() => handleJoinLiveChat(selectedCollege)} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} />
+      return <CollegeProfileView 
+        college={selectedCollege} 
+        user={user}
+        onJoinChat={() => handleJoinLiveChat(selectedCollege)} 
+        onJoinCampus={async (college) => {
+          try {
+            // Add student as member of college
+            const response = await joinCollege(college)
+            if (response.success) {
+              // Reload user to get updated college membership info
+              const userResponse = await verifyAuth()
+              if (userResponse.success) {
+                setUser(userResponse.user)
+              }
+              // Update selectedCollege with incremented member count
+              const updatedCollege = {
+                ...college,
+                totalMembers: (college.totalMembers || 0) + 1
+              }
+              setSelectedCollege(updatedCollege)
+              
+              // Add college to chats list in home section if not already there
+              const collegeId = college.aisheCode || college.name
+              const collegeName = college.name || 'College Chat'
+              const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+              
+              setChats(prev => {
+                const exists = prev.find(c => 
+                  c.type === 'college' && 
+                  (c.collegeId === collegeId || c.name === collegeName)
+                )
+                if (!exists) {
+                  return [{
+                    id: `college-${collegeId}`,
+                    type: 'college',
+                    collegeId: collegeId,
+                    name: collegeName,
+                    avatar: collegeLogo,
+                    lastMessage: 'No messages yet',
+                    timestamp: '',
+                    lastMessageTime: new Date(),
+                    unreadCount: 0,
+                    college: updatedCollege
+                  }, ...prev]
+                }
+                return prev
+              })
+            }
+            return response
+          } catch (error) {
+            console.error('Error joining college:', error)
+            return { success: false, message: error.message }
+          }
+        }}
+        onLeaveCampus={async (college) => {
+          try {
+            const response = await leaveCollege(college)
+            if (response.success) {
+              // Reload user to get updated college membership info
+              const userResponse = await verifyAuth()
+              if (userResponse.success) {
+                setUser(userResponse.user)
+              }
+              // Update selectedCollege with decremented member count
+              const updatedCollege = {
+                ...college,
+                totalMembers: Math.max((college.totalMembers || 1) - 1, 0)
+              }
+              setSelectedCollege(updatedCollege)
+              
+              // Remove college from chats list
+              const collegeId = college.aisheCode || college.name
+              setChats(prev => prev.filter(c => 
+                !(c.type === 'college' && (c.collegeId === collegeId || c.name === college.name))
+              ))
+              
+              // Clear selected chat if it's the one being left
+              if (selectedChat?.collegeId === collegeId) {
+                setSelectedChat(null)
+                setView('list')
+              }
+            }
+            return response
+          } catch (error) {
+            console.error('Error leaving college:', error)
+            return { success: false, message: error.message }
+          }
+        }}
+        onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} 
+      />
     }
     if (view === 'live-chat' && selectedChat) {
       const college = selectedChat.type === 'college' 
-        ? (selectedChat.college || dummyColleges.find(c => c.id === selectedChat.collegeId))
+        ? selectedChat.college
         : null
       return <LiveChatView chat={selectedChat} college={college} user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onViewProfile={() => college && handleViewCollegeProfile(college)} />
     }
     if (view === 'student-profile') {
-      return <StudentProfileView user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onVerificationUpdate={loadVerificationStatus} />
+      // Ensure handleLeaveCampus is defined
+      const leaveCollegeHandler = handleLeaveCampus || (async (college) => {
+        console.warn('handleLeaveCampus not available, using fallback')
+        try {
+          const response = await leaveCollege(college)
+          if (response.success) {
+            setChats(prev => prev.filter(c => c.collegeId !== (college.aisheCode || college.name)))
+            if (selectedChat?.collegeId === (college.aisheCode || college.name)) {
+              setSelectedChat(null)
+              setView('list')
+            }
+          }
+          return response
+        } catch (error) {
+          console.error('Error leaving college:', error)
+          return { success: false, message: error.message }
+        }
+      })
+      
+      return <StudentProfileView 
+        user={user} 
+        verificationStatus={verificationStatus} 
+        onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} 
+        onVerificationUpdate={loadVerificationStatus}
+        onProfileUpdate={async () => {
+          try {
+            const authData = await verifyAuth()
+            if (authData.success) {
+              setUser(authData.user)
+            }
+          } catch (error) {
+            console.error('Error updating profile:', error)
+          }
+        }}
+        onLeaveCollege={leaveCollegeHandler}
+      />
     }
     if (view === 'settings') {
       return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} onLogout={handleLogout} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} />
@@ -699,9 +1208,79 @@ const Chat = () => {
 
   return (
     <div className={`chat-container theme-${theme}`}>
-      {/* Top Header with Title */}
+      {/* Top Header with Logo and Search */}
       <div className="chat-top-header">
-        <h1 className="app-title">connect campus</h1>
+        <div className="header-logo">
+          <h1 className="app-title">connect campus</h1>
+        </div>
+        {!isMobileView && (
+          <div className="header-search-wrapper">
+            <form 
+              className="header-search-form"
+              onSubmit={handleCollegeSearch}
+            >
+              <input
+                type="text"
+                className="header-search-input"
+                placeholder="explore more colleges......"
+                value={collegeSearchQuery}
+              onChange={(e) => {
+                setCollegeSearchQuery(e.target.value)
+                // Search is handled by useEffect when collegeSearchQuery changes
+              }}
+                onFocus={() => {
+                  if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
+                    setShowCollegeSuggestions(true)
+                  }
+                }}
+                ref={collegeSearchRef}
+              />
+              <button type="submit" className="header-search-button">
+                <span>🔍</span>
+              </button>
+            </form>
+            {showCollegeSuggestions && (collegeSuggestions.length > 0 || recentCollegeSearches.length > 0) && (
+              <div className="header-suggestions-dropdown" ref={collegeSuggestionsRef}>
+                {collegeSuggestions.length > 0 ? (
+                  collegeSuggestions.map((college) => (
+                    <div
+                      key={college.aisheCode || college.id}
+                      className="suggestion-item"
+                      onClick={() => handleCollegeSuggestionClick(college)}
+                    >
+                      <div className="suggestion-avatar">
+                        <img src={college.logo} alt={college.name} />
+                        {college.isVerified && <span className="verified-badge-small">✓</span>}
+                      </div>
+                      <div className="suggestion-info">
+                        <div className="suggestion-name">{college.name}</div>
+                        <div className="suggestion-location">{college.district}, {college.state}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  recentCollegeSearches.slice(0, 5).map((college) => (
+                    <div
+                      key={college.aisheCode || college.id}
+                      className="suggestion-item"
+                      onClick={() => handleCollegeSuggestionClick(college)}
+                    >
+                      <div className="suggestion-avatar">
+                        <img src={college.logo} alt={college.name} />
+                        {college.isVerified && <span className="verified-badge-small">✓</span>}
+                      </div>
+                      <div className="suggestion-info">
+                        <div className="suggestion-name">{college.name}</div>
+                        <div className="suggestion-location">{college.district}, {college.state}</div>
+                      </div>
+                      <span className="history-badge">Recent</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Left Sidebar - Fixed Navigation */}
@@ -712,78 +1291,44 @@ const Chat = () => {
           </div>
           <div className="profile-name-sidebar">{getUserDisplayName()}</div>
         </div>
+        
+        {/* Search Chat Input */}
+        {activeSection === 'chats' && (
+          <div className="sidebar-search-chat">
+            <input
+              type="text"
+              className="sidebar-search-input"
+              placeholder="search chat..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        )}
+        
         <div className="sidebar-divider"></div>
-        <div className="sidebar-menu">
+        
+        {/* Chat List / Content */}
+        <div className="sidebar-content">
+          {/* Content will be rendered in middle panel */}
+        </div>
+        
+        {/* Bottom Menu - COMMUNITY and SETTING */}
+        <div className="sidebar-bottom-menu">
           <button
-            className={`sidebar-menu-item ${activeSection === 'chats' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('chats')}
-            title="Chats"
-          >
-            <span className="menu-icon">💬</span>
-            <span className="menu-label">Chats</span>
-          </button>
-          <button
-            className={`sidebar-menu-item ${activeSection === 'community' ? 'active' : ''}`}
+            className={`sidebar-bottom-item ${activeSection === 'community' ? 'active' : ''}`}
             onClick={() => handleSectionChange('community')}
             title="Community"
           >
-            <span className="menu-icon">🏫</span>
-            <span className="menu-label">Community</span>
+            <span className="bottom-item-label">COMMUNITY</span>
           </button>
           <button
-            className={`sidebar-menu-item ${activeSection === 'settings' ? 'active' : ''}`}
+            className={`sidebar-bottom-item ${activeSection === 'settings' ? 'active' : ''}`}
             onClick={() => { setActiveSection('settings'); setView('settings'); if (isMobileView) setShowChatList(false) }}
             title="Settings"
           >
-            <span className="menu-icon">⚙️</span>
-            <span className="menu-label">Settings</span>
+            <span className="bottom-item-label">SETTING</span>
           </button>
         </div>
-        <div className="sidebar-divider"></div>
-        <div className="sidebar-footer">
-          <button
-            className="sidebar-menu-item"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
-          >
-            <span className="menu-icon">{theme === 'dark' ? '🌗' : '☀️'}</span>
-            <span className="menu-label">Theme</span>
-          </button>
-          <button
-            className="sidebar-menu-item notification-toggle"
-            onClick={() => {
-              const newValue = !notificationsEnabled
-              setNotificationsEnabled(newValue)
-              localStorage.setItem('notificationsEnabled', JSON.stringify(newValue))
-            }}
-            title={notificationsEnabled ? 'Disable Notifications' : 'Enable Notifications'}
-          >
-            <span className="menu-icon">🔔</span>
-            <span className="menu-label">Notify</span>
-            {totalUnreadCount > 0 && (
-              <span className="notification-badge">{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</span>
-            )}
-          </button>
-          <button
-            className="sidebar-menu-item"
-            onClick={handleLogout}
-            title="Logout"
-          >
-            <span className="menu-icon">🚪</span>
-            <span className="menu-label">Logout</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Search Bar - Spans Middle and Right Panels */}
-      <div className="chat-search-bar">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="explore more colleges......"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
       </div>
 
       {/* Middle Panel - Dynamic List */}
@@ -792,63 +1337,348 @@ const Chat = () => {
       </div>
 
       {/* Right Panel - Main Content */}
-      <div className={`right-panel ${showChatList && isMobileView && view === 'list' ? 'hidden' : ''}`}>
-        {isMobileView && view !== 'list' && (
-          <button className="back-button" onClick={() => { setView('list'); setShowChatList(true) }}>
-            ←
-          </button>
-        )}
+      <div className={`right-panel ${(showChatList && isMobileView && view === 'list') || (isMobileView && activeSection === 'search' && !selectedChat) ? 'hidden' : ''}`}>
         {renderRightPanel()}
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      {isMobileView && (
+        <div className="mobile-bottom-nav">
+          <button
+            className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
+            onClick={() => { handleSectionChange('chats'); setView('list') }}
+            title="Home"
+          >
+            <span className="mobile-nav-icon">🏠</span>
+            <span className="mobile-nav-label">Home</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${isSearchActive ? 'active' : ''}`}
+            onClick={() => {
+              setIsSearchActive(true)
+              setShowChatList(true)
+              setView('list')
+              setActiveSection('search')
+              setCollegeSearchQuery('')
+              setSearchBarAtTop(false)
+              setSelectedCollegeInSearch(null)
+            }}
+            title="Search"
+          >
+            <span className="mobile-nav-icon">🔍</span>
+            <span className="mobile-nav-label">Search</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${activeSection === 'community' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('community')}
+            title="Explore"
+          >
+            <span className="mobile-nav-icon">🌐</span>
+            <span className="mobile-nav-label">Explore</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${view === 'student-profile' ? 'active' : ''}`}
+            onClick={handleProfileClick}
+            title="Profile"
+          >
+            <span className="mobile-nav-icon">👤</span>
+            <span className="mobile-nav-label">Profile</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${activeSection === 'settings' ? 'active' : ''}`}
+            onClick={() => { setActiveSection('settings'); setView('settings'); setShowChatList(false) }}
+            title="Settings"
+          >
+            <span className="mobile-nav-icon">⚙️</span>
+            <span className="mobile-nav-label">Settings</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
 // College Profile View Component
-const CollegeProfileView = ({ college, onJoinChat, onBack }) => {
+const CollegeProfileView = ({ college, user, onJoinChat, onJoinCampus, onLeaveCampus, onBack, showBackButton = true }) => {
+  const [showMembers, setShowMembers] = useState(false)
+  const [members, setMembers] = useState([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [collegeData, setCollegeData] = useState(college) // Local state for college data
+  const [isJoining, setIsJoining] = useState(false)
+
+  // Check if user is a member of this college
+  const isMember = user?.profile?.college && (
+    user.profile.college.aisheCode === college.aisheCode || 
+    user.profile.college.name === college.name
+  )
+
+  // Helper function to get user avatar
+  const getUserAvatar = () => {
+    if (user?.profile?.profilePicture) {
+      if (user.profile.profilePicture.startsWith('/uploads/')) {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        return `${backendUrl}${user.profile.profilePicture}`
+      }
+      return user.profile.profilePicture
+    }
+    const name = user?.profile?.displayName || user?.email || 'User'
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=50&background=00a8ff&color=fff`
+  }
+
+  // Helper function to get user display name
+  const getUserDisplayName = () => {
+    return user?.profile?.displayName || user?.email?.split('@')[0] || 'User'
+  }
+
+  // Handle join campus with member addition
+  const handleJoinCampus = async () => {
+    if (isJoining || isMember) return // Prevent multiple clicks
+    
+    setIsJoining(true)
+    const result = await onJoinCampus(college)
+    if (result?.success) {
+      // Add current user to members list
+      const userMember = {
+        id: user?.id || user?._id || `user-${Date.now()}`,
+        name: getUserDisplayName(),
+        avatar: getUserAvatar()
+      }
+      
+      // Update members list (only if not already present)
+      setMembers(prev => {
+        const exists = prev.find(m => 
+          m.id === userMember.id || 
+          (m.name === userMember.name && m.avatar === userMember.avatar)
+        )
+        if (!exists) {
+          return [userMember, ...prev]
+        }
+        return prev
+      })
+      
+      // Increment total members count (only if not already counted)
+      setCollegeData(prev => {
+        const currentCount = prev.totalMembers || 0
+        // Check if user is already in members to avoid double counting
+        const userAlreadyInMembers = members.some(m => 
+          m.id === userMember.id || 
+          (m.name === userMember.name && m.avatar === userMember.avatar)
+        )
+        if (!userAlreadyInMembers) {
+          return {
+            ...prev,
+            totalMembers: currentCount + 1
+          }
+        }
+        return prev
+      })
+    }
+    setIsJoining(false)
+  }
+
+  // Handle leave campus with member removal
+  const handleLeaveCampus = async () => {
+    if (isJoining || !isMember) return // Prevent multiple clicks
+    
+    setIsJoining(true)
+    if (onLeaveCampus) {
+      const result = await onLeaveCampus(college)
+      if (result?.success) {
+        // Remove current user from members list
+        const userId = user?.id || user?._id
+        const userName = getUserDisplayName()
+        
+        setMembers(prev => prev.filter(m => 
+          m.id !== userId && m.name !== userName
+        ))
+        
+        // Decrement total members count
+        setCollegeData(prev => ({
+          ...prev,
+          totalMembers: Math.max((prev.totalMembers || 1) - 1, 0)
+        }))
+      }
+    }
+    setIsJoining(false)
+  }
+
+  // Fetch members when toggle is clicked
+  const handleToggleMembers = async () => {
+    if (!showMembers && !members.length) {
+      setLoadingMembers(true)
+      try {
+        // Try to fetch members from API
+        const collegeId = encodeURIComponent(collegeData.aisheCode || collegeData.name)
+        const response = await fetch(`/api/colleges/${collegeId}/members`, {
+          credentials: 'include'
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.members) {
+            // Add current user to members if they're a member and not already in the list
+            let membersList = data.members
+            if (isMember && user) {
+              const userMember = {
+                id: user?.id || user?._id || `user-${Date.now()}`,
+                name: getUserDisplayName(),
+                avatar: getUserAvatar()
+              }
+              const userExists = membersList.some(m => 
+                m.id === userMember.id || 
+                (m.name === userMember.name && m.avatar === userMember.avatar)
+              )
+              if (!userExists) {
+                membersList = [userMember, ...membersList]
+              }
+            }
+            setMembers(membersList)
+          } else {
+            // No members returned from API, only show current user if they're a member
+            let membersList = []
+            if (isMember && user) {
+              membersList.push({
+                id: user?.id || user?._id || `user-${Date.now()}`,
+                name: getUserDisplayName(),
+                avatar: getUserAvatar()
+              })
+            }
+            setMembers(membersList)
+          }
+        } else {
+          // API doesn't exist yet, only show current user if they're a member
+          let membersList = []
+          if (isMember && user) {
+            membersList.push({
+              id: user?.id || user?._id || `user-${Date.now()}`,
+              name: getUserDisplayName(),
+              avatar: getUserAvatar()
+            })
+          }
+          setMembers(membersList)
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error)
+        // Fallback on error - only show current user if they're a member
+        let membersList = []
+        if (isMember && user) {
+          membersList.push({
+            id: user?.id || user?._id || `user-${Date.now()}`,
+            name: getUserDisplayName(),
+            avatar: getUserAvatar()
+          })
+        }
+        setMembers(membersList)
+      } finally {
+        setLoadingMembers(false)
+      }
+    }
+    setShowMembers(!showMembers)
+  }
+
+  // Update college data when prop changes
+  useEffect(() => {
+    setCollegeData(college)
+  }, [college])
+
+  // Initialize members list with current user if they're a member and list is empty
+  useEffect(() => {
+    if (isMember && user && members.length === 0 && !showMembers) {
+      const userMember = {
+        id: user?.id || user?._id || `user-${Date.now()}`,
+        name: getUserDisplayName(),
+        avatar: getUserAvatar()
+      }
+      setMembers([userMember])
+    }
+  }, [isMember, user, college])
+
+  // Generate about text
+  const aboutText = `${collegeData.name} is a prestigious educational institution located in ${collegeData.district}, ${collegeData.state}. We are committed to providing quality education and fostering a vibrant community of students and educators. Join us to connect with fellow students, share knowledge, and be part of an enriching academic experience.`
+
   return (
     <div className="college-profile-view">
-      <div className="view-header">
-        <button className="back-btn" onClick={onBack}>←</button>
-        <h2>College Profile</h2>
-      </div>
-      <div className="college-profile-content">
-        <div className="college-logo-large">
-          <img src={college.logo} alt={college.name} />
-          {college.isVerified && <span className="verified-badge-large">✓ Verified</span>}
-        </div>
-        <h1 className="college-name-large">{college.name}</h1>
-        <p className="college-location">{college.district}, {college.state}</p>
-        <div className="college-about">
-          <h3>About</h3>
-          <p>{college.about}</p>
-        </div>
-        <div className="college-stats">
-          <div className="stat-item">
-            <span className="stat-value">{college.totalMembers}</span>
-            <span className="stat-label">Total Members</span>
-          </div>
-        </div>
-        <div className="college-members">
-          <h3>Members</h3>
-          <div className="members-list">
-            {college.members.map(member => (
-              <div key={member.id} className="member-avatar" title={member.name}>
-                <img src={member.avatar} alt={member.name} />
-              </div>
-            ))}
-            {college.members.length < college.totalMembers && (
-              <div className="member-avatar more">
-                <span>+{college.totalMembers - college.members.length}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="college-actions">
-          {!college.isVerified && (
-            <button className="btn-secondary">Get Verified</button>
+      <div className="college-profile-content-new">
+        {/* Logo in the middle */}
+        <div className="college-logo-center">
+          <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=150&background=00a8ff&color=fff`} alt={college.name} />
+          {college.isVerified && (
+            <div className="verified-badge-center" title="Verified College">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           )}
-          <button className="btn-primary" onClick={onJoinChat}>Join Live Chat</button>
+        </div>
+
+        {/* Full name and location */}
+        <div className="college-name-section">
+          <h1 className="college-name-full">{collegeData.name}</h1>
+          <p className="college-location-full">{collegeData.district}, {collegeData.state}</p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="college-action-buttons">
+          <button 
+            className={isMember ? "btn-join-campus btn-remove-campus" : "btn-join-campus"} 
+            onClick={isMember ? handleLeaveCampus : handleJoinCampus}
+            disabled={isJoining}
+          >
+            {isMember ? 'Remove College' : 'Join College'}
+          </button>
+          {isMember && (
+            <button 
+              className="btn-join-chat" 
+              onClick={onJoinChat}
+            >
+              Join Chat
+            </button>
+          )}
+        </div>
+
+        {/* About Section */}
+        <div className="college-about-section">
+          <h3 className="section-title">About</h3>
+          <p className="about-text">{aboutText}</p>
+        </div>
+
+        {/* Total Members Toggle */}
+        <div className="college-members-section">
+          <button 
+            className="members-toggle"
+            onClick={handleToggleMembers}
+          >
+            <span className="toggle-label">Total Members</span>
+            <span className="toggle-count">{collegeData.totalMembers || 0}</span>
+            <span className="toggle-arrow">{showMembers ? '▼' : '▶'}</span>
+          </button>
+
+          {/* Members List (shown when toggle is active) */}
+          {showMembers && (
+            <div className="members-list-container">
+              {loadingMembers ? (
+                <div className="members-loading">Loading members...</div>
+              ) : members.length > 0 ? (
+                <div className="members-list-whatsapp">
+                  {members.map((member, index) => (
+                    <div key={member.id || index} className="member-item-whatsapp">
+                      <div className="member-avatar-whatsapp">
+                        <img 
+                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`} 
+                          alt={member.name || 'Member'} 
+                        />
+                      </div>
+                      <div className="member-name-whatsapp">{member.name || 'Member'}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="members-empty">No members found</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -926,27 +1756,56 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
 
   // Set up Socket.IO listeners for real-time messages
   useEffect(() => {
-    if (!socket || !collegeId || chat.type !== 'college') return
+    if (!collegeId || chat.type !== 'college') return
 
     const handleReceiveMessage = (message) => {
       // Only add message if it's for this college
       if (message.collegeId === collegeId) {
-        const formattedMessage = {
-          id: message.id,
-          text: message.text,
-          sender: message.senderName,
-          senderId: message.senderId,
-          time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
-          date: formatDate(new Date(message.timestamp)),
-          isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
-          timestamp: new Date(message.timestamp)
-        }
-        
-        setMessages(prev => [...prev, formattedMessage])
+        // Check if this message matches an optimistic message (replace it)
+        setMessages(prev => {
+          const optimisticIndex = prev.findIndex(m => 
+            m.isOptimistic && 
+            m.text === message.text && 
+            String(m.senderId) === String(message.senderId)
+          )
+          
+          if (optimisticIndex !== -1) {
+            // Replace optimistic message with real one
+            const newMessages = [...prev]
+            newMessages[optimisticIndex] = {
+              id: message.id,
+              text: message.text,
+              sender: message.senderName,
+              senderId: message.senderId,
+              time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+              date: formatDate(new Date(message.timestamp)),
+              isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
+              timestamp: new Date(message.timestamp)
+            }
+            return newMessages
+          } else {
+            // New message from someone else, add it
+            const formattedMessage = {
+              id: message.id,
+              text: message.text,
+              sender: message.senderName,
+              senderId: message.senderId,
+              time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+              date: formatDate(new Date(message.timestamp)),
+              isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
+              timestamp: new Date(message.timestamp)
+            }
+            return [...prev, formattedMessage]
+          }
+        })
       }
     }
 
@@ -955,7 +1814,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
     return () => {
       // Cleanup is handled by removeAllListeners in parent
     }
-  }, [socket, collegeId, chat.type, user?.id])
+  }, [collegeId, chat.type, user?.id])
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -964,11 +1823,66 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
     }
   }, [messages])
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (messageInput.trim() && socket?.connected && collegeId) {
-      sendMessage(messageInput.trim(), collegeId)
-      setMessageInput('')
+    const messageText = messageInput.trim()
+    if (!messageText || !collegeId) return
+
+    // Create optimistic message
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`,
+      text: messageText,
+      sender: user?.profile?.displayName || user?.email?.split('@')[0] || 'You',
+      senderId: user?.id || user?._id || '',
+      time: new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      }),
+      date: formatDate(new Date()),
+      isOwn: true,
+      timestamp: new Date(),
+      isOptimistic: true
+    }
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage])
+    setMessageInput('')
+
+    // Try to connect socket if not connected
+    let socketInstance = socket
+    if (!socketInstance || !socketInstance.connected) {
+      try {
+        socketInstance = connectSocket()
+        if (socketInstance) {
+          // Join room
+          onJoinedRoom((data) => {
+            console.log('✅ Joined college room:', data)
+          })
+          socketInstance.emit('joinCollegeRoom', { collegeId })
+          await new Promise(resolve => setTimeout(resolve, 200)) // Wait a bit for join
+        }
+      } catch (error) {
+        console.error('Failed to connect socket:', error)
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+        return
+      }
+    }
+
+    // Send message via socket
+    try {
+      if (socketInstance && socketInstance.connected) {
+        sendMessage(messageText, collegeId)
+      } else {
+        console.error('Socket not connected, cannot send message')
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
     }
   }
 
@@ -976,35 +1890,48 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
 
   // Determine if it's a direct message or college chat
   const isDirectMessage = chat.type === 'direct'
-  const displayName = isDirectMessage ? chat.name : (college?.name || chat.name || 'College Chat')
-  const displayAvatar = chat.avatar || (college?.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=50&background=00a8ff&color=fff`)
+  const fullCollegeName = college?.name || chat.name || 'College Chat'
+  // Truncate college name to show only first few words
+  const truncateName = (name, maxWords = 3) => {
+    const words = name.split(' ')
+    if (words.length <= maxWords) return name
+    return words.slice(0, maxWords).join(' ') + '...'
+  }
+  const displayName = isDirectMessage ? chat.name : truncateName(fullCollegeName, 3)
+  const displayAvatar = chat.avatar || (college?.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullCollegeName)}&size=50&background=00a8ff&color=fff`)
   const displayStatus = isDirectMessage 
     ? (chat.isOnline ? 'Online' : 'Offline')
     : `${chat.onlineCount || 0} online`
+  // Check if college is verified
+  const isCollegeVerified = college?.isVerified || false
 
   return (
     <div className="live-chat-view">
       <div className="chat-header-bar">
-        <button className="back-btn" onClick={onBack}>←</button>
         <div className="chat-header-avatar">
           <img src={displayAvatar} alt={displayName} />
         </div>
         <div className="chat-header-info">
           <div className="chat-header-name-row">
             <h3>{displayName}</h3>
-            {verificationStatus?.status === 'verified' && (
-              <span className="verified-badge-chat" title="Verified Student">✓</span>
+            {isCollegeVerified && (
+              <div className="verified-badge-blue-inline" title="Verified College">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+            {!isDirectMessage && verificationStatus?.status === 'verified' && (
+              <div className="verified-badge-blue-inline" title="Verified Student">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             )}
           </div>
           <span className="chat-status">{displayStatus}</span>
-        </div>
-        <div className="chat-header-actions">
-          {!isDirectMessage && verificationStatus?.status !== 'verified' && (
-            <button className="action-btn" title="Get Verified">Verify</button>
-          )}
-          {!isDirectMessage && college && (
-            <button className="action-btn" onClick={onViewProfile} title="College Info">ℹ️</button>
-          )}
         </div>
       </div>
       <div className="chat-messages-area">
@@ -1019,7 +1946,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
               const showDate = message.date !== lastDate
               if (showDate) lastDate = message.date
               return (
-                <React.Fragment key={message.id}>
+                <Fragment key={message.id}>
                   {showDate && (
                     <div className="date-separator" key={`date-${message.id}`}>
                       <span>{message.date}</span>
@@ -1034,7 +1961,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
                       <span className="message-time">{message.time}</span>
                     </div>
                   </div>
-                </React.Fragment>
+                </Fragment>
               )
             })
           })()
@@ -1056,19 +1983,161 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, user, verification
 }
 
 // Student Profile View Component
-const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUpdate }) => {
+const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUpdate, onProfileUpdate, onLeaveCollege }) => {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [uploadingPicture, setUploadingPicture] = useState(false)
+  const [pictureError, setPictureError] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    displayName: '',
+    firstName: '',
+    lastName: '',
+    bio: '',
+    year: '',
+    course: ''
+  })
   const fileInputRef = useRef(null)
+  const profilePictureInputRef = useRef(null)
+
+  // Initialize edit form when component mounts or user changes
+  useEffect(() => {
+    try {
+      if (user?.profile) {
+        setEditForm({
+          displayName: user.profile.displayName || '',
+          firstName: user.profile.firstName || '',
+          lastName: user.profile.lastName || '',
+          bio: user.profile.bio || '',
+          year: user.profile.year || '',
+          course: user.profile.course || ''
+        })
+      } else if (user) {
+        // User exists but no profile yet, initialize with empty values
+        setEditForm({
+          displayName: user.email?.split('@')[0] || '',
+          firstName: '',
+          lastName: '',
+          bio: '',
+          year: '',
+          course: ''
+        })
+      }
+    } catch (error) {
+      console.error('Error initializing edit form:', error)
+    }
+  }, [user])
 
   const getUserAvatar = () => {
-    if (user?.profile?.profilePicture) {
-      return user.profile.profilePicture
+    try {
+      if (user?.profile?.profilePicture) {
+        // If it's a relative path, prepend the backend URL
+        if (user.profile.profilePicture.startsWith('/uploads/')) {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+          return `${backendUrl}${user.profile.profilePicture}`
+        }
+        return user.profile.profilePicture
+      }
+      const name = user?.profile?.displayName || user?.email || 'User'
+      const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=100&background=00a8ff&color=fff`
+    } catch (error) {
+      console.error('Error in getUserAvatar:', error)
+      return `https://ui-avatars.com/api/?name=User&size=100&background=00a8ff&color=fff`
     }
-    const name = user?.profile?.displayName || user?.email || 'User'
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=100&background=00a8ff&color=fff`
+  }
+
+  const handleProfilePictureSelect = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setPictureError('Please select an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPictureError('File size must be less than 5MB')
+      return
+    }
+
+    try {
+      setUploadingPicture(true)
+      setPictureError(null)
+
+      const response = await uploadProfilePicture(file)
+      
+      if (response.success) {
+        if (onProfileUpdate) {
+          await onProfileUpdate()
+        }
+        if (profilePictureInputRef.current) {
+          profilePictureInputRef.current.value = ''
+        }
+      } else {
+        setPictureError(response.message || 'Failed to upload profile picture')
+      }
+    } catch (error) {
+      console.error('Error uploading profile picture:', error)
+      setPictureError('Failed to upload profile picture. Please try again.')
+    } finally {
+      setUploadingPicture(false)
+    }
+  }
+
+  const handleEditProfile = async () => {
+    if (!editForm.displayName || !editForm.displayName.trim()) {
+      setUploadError('Display name is required')
+      return
+    }
+
+    try {
+      setUploading(true)
+      setUploadError(null)
+
+      const response = await updateProfile({
+        displayName: editForm.displayName.trim(),
+        firstName: editForm.firstName.trim() || undefined,
+        lastName: editForm.lastName.trim() || undefined,
+        bio: editForm.bio.trim() || undefined,
+        year: editForm.year || undefined,
+        course: editForm.course.trim() || undefined,
+      })
+      
+      if (response.success) {
+        setIsEditing(false)
+        if (onProfileUpdate) {
+          await onProfileUpdate()
+        }
+      } else {
+        setUploadError(response.message || 'Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      setUploadError('Failed to update profile. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveCollege = async () => {
+    if (!user?.profile?.college) return
+    
+    if (window.confirm('Are you sure you want to remove your college identity? This will remove you from the college chat.')) {
+      try {
+        setUploading(true)
+        await onLeaveCollege(user.profile.college)
+        if (onProfileUpdate) {
+          await onProfileUpdate()
+        }
+      } catch (error) {
+        console.error('Error removing college:', error)
+        setUploadError('Failed to remove college identity')
+      } finally {
+        setUploading(false)
+      }
+    }
   }
 
   const handleFileSelect = async (e) => {
@@ -1128,9 +2197,27 @@ const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUp
     }
   }
 
-  const isVerified = verificationStatus?.status === 'verified'
-  const isPending = verificationStatus?.status === 'pending'
-  const isNotSubmitted = !verificationStatus || verificationStatus.status === 'not_submitted'
+  // Safety check: if user is not loaded yet, show loading state
+  if (!user) {
+    console.warn('⚠️ StudentProfileView: user is not loaded')
+    return (
+      <div className="student-profile-view">
+        <div className="view-header">
+          <button className="back-btn" onClick={onBack}>←</button>
+          <h2>My Profile</h2>
+        </div>
+        <div className="student-profile-content" style={{ textAlign: 'center', padding: '40px' }}>
+          <p>Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Safe variable assignments with defaults
+  const isVerified = verificationStatus?.status === 'verified' || false
+  const isPending = verificationStatus?.status === 'pending' || false
+  const isNotSubmitted = !verificationStatus || verificationStatus.status === 'not_submitted' || false
+  const collegeName = user?.profile?.college?.name || ''
 
   return (
     <div className="student-profile-view">
@@ -1139,20 +2226,223 @@ const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUp
         <h2>My Profile</h2>
       </div>
       <div className="student-profile-content">
-        <div className="profile-photo-large">
-          <img src={getUserAvatar()} alt="Profile" />
-        </div>
-        <div className="profile-name-row">
-          <h1 className="profile-name">{user?.profile?.displayName || user?.email || 'User'}</h1>
-          {isVerified && (
-            <span className="verified-badge-profile" title="Verified Student">✓</span>
+        {/* Profile Photo Section */}
+        <div className="profile-photo-section">
+          <div className="profile-photo-large">
+            <img src={getUserAvatar()} alt="Profile" />
+            {isVerified && (
+              <div className="verified-badge-blue" title="Verified Student">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+            <div className="profile-photo-overlay">
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureSelect}
+                style={{ display: 'none' }}
+                id="profile-picture-upload"
+              />
+              <button 
+                className="photo-upload-btn"
+                onClick={() => profilePictureInputRef.current?.click()}
+                disabled={uploadingPicture}
+                title="Change Profile Photo"
+              >
+                {uploadingPicture ? '⏳' : '📷'}
+              </button>
+            </div>
+          </div>
+          {pictureError && (
+            <p className="upload-error-small">{pictureError}</p>
           )}
         </div>
-        <p className="profile-email">{user?.email}</p>
-        {user?.profile?.college?.name && (
-          <p className="profile-college">{user.profile.college.name}</p>
+
+        {/* Profile Name and Info */}
+        <div className="profile-header-info">
+          <div className="profile-name-row">
+            <h1 className="profile-name">
+              {user?.profile?.displayName || user?.email?.split('@')[0] || 'User'}
+            </h1>
+            {isVerified && (
+              <div className="verified-badge-blue-inline" title="Verified Student">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                  <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+          </div>
+          <p className="profile-email">{user?.email}</p>
+          {user?.profile?.college?.name && (
+            <div className="profile-college-row">
+              <p className="profile-college">📚 {user.profile.college.name}</p>
+              <button 
+                className="remove-college-btn"
+                onClick={handleRemoveCollege}
+                title="Remove College Identity"
+                disabled={uploading}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Bio Section */}
+        <div className="profile-bio-section">
+          {isEditing ? (
+            <div className="bio-edit-form">
+              <textarea
+                className="bio-input"
+                placeholder="Tell us about yourself..."
+                value={editForm.bio}
+                onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
+                maxLength={500}
+                rows={4}
+              />
+              <div className="bio-char-count">{editForm.bio.length}/500</div>
+            </div>
+          ) : (
+            <div className="profile-bio">
+              {isVerified && collegeName ? (
+                <p className="verified-bio-text">
+                  ✓ Verified student of <strong>{collegeName}</strong>
+                </p>
+              ) : user?.profile?.bio ? (
+                <p>{user.profile.bio}</p>
+              ) : (
+                <p className="bio-placeholder">No bio yet. Click Edit to add one.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Profile Details */}
+        {isEditing ? (
+          <div className="profile-edit-form">
+            <div className="form-group">
+              <label>Display Name <span className="required">*</span></label>
+              <input
+                type="text"
+                className="form-input"
+                value={editForm.displayName}
+                onChange={(e) => setEditForm({...editForm, displayName: e.target.value})}
+                placeholder="Your display name"
+                required
+              />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>First Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm({...editForm, firstName: e.target.value})}
+                  placeholder="First name"
+                />
+              </div>
+              <div className="form-group">
+                <label>Last Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm({...editForm, lastName: e.target.value})}
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Year</label>
+                <select
+                  className="form-input"
+                  value={editForm.year}
+                  onChange={(e) => setEditForm({...editForm, year: e.target.value})}
+                >
+                  <option value="">Select Year</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                  <option value="Graduate">Graduate</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Course</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editForm.course}
+                  onChange={(e) => setEditForm({...editForm, course: e.target.value})}
+                  placeholder="e.g., Computer Science"
+                />
+              </div>
+            </div>
+            {uploadError && (
+              <p className="upload-error">{uploadError}</p>
+            )}
+            <div className="form-actions">
+              <button 
+                className="btn-secondary"
+                onClick={() => {
+                  setIsEditing(false)
+                  setUploadError(null)
+                  if (user?.profile) {
+                    setEditForm({
+                      displayName: user.profile.displayName || '',
+                      firstName: user.profile.firstName || '',
+                      lastName: user.profile.lastName || '',
+                      bio: user.profile.bio || '',
+                      year: user.profile.year || '',
+                      course: user.profile.course || ''
+                    })
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary"
+                onClick={handleEditProfile}
+                disabled={uploading || !editForm.displayName.trim()}
+              >
+                {uploading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="profile-details">
+            {(user?.profile?.firstName || user?.profile?.lastName) && (
+              <div className="detail-item">
+                <span className="detail-label">Name:</span>
+                <span className="detail-value">
+                  {[user.profile.firstName, user.profile.lastName].filter(Boolean).join(' ') || 'Not set'}
+                </span>
+              </div>
+            )}
+            {user?.profile?.year && (
+              <div className="detail-item">
+                <span className="detail-label">Year:</span>
+                <span className="detail-value">{user.profile.year}</span>
+              </div>
+            )}
+            {user?.profile?.course && (
+              <div className="detail-item">
+                <span className="detail-label">Course:</span>
+                <span className="detail-value">{user.profile.course}</span>
+              </div>
+            )}
+          </div>
         )}
-        
+
         {/* Verification Status */}
         <div className="verification-section">
           <h3>Verification Status</h3>
@@ -1168,15 +2458,17 @@ const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUp
             <p className="rejection-reason">Reason: {verificationStatus.rejectionReason}</p>
           )}
         </div>
-
-        {user?.profile?.bio && (
-          <div className="profile-bio">
-            <h3>Bio</h3>
-            <p>{user.profile.bio}</p>
-          </div>
-        )}
         
+        {/* Actions */}
         <div className="profile-actions">
+          {!isEditing && (
+            <button 
+              className="btn-primary"
+              onClick={() => setIsEditing(true)}
+            >
+              ✏️ Edit Profile
+            </button>
+          )}
           {isNotSubmitted && (
             <div className="upload-section">
               <input
@@ -1188,11 +2480,11 @@ const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUp
                 id="college-id-upload"
               />
               <button 
-                className="btn-primary" 
+                className="btn-secondary" 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                {uploading ? 'Uploading...' : 'Upload College ID'}
+                {uploading ? 'Uploading...' : '📄 Upload College ID'}
               </button>
               {uploadError && (
                 <p className="upload-error">{uploadError}</p>
@@ -1204,7 +2496,7 @@ const StudentProfileView = ({ user, verificationStatus, onBack, onVerificationUp
           )}
           {isPending && (
             <div className="verification-pending-message">
-              <p>Your college ID is under review. You'll be notified once verification is complete.</p>
+              <p>⏳ Your college ID is under review. You'll be notified once verification is complete.</p>
             </div>
           )}
           {isVerified && (
