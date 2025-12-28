@@ -47,6 +47,14 @@ const Chat = () => {
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
   const navigationHistory = useRef([]) // Track navigation history for back button
+  const [middlePanelWidth, setMiddlePanelWidth] = useState(() => {
+    // Load from localStorage or use default
+    const saved = localStorage.getItem('middlePanelWidth')
+    return saved ? parseInt(saved, 10) : 400
+  })
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStartX = useRef(0)
+  const resizeStartWidth = useRef(400)
 
   // Load user data and connect Socket.IO
   useEffect(() => {
@@ -372,10 +380,10 @@ const Chat = () => {
       )
       
       if (existingChat) {
-        // Chat exists, open it
+        // Chat exists, open college profile first (user can then join chat from profile)
         setSelectedCollege(collegeData)
         setSelectedChat(existingChat)
-        setView('live-chat')
+        setView('college-profile')
         setActiveSection('chats')
         if (isMobileView) {
           setShowChatList(false)
@@ -416,10 +424,10 @@ const Chat = () => {
         console.error('Error loading chat info:', error)
       })
       
-      // Open the chat immediately
+      // Open the college profile first (user can then join chat from profile)
       setSelectedCollege(collegeData)
       setSelectedChat(newChat)
-      setView('live-chat')
+      setView('college-profile')
       setActiveSection('chats')
       if (isMobileView) {
         setShowChatList(false)
@@ -734,6 +742,45 @@ const Chat = () => {
       setShowChatList(false)
     }
   }
+
+  // Resize handlers for middle panel
+  const handleResizeMove = useCallback((e) => {
+    const currentX = e.clientX || e.touches?.[0]?.clientX
+    const diff = currentX - resizeStartX.current
+    const newWidth = Math.max(300, Math.min(800, resizeStartWidth.current + diff)) // Min 300px, Max 800px
+    setMiddlePanelWidth(newWidth)
+    localStorage.setItem('middlePanelWidth', newWidth.toString())
+  }, [])
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false)
+    document.removeEventListener('mousemove', handleResizeMove)
+    document.removeEventListener('mouseup', handleResizeEnd)
+    document.removeEventListener('touchmove', handleResizeMove)
+    document.removeEventListener('touchend', handleResizeEnd)
+  }, [handleResizeMove])
+
+  const handleResizeStart = useCallback((e) => {
+    if (isMobileView) return // Don't allow resizing on mobile
+    setIsResizing(true)
+    resizeStartX.current = e.clientX || e.touches?.[0]?.clientX
+    resizeStartWidth.current = middlePanelWidth
+    document.addEventListener('mousemove', handleResizeMove)
+    document.addEventListener('mouseup', handleResizeEnd)
+    document.addEventListener('touchmove', handleResizeMove)
+    document.addEventListener('touchend', handleResizeEnd)
+    e.preventDefault()
+  }, [isMobileView, middlePanelWidth, handleResizeMove, handleResizeEnd])
+
+  // Cleanup resize listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeEnd)
+      document.removeEventListener('touchmove', handleResizeMove)
+      document.removeEventListener('touchend', handleResizeEnd)
+    }
+  }, [handleResizeMove, handleResizeEnd])
 
   // Handle logout
   const handleLogout = async () => {
@@ -1453,7 +1500,6 @@ const Chat = () => {
             return { success: false, message: error.message }
           }
         }}
-        onBack={navigateBack} 
       />
     }
     if (view === 'live-chat' && selectedChat) {
@@ -1518,18 +1564,23 @@ const Chat = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <div className={`chat-container theme-${theme}`} style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100vh',
-        width: '100vw',
-        backgroundColor: '#0b141a',
-        color: '#e9edef'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '16px' }}>Loading...</div>
-          <div>Please wait while we load your chat</div>
+      <div className="loading-screen">
+        <div className="loading-container">
+          <div className="loading-spinner">
+            <div className="spinner-ring"></div>
+            <div className="spinner-ring"></div>
+            <div className="spinner-ring"></div>
+            <div className="spinner-ring"></div>
+          </div>
+          <div className="loading-text">
+            <h2 className="loading-title">connect campus</h2>
+            <p className="loading-subtitle">Loading your chat experience...</p>
+          </div>
+          <div className="loading-dots">
+            <span className="dot"></span>
+            <span className="dot"></span>
+            <span className="dot"></span>
+          </div>
         </div>
       </div>
     )
@@ -1539,8 +1590,19 @@ const Chat = () => {
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search */}
       <div className="chat-top-header">
-        <div className="header-logo">
-          <h1 className="app-title">connect campus</h1>
+        <div className="header-left-section">
+          <button 
+            className="navbar-back-to-home-btn"
+            onClick={() => navigate('/')}
+            title="Back to Home"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <div className="header-logo">
+            <h1 className="app-title">connect campus</h1>
+          </div>
         </div>
         {/* Search bar on the right side - same as landing page */}
         {!isMobileView && (
@@ -1669,12 +1731,31 @@ const Chat = () => {
       </div>
 
       {/* Middle Panel - Dynamic List */}
-      <div className={`middle-panel ${!showChatList && isMobileView ? 'hidden' : ''}`}>
+      <div 
+        className={`middle-panel ${!showChatList && isMobileView ? 'hidden' : ''} ${isResizing ? 'resizing' : ''}`}
+        style={{ width: isMobileView ? '100%' : `${middlePanelWidth}px` }}
+      >
         {renderMiddlePanel()}
       </div>
 
+      {/* Resizable Divider - Only on desktop */}
+      {!isMobileView && (
+        <div 
+          className={`panel-resizer ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={handleResizeStart}
+          onTouchStart={handleResizeStart}
+          style={{ 
+            left: `${80 + middlePanelWidth}px`,
+            cursor: isResizing ? 'col-resize' : 'col-resize' 
+          }}
+        />
+      )}
+
       {/* Right Panel - Main Content */}
-      <div className={`right-panel ${(showChatList && isMobileView && view === 'list') || (isMobileView && activeSection === 'search' && !selectedChat) ? 'hidden' : ''}`}>
+      <div 
+        className={`right-panel ${(showChatList && isMobileView && view === 'list') || (isMobileView && activeSection === 'search' && !selectedChat) ? 'hidden' : ''} ${isResizing ? 'resizing' : ''}`}
+        style={{ left: isMobileView ? '0' : `${80 + middlePanelWidth}px` }}
+      >
         {renderRightPanel()}
       </div>
 

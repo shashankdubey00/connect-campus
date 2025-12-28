@@ -42,11 +42,11 @@ const CollegeProfileCard = ({ college }) => {
         },
       });
     } else {
-      // User is authenticated - redirect to chat with college context
+      // User is authenticated - redirect to chat page with college context to open college profile
       navigate('/chat', {
         state: {
           college: college,
-          openCollegeChat: true,
+          openCollegeChat: true, // This will open college profile first, then user can join chat
         },
       });
     }
