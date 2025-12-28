@@ -1,4 +1,6 @@
 import UserProfile from '../models/UserProfile.js';
+import Follow from '../models/Follow.js';
+import User from '../models/User.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -252,6 +254,265 @@ export const leaveCollege = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error leaving college',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Follow a college
+ */
+export const followCollege = async (req, res) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+    }
+    
+    const userId = req.user.userId;
+    const { aisheCode, name } = req.body;
+
+    if (!aisheCode && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode or name is required',
+      });
+    }
+
+    const collegeId = aisheCode || name;
+
+    // Check if already following
+    const existingFollow = await Follow.findOne({
+      userId,
+      collegeId,
+    });
+
+    if (existingFollow) {
+      return res.json({
+        success: true,
+        message: 'Already following this college',
+        follow: existingFollow,
+      });
+    }
+
+    // Create new follow
+    const follow = new Follow({
+      userId,
+      collegeId,
+      collegeAisheCode: aisheCode,
+    });
+
+    await follow.save();
+
+    res.json({
+      success: true,
+      message: 'Successfully followed college',
+      follow,
+    });
+  } catch (error) {
+    console.error('Error following college:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error following college',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Unfollow a college
+ */
+export const unfollowCollege = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { aisheCode, name } = req.body;
+
+    if (!aisheCode && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode or name is required',
+      });
+    }
+
+    const collegeId = aisheCode || name;
+
+    // Find and delete follow
+    const follow = await Follow.findOneAndDelete({
+      userId,
+      collegeId,
+    });
+
+    if (!follow) {
+      return res.status(404).json({
+        success: false,
+        message: 'You are not following this college',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Successfully unfollowed college',
+    });
+  } catch (error) {
+    console.error('Error unfollowing college:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error unfollowing college',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Check if user follows a college
+ */
+export const checkFollowStatus = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { aisheCode, name } = req.query;
+
+    if (!aisheCode && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode or name is required',
+      });
+    }
+
+    const collegeId = aisheCode || name;
+
+    const follow = await Follow.findOne({
+      userId,
+      collegeId,
+    });
+
+    res.json({
+      success: true,
+      isFollowing: !!follow,
+    });
+  } catch (error) {
+    console.error('Error checking follow status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking follow status',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get count of followers for a college
+ */
+export const getCollegeFollowersCount = async (req, res) => {
+  try {
+    const { aisheCode, name } = req.query;
+
+    if (!aisheCode && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode or name is required',
+      });
+    }
+
+    const collegeId = aisheCode || name;
+
+    const count = await Follow.countDocuments({ collegeId });
+
+    res.json({
+      success: true,
+      count,
+    });
+  } catch (error) {
+    console.error('Error getting followers count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting followers count',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get all followers of a college with user details
+ */
+export const getCollegeFollowers = async (req, res) => {
+  try {
+    const { aisheCode, name } = req.query;
+
+    if (!aisheCode && !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'College aisheCode or name is required',
+      });
+    }
+
+    const collegeId = aisheCode || name;
+
+    // Get all follows for this college
+    const follows = await Follow.find({ collegeId }).lean();
+
+    // Get user IDs
+    const userIds = follows.map(f => f.userId);
+
+    // Get user profiles
+    const userProfiles = await UserProfile.find({ userId: { $in: userIds } }).lean();
+    const users = await User.find({ _id: { $in: userIds } }).select('email').lean();
+
+    // Create a map of userId to profile and user
+    const profileMap = new Map();
+    userProfiles.forEach(profile => {
+      profileMap.set(profile.userId.toString(), profile);
+    });
+    const userMap = new Map();
+    users.forEach(user => {
+      userMap.set(user._id.toString(), user);
+    });
+
+    // Format followers with user details
+    const followers = follows
+      .map(f => {
+        const userId = f.userId.toString();
+        const profile = profileMap.get(userId);
+        const user = userMap.get(userId);
+
+        if (!user) return null; // Skip if user not found
+
+        const displayName = profile?.displayName || 
+          (profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : '') || 
+          user.email?.split('@')[0] || 
+          'User';
+        
+        let avatar = '';
+        if (profile?.profilePicture) {
+          if (profile.profilePicture.startsWith('/uploads/')) {
+            avatar = profile.profilePicture;
+          } else {
+            avatar = profile.profilePicture;
+          }
+        } else {
+          const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=50&background=00a8ff&color=fff`;
+        }
+
+        return {
+          id: userId,
+          name: displayName,
+          avatar: avatar,
+        };
+      })
+      .filter(f => f !== null); // Remove null entries
+
+    res.json({
+      success: true,
+      members: followers,
+      count: followers.length,
+    });
+  } catch (error) {
+    console.error('Error getting college followers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting college followers',
       error: error.message,
     });
   }

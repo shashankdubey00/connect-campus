@@ -1,7 +1,7 @@
 import express from 'express';
 import Message from '../models/Message.js';
+import Follow from '../models/Follow.js';
 import { protect } from '../middleware/authMiddleware.js';
-import UserProfile from '../models/UserProfile.js';
 import College from '../../models/College.js';
 
 const router = express.Router();
@@ -53,17 +53,27 @@ router.get('/college/:collegeId', protect, async (req, res) => {
   }
 });
 
-// Get all colleges where user has sent or received messages
+// Get all colleges where user has sent messages OR follows
+// Students can join multiple colleges and chat in any college
+// Show colleges where they've sent messages OR followed
 router.get('/user/colleges', protect, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
+    
+    // Find all distinct collegeIds where THIS USER has sent messages
+    const collegeIdsFromMessages = await Message.distinct('collegeId', {
+      senderId: userId
+    });
 
-    // Find all distinct collegeIds where messages exist
-    // Since users can see all college chats, get all colleges with messages
-    const collegeIds = await Message.distinct('collegeId');
+    // Find all colleges the user follows
+    const follows = await Follow.find({ userId }).lean();
+    const collegeIdsFromFollows = follows.map(f => f.collegeId);
 
-    // If no messages found, return empty array
-    if (collegeIds.length === 0) {
+    // Combine both lists and get unique college IDs
+    const allCollegeIds = [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows])];
+
+    // If no colleges found (user hasn't sent messages or followed any), return empty array
+    if (allCollegeIds.length === 0) {
       return res.json({
         success: true,
         colleges: []
@@ -73,17 +83,17 @@ router.get('/user/colleges', protect, async (req, res) => {
     // Fetch college details for each collegeId
     const colleges = await College.find({
       $or: [
-        { aisheCode: { $in: collegeIds } },
-        { name: { $in: collegeIds } }
+        { aisheCode: { $in: allCollegeIds } },
+        { name: { $in: allCollegeIds } }
       ]
     }).lean();
 
-    // Get last message for each college
+    // Get last message for each college (from all users since it's a group chat)
     const collegesWithMessages = await Promise.all(
       colleges.map(async (college) => {
         const collegeId = college.aisheCode || college.name;
         
-        // Get last message for this college
+        // Get last message for this college (from all users since it's a group chat)
         const lastMessage = await Message.findOne({ collegeId })
           .sort({ timestamp: -1 })
           .lean();

@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { protect } from '../middleware/authMiddleware.js';
-import { uploadCollegeId, getVerificationStatus, updateProfile, joinCollege, leaveCollege, uploadProfilePicture } from '../controllers/profileController.js';
+import { uploadCollegeId, getVerificationStatus, updateProfile, joinCollege, leaveCollege, uploadProfilePicture, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers } from '../controllers/profileController.js';
 
 const router = express.Router();
 
@@ -73,6 +73,21 @@ router.post('/join-college', joinCollege);
 
 // Leave college
 router.post('/leave-college', leaveCollege);
+
+// Follow college
+router.post('/follow-college', followCollege);
+
+// Unfollow college
+router.post('/unfollow-college', unfollowCollege);
+
+// Check follow status
+router.get('/check-follow-status', checkFollowStatus);
+
+// Get college followers count
+router.get('/college-followers-count', getCollegeFollowersCount);
+
+// Get college followers with user details
+router.get('/college-followers', getCollegeFollowers);
 
 export default router;
 
