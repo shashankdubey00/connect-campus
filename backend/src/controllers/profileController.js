@@ -1,6 +1,9 @@
 import UserProfile from '../models/UserProfile.js';
 import Follow from '../models/Follow.js';
 import User from '../models/User.js';
+import Block from '../models/Block.js';
+import DirectMessage from '../models/DirectMessage.js';
+import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -436,6 +439,156 @@ export const getCollegeFollowersCount = async (req, res) => {
 /**
  * Get all followers of a college with user details
  */
+/**
+ * Get user profile by userId
+ */
+export const getUserProfile = async (req, res) => {
+  try {
+    console.log('🔍 getUserProfile called with params:', req.params, 'URL:', req.originalUrl);
+    
+    // Decode userId from URL (in case it was encoded)
+    let { userId } = req.params;
+    userId = decodeURIComponent(userId);
+
+    console.log('🔍 Decoded userId:', userId);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+
+    // Convert userId to ObjectId if it's a valid MongoDB ObjectId string
+    let userObjectId;
+    try {
+      userObjectId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format',
+      });
+    }
+
+    // Get user profile - userId field in UserProfile is an ObjectId reference
+    const userProfile = await UserProfile.findOne({ userId: userObjectId }).lean();
+    const user = await User.findById(userObjectId).select('email').lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        profile: userProfile || null,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+/**
+ * Get all colleges that a user has joined/followed
+ */
+export const getUserColleges = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+
+    // Convert userId to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format',
+      });
+    }
+
+    // Get all colleges where user has sent messages
+    const Message = (await import('../models/Message.js')).default;
+    const collegeIdsFromMessages = await Message.distinct('collegeId', {
+      senderId: userObjectId
+    });
+
+    // Get all colleges the user follows
+    const follows = await Follow.find({ userId: userObjectId }).lean();
+    const collegeIdsFromFollows = follows.map(f => f.collegeId);
+
+    // Combine both lists and get unique college IDs (normalize to strings)
+    const allCollegeIds = [...new Set([...collegeIdsFromMessages.map(String), ...collegeIdsFromFollows.map(String)])];
+
+    console.log(`🔍 getUserColleges for userId ${userId}:`, {
+      collegeIdsFromMessages: collegeIdsFromMessages.length,
+      collegeIdsFromFollows: collegeIdsFromFollows.length,
+      allCollegeIds: allCollegeIds
+    });
+
+    // If no colleges found, return empty array
+    if (allCollegeIds.length === 0) {
+      return res.json({
+        success: true,
+        colleges: []
+      });
+    }
+
+    // Fetch college details - match by both aisheCode and name
+    const College = (await import('../../models/College.js')).default;
+    const colleges = await College.find({
+      $or: [
+        { aisheCode: { $in: allCollegeIds } },
+        { name: { $in: allCollegeIds } }
+      ]
+    }).select('aisheCode name logo state district _id').lean();
+
+    console.log(`✅ Found ${colleges.length} colleges for userId ${userId}:`, colleges.map(c => ({ name: c.name, aisheCode: c.aisheCode })));
+
+    res.json({
+      success: true,
+      colleges: colleges.map(college => ({
+        id: college._id?.toString(),
+        aisheCode: college.aisheCode,
+        name: college.name,
+        logo: college.logo,
+        state: college.state,
+        district: college.district,
+        // Add a normalized identifier for comparison
+        identifier: college.aisheCode || college.name,
+      })),
+    });
+  } catch (error) {
+    console.error('Error getting user colleges:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting user colleges',
+      error: error.message,
+    });
+  }
+};
+
 export const getCollegeFollowers = async (req, res) => {
   try {
     const { aisheCode, name } = req.query;
@@ -576,6 +729,130 @@ export const uploadProfilePicture = async (req, res) => {
       success: false,
       message: 'Error uploading profile picture',
       error: error.message,
+    });
+  }
+};
+
+/**
+ * Block a user
+ */
+export const blockUser = async (req, res) => {
+  try {
+    const { blockedId } = req.body;
+    const blockerId = req.user.userId;
+
+    if (!blockedId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID to block is required',
+      });
+    }
+
+    if (String(blockerId) === String(blockedId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot block yourself',
+      });
+    }
+
+    // Check if already blocked
+    const existingBlock = await Block.findOne({ blockerId, blockedId });
+    if (existingBlock) {
+      return res.json({
+        success: true,
+        message: 'User is already blocked',
+        blocked: true,
+      });
+    }
+
+    // Create block
+    const block = new Block({ blockerId, blockedId });
+    await block.save();
+
+    res.json({
+      success: true,
+      message: 'User blocked successfully',
+      blocked: true,
+    });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+/**
+ * Unblock a user
+ */
+export const unblockUser = async (req, res) => {
+  try {
+    const { blockedId } = req.body;
+    const blockerId = req.user.userId;
+
+    if (!blockedId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID to unblock is required',
+      });
+    }
+
+    const block = await Block.findOneAndDelete({ blockerId, blockedId });
+
+    if (!block) {
+      return res.status(404).json({
+        success: false,
+        message: 'User is not blocked',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User unblocked successfully',
+      blocked: false,
+    });
+  } catch (error) {
+    console.error('Error unblocking user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+/**
+ * Check if a user is blocked
+ */
+export const checkBlockStatus = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const blockerId = req.user.userId;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+
+    // Check if current user blocked the other user
+    const blockedByMe = await Block.findOne({ blockerId, blockedId: userId });
+    
+    // Check if current user is blocked by the other user
+    const blockedByThem = await Block.findOne({ blockerId: userId, blockedId: blockerId });
+
+    res.json({
+      success: true,
+      blockedByMe: !!blockedByMe,
+      blockedByThem: !!blockedByThem,
+      canMessage: !blockedByMe && !blockedByThem,
+    });
+  } catch (error) {
+    console.error('Error checking block status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
     });
   }
 };

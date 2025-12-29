@@ -108,59 +108,70 @@ const Navbar = ({ isScrolled }) => {
         {!loading && (
           <div className="navbar-right">
             {user ? (
-              // Logged in - show profile
-              <div className="profile-menu-container" ref={profileMenuRef}>
-                <div 
-                  className="profile-avatar"
-                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                  onMouseEnter={() => setIsProfileMenuOpen(true)}
+              // Logged in - show integrated chat button with profile
+              <div className="user-actions-container">
+                <button 
+                  className="chat-icon-btn animated-chat-btn"
+                  onClick={() => navigate('/chat')}
+                  title="Go to Chat"
                 >
-                  <img src={getUserAvatar()} alt="Profile" />
-                </div>
-                {isProfileMenuOpen && (
-                  <div className="profile-dropdown" onMouseLeave={() => setIsProfileMenuOpen(false)}>
-                    <div className="profile-dropdown-header">
-                      <div className="profile-dropdown-avatar">
-                        <img src={getUserAvatar()} alt="Profile" />
-                      </div>
-                      <div className="profile-dropdown-info">
-                        <div className="profile-dropdown-name">
-                          {user.profile?.displayName || user.email}
-                        </div>
-                        <div className="profile-dropdown-email">{user.email}</div>
-                      </div>
-                    </div>
-                    <div className="profile-dropdown-divider"></div>
-                    <div className="profile-dropdown-menu">
-                      {/* Show Set Password for Google users without password */}
-                      {(user?.googleId && (user?.hasPassword === false || user?.hasPassword === undefined || !user?.hasPassword)) && (
-                        <Link 
-                          to="/set-password" 
-                          className="profile-dropdown-item"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                        >
-                          🔒 Set Password
-                        </Link>
-                      )}
-                      {/* Show Change Password if user has password */}
-                      {user?.hasPassword === true && (
-                        <Link 
-                          to="/change-password" 
-                          className="profile-dropdown-item"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                        >
-                          🔒 Change Password
-                        </Link>
-                      )}
-                      <button 
-                        className="profile-dropdown-item logout-item"
-                        onClick={handleLogout}
-                      >
-                        🚪 Logout
-                      </button>
-                    </div>
+                  <svg className="chat-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <div className="profile-menu-container" ref={profileMenuRef}>
+                  <div 
+                    className="profile-avatar"
+                    onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                    onMouseEnter={() => setIsProfileMenuOpen(true)}
+                  >
+                    <img src={getUserAvatar()} alt="Profile" />
                   </div>
-                )}
+                  {isProfileMenuOpen && (
+                    <div className="profile-dropdown" onMouseLeave={() => setIsProfileMenuOpen(false)}>
+                      <div className="profile-dropdown-header">
+                        <div className="profile-dropdown-avatar">
+                          <img src={getUserAvatar()} alt="Profile" />
+                        </div>
+                        <div className="profile-dropdown-info">
+                          <div className="profile-dropdown-name">
+                            {user.profile?.displayName || user.email}
+                          </div>
+                          <div className="profile-dropdown-email">{user.email}</div>
+                        </div>
+                      </div>
+                      <div className="profile-dropdown-divider"></div>
+                      <div className="profile-dropdown-menu">
+                        {/* Show Set Password for Google users without password */}
+                        {(user?.googleId && (user?.hasPassword === false || user?.hasPassword === undefined || !user?.hasPassword)) && (
+                          <Link 
+                            to="/set-password" 
+                            className="profile-dropdown-item"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            🔒 Set Password
+                          </Link>
+                        )}
+                        {/* Show Change Password if user has password */}
+                        {user?.hasPassword === true && (
+                          <Link 
+                            to="/change-password" 
+                            className="profile-dropdown-item"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                          >
+                            🔒 Change Password
+                          </Link>
+                        )}
+                        <button 
+                          className="profile-dropdown-item logout-item"
+                          onClick={handleLogout}
+                        >
+                          🚪 Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               // Not logged in - show auth buttons
@@ -200,6 +211,15 @@ const Navbar = ({ isScrolled }) => {
                   <div className="mobile-profile-email">{user.email}</div>
                 </div>
               </div>
+              <button 
+                className="mobile-nav-btn chat-btn-mobile animated-chat-btn"
+                onClick={() => { setIsMobileMenuOpen(false); navigate('/chat'); }}
+              >
+                <svg className="chat-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Go to Chat</span>
+              </button>
               {user?.googleId && !user?.hasPassword && (
                 <Link to="/set-password" className="mobile-nav-link" onClick={() => setIsMobileMenuOpen(false)}>Set Password</Link>
               )}

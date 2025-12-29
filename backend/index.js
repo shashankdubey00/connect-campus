@@ -10,6 +10,7 @@ import collegeRoutes from './routes/collegeRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import messageRoutes from './src/routes/messageRoutes.js';
 import profileRoutes from './src/routes/profileRoutes.js';
+import directMessageRoutes from './src/routes/directMessageRoutes.js';
 import passport from './src/config/passport.js';
 import { initializeSocket } from './src/socket/socketServer.js';
 
@@ -63,6 +64,7 @@ app.use('/api/colleges', collegeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/direct-messages', directMessageRoutes);
 app.use('/auth', authRoutes); // Also support /auth routes for OAuth
 
 // Health check

@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { authenticateSocket } from '../middleware/socketAuth.js';
 import Message from '../models/Message.js';
 import UserProfile from '../models/UserProfile.js';
+import Block from '../models/Block.js';
 
 let io;
 
@@ -81,6 +82,16 @@ export const initializeSocket = (server) => {
         if (!collegeId) {
           socket.emit('error', {
             message: 'College ID is required',
+          });
+          return;
+        }
+
+        // Check if sender has blocked anyone (prevent sending if blocked)
+        const blockedUsers = await Block.find({ blockerId: socket.user.userId }).lean();
+        if (blockedUsers.length > 0) {
+          socket.emit('messageBlocked', {
+            message: 'You cannot send messages because you have blocked users in this chat',
+            blockedCount: blockedUsers.length,
           });
           return;
         }

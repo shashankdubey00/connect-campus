@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { verifyAuth } from '../services/authService'
 import CollegeProfileModal from './CollegeProfileModal'
 import './Hero.css'
 
@@ -15,6 +17,9 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const [loadingDistricts, setLoadingDistricts] = useState(false)
   const [selectedCollege, setSelectedCollege] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [user, setUser] = useState(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const navigate = useNavigate()
   const searchRef = useRef(null)
   const suggestionsRef = useRef(null)
 
@@ -29,6 +34,28 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
       }
     }
   }, [openModalFromState, collegeFromState])
+
+  // Check authentication status - only show CTA for logged-in users
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const data = await verifyAuth()
+        if (data.success && data.user) {
+          // Only set user if authentication is successful and user exists
+          setUser(data.user)
+        } else {
+          // Not logged in - clear user
+          setUser(null)
+        }
+      } catch (error) {
+        // Error or not authenticated - clear user
+        setUser(null)
+      } finally {
+        setCheckingAuth(false)
+      }
+    }
+    checkAuth()
+  }, [])
 
   // Fetch states on component mount
   useEffect(() => {
@@ -196,6 +223,31 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
       </div>
       
       <div className="hero-content">
+        {/* Only show CTA section for authenticated logged-in users, not visitors */}
+        {!checkingAuth && user && user.email && (
+          <div className="hero-cta-section">
+            <div className="cta-content">
+              <div className="cta-icon-wrapper">
+                <div className="cta-icon">💬</div>
+                <div className="pulse-ring"></div>
+              </div>
+              <div className="cta-text">
+                <h2 className="cta-title">Welcome back, {user.profile?.displayName || user.email?.split('@')[0] || 'Student'}!</h2>
+                <p className="cta-subtitle">Continue your conversations and connect with your college community</p>
+              </div>
+              <button 
+                className="cta-button animated-cta-button"
+                onClick={() => navigate('/chat')}
+              >
+                <span>Go to Chat</span>
+                <svg className="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="hero-text">
           <h1 className="hero-heading">
             Connect with students from your college and beyond

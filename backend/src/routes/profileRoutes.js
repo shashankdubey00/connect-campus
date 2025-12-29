@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { protect } from '../middleware/authMiddleware.js';
-import { uploadCollegeId, getVerificationStatus, updateProfile, joinCollege, leaveCollege, uploadProfilePicture, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers } from '../controllers/profileController.js';
+import { uploadCollegeId, getVerificationStatus, updateProfile, joinCollege, leaveCollege, uploadProfilePicture, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus } from '../controllers/profileController.js';
 
 const router = express.Router();
 
@@ -88,6 +88,21 @@ router.get('/college-followers-count', getCollegeFollowersCount);
 
 // Get college followers with user details
 router.get('/college-followers', getCollegeFollowers);
+
+// Get user profile by userId - MUST be after other specific routes
+router.get('/user/:userId', getUserProfile);
+
+// Get colleges that a user has joined/followed
+router.get('/user/:userId/colleges', getUserColleges);
+
+// Block user
+router.post('/block-user', blockUser);
+
+// Unblock user
+router.post('/unblock-user', unblockUser);
+
+// Check block status
+router.get('/check-block-status', checkBlockStatus);
 
 export default router;
 

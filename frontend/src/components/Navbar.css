@@ -160,6 +160,116 @@
   }
 }
 
+/* User Actions Container */
+.user-actions-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Chat Icon Button - Compact Style */
+.chat-icon-btn {
+  background: linear-gradient(135deg, #00a8ff 0%, #00d4aa 100%);
+  color: #0a0e1a;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  animation: chatButtonPulse 2s ease-in-out infinite;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.chat-icon-btn .chat-icon-svg {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  z-index: 2;
+  color: #0a0e1a;
+}
+
+.chat-icon-btn:hover {
+  transform: translateY(-2px) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 168, 255, 0.5);
+}
+
+.animated-chat-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.animated-chat-btn:hover::before {
+  left: 100%;
+}
+
+.animated-chat-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 168, 255, 0.5);
+  animation: none;
+}
+
+.chat-btn-icon {
+  font-size: 1.2rem;
+  animation: chatIconBounce 1.5s ease-in-out infinite;
+}
+
+.chat-btn-text {
+  font-weight: 600;
+}
+
+@keyframes chatButtonPulse {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(0, 168, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(0, 212, 170, 0.6);
+  }
+}
+
+@keyframes chatIconBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.chat-btn-mobile {
+  background: linear-gradient(135deg, #00a8ff 0%, #00d4aa 100%);
+  color: #0a0e1a;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  animation: chatButtonPulse 2s ease-in-out infinite;
+}
+
+.chat-btn-mobile .chat-icon-svg {
+  width: 20px;
+  height: 20px;
+  color: #0a0e1a;
+}
+
+.chat-btn-mobile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 168, 255, 0.4);
+}
+
 
 .mobile-menu-toggle {
   display: none;
@@ -264,6 +374,25 @@
   }
 
   .navbar-buttons {
+    display: none;
+  }
+
+  .chat-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .chat-icon-btn .chat-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .user-actions-container {
+    gap: 0.5rem;
+  }
+  
+  /* Hide profile avatar in mobile navbar - keep only in hamburger menu */
+  .navbar-right .profile-menu-container {
     display: none;
   }
 
@@ -541,11 +670,7 @@
     gap: 0.75rem;
   }
 
-  .profile-avatar {
-    width: 36px;
-    height: 36px;
-  }
-
+  /* Profile avatar is hidden in mobile navbar, so no need to style it */
   .google-btn {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
@@ -558,10 +683,7 @@
 }
 
 @media (max-width: 480px) {
-  .profile-avatar {
-    width: 32px;
-    height: 32px;
-  }
+  /* Profile avatar is hidden in mobile navbar */
 
   .google-btn {
     padding: 0.45rem 0.9rem;

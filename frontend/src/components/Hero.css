@@ -51,6 +51,221 @@
   animation: fadeInUp 1s ease;
 }
 
+/* Hero CTA Section for Logged-in Users */
+.hero-cta-section {
+  margin-bottom: 3rem;
+  animation: slideInDown 0.8s ease;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cta-content {
+  background: linear-gradient(135deg, rgba(0, 168, 255, 0.15) 0%, rgba(0, 212, 170, 0.15) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid rgba(0, 168, 255, 0.3);
+  border-radius: 20px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.cta-content::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(0, 168, 255, 0.1) 0%, transparent 70%);
+  animation: rotate 10s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cta-content:hover {
+  border-color: rgba(0, 168, 255, 0.5);
+  box-shadow: 0 8px 30px rgba(0, 168, 255, 0.3);
+  transform: translateY(-5px);
+}
+
+.cta-icon-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cta-icon {
+  font-size: 3rem;
+  position: relative;
+  z-index: 2;
+  animation: iconFloat 3s ease-in-out infinite;
+}
+
+@keyframes iconFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border: 3px solid rgba(0, 168, 255, 0.5);
+  border-radius: 50%;
+  animation: pulseRing 2s ease-out infinite;
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.cta-text {
+  flex: 1;
+  text-align: left;
+  position: relative;
+  z-index: 2;
+}
+
+.cta-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #ffffff 0%, #00a8ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cta-subtitle {
+  font-size: 1rem;
+  color: #b0b0b0;
+  line-height: 1.5;
+}
+
+.cta-button {
+  background: linear-gradient(135deg, #00a8ff 0%, #00d4aa 100%);
+  color: #0a0e1a;
+  border: none;
+  border-radius: 12px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.animated-cta-button {
+  animation: ctaButtonGlow 2s ease-in-out infinite;
+}
+
+@keyframes ctaButtonGlow {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(0, 168, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(0, 212, 170, 0.6);
+  }
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.cta-button:hover::before {
+  left: 100%;
+}
+
+.cta-button:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 30px rgba(0, 168, 255, 0.5);
+  animation: none;
+}
+
+.arrow-icon {
+  transition: transform 0.3s ease;
+}
+
+.cta-button:hover .arrow-icon {
+  transform: translateX(5px);
+}
+
+@media (max-width: 768px) {
+  .cta-content {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .cta-text {
+    text-align: center;
+  }
+
+  .cta-title {
+    font-size: 1.5rem;
+  }
+
+  .cta-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .cta-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cta-icon {
+    font-size: 2.5rem;
+  }
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
