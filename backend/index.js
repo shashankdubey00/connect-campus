@@ -80,23 +80,73 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// Error handler middleware
+// Error handler middleware (production-ready)
 app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
+  // Log error with context
+  console.error('Server Error:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    timestamp: new Date().toISOString(),
+  });
+  
+  // Don't leak error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    message: isDevelopment 
+      ? (err.message || 'Internal server error')
+      : 'An error occurred. Please try again later.',
+    ...(isDevelopment && { 
+      stack: err.stack,
+      error: err.name 
+    }),
   });
 });
 
 // Initialize Socket.IO
 initializeSocket(server);
 
-// Start server
+// Start server with error handling
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`🔌 Socket.IO is ready for real-time messaging`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+  
+  const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+  
+  switch (error.code) {
+    case 'EACCES':
+      console.error(`❌ ${bind} requires elevated privileges`);
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(`❌ ${bind} is already in use`);
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
 });
 
 

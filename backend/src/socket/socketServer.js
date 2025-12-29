@@ -22,15 +22,35 @@ export const initializeSocket = (server) => {
   // Authentication middleware
   io.use(authenticateSocket);
 
+  // Store online users
+  const onlineUsers = new Map(); // userId -> { socketId, email, lastSeen }
+
   // Connection handler
   io.on('connection', (socket) => {
-    console.log(`✅ User connected: ${socket.user.email} (College: ${socket.collegeId || 'None'})`);
+    const userId = socket.user.userId.toString();
+    const userEmail = socket.user.email;
+    
+    // Mark user as online
+    onlineUsers.set(userId, {
+      socketId: socket.id,
+      email: userEmail,
+      lastSeen: new Date(),
+      isOnline: true,
+    });
+    
+    // Broadcast user online status to all connected clients
+    io.emit('userOnline', { userId, isOnline: true });
+    
+    console.log(`✅ User connected: ${userEmail} (College: ${socket.collegeId || 'None'})`);
+
+    // Join user to their personal room for direct messages
+    socket.join(`user:${userId}`);
 
     // Auto-join user to their college room if they belong to one
     if (socket.collegeId) {
       const roomName = `college:${socket.collegeId}`;
       socket.join(roomName);
-      console.log(`📥 User ${socket.user.email} joined room: ${roomName}`);
+      console.log(`📥 User ${userEmail} joined room: ${roomName}`);
 
       // Emit confirmation to client
       socket.emit('joinedCollegeRoom', {
@@ -40,7 +60,7 @@ export const initializeSocket = (server) => {
       });
     } else {
       // User doesn't belong to a college yet
-      console.log(`⚠️ User ${socket.user.email} connected but doesn't belong to a college yet`);
+      console.log(`⚠️ User ${userEmail} connected but doesn't belong to a college yet`);
     }
 
     // Handle joinCollegeRoom event - allow joining any college room
@@ -119,14 +139,29 @@ export const initializeSocket = (server) => {
         
         console.log(`💾 Message saved to DB: ${savedMessage._id} for college: ${messageCollegeId}`);
 
+        // Mark message as delivered to sender immediately
+        savedMessage.deliveredTo.push({
+          userId: socket.user.userId,
+          deliveredAt: new Date(),
+        });
+        await savedMessage.save();
+
         // Prepare message for broadcast
         const messageToSend = {
-          id: message._id.toString(),
-          senderId: message.senderId.toString(),
-          senderName: message.senderName,
-          collegeId: message.collegeId,
-          text: message.text,
-          timestamp: message.timestamp,
+          id: savedMessage._id.toString(),
+          senderId: savedMessage.senderId.toString(),
+          senderName: savedMessage.senderName,
+          collegeId: savedMessage.collegeId,
+          text: savedMessage.text,
+          timestamp: savedMessage.timestamp,
+          deliveredTo: savedMessage.deliveredTo.map(d => ({
+            userId: d.userId.toString(),
+            deliveredAt: d.deliveredAt,
+          })),
+          readBy: savedMessage.readBy.map(r => ({
+            userId: r.userId.toString(),
+            readAt: r.readAt,
+          })),
         };
 
         // Broadcast to all users in the college room
@@ -142,8 +177,108 @@ export const initializeSocket = (server) => {
       }
     });
 
+    // Handle typing indicator
+    socket.on('typing', (data) => {
+      const { collegeId, isTyping } = data;
+      if (collegeId) {
+        const roomName = `college:${collegeId}`;
+        // Broadcast to others in the room (not to sender)
+        socket.to(roomName).emit('userTyping', {
+          userId: socket.user.userId.toString(),
+          userName: socket.user.profile?.displayName || socket.user.email.split('@')[0],
+          collegeId: collegeId,
+          isTyping: isTyping,
+        });
+      }
+    });
+
+    // Handle typing indicator for direct messages
+    socket.on('typingDirect', (data) => {
+      const { receiverId, isTyping } = data;
+      if (receiverId) {
+        // Send to specific user
+        io.to(`user:${receiverId}`).emit('userTypingDirect', {
+          userId: socket.user.userId.toString(),
+          userName: socket.user.profile?.displayName || socket.user.email.split('@')[0],
+          isTyping: isTyping,
+        });
+      }
+    });
+
+    // Handle message read receipt
+    socket.on('markMessageRead', async (data) => {
+      try {
+        const { messageId, collegeId } = data;
+        if (!messageId || !collegeId) return;
+
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Check if already read
+        const alreadyRead = message.readBy.some(
+          read => read.userId.toString() === userId
+        );
+
+        if (!alreadyRead) {
+          message.readBy.push({
+            userId: socket.user.userId,
+            readAt: new Date(),
+          });
+          await message.save();
+
+          // Broadcast read receipt to others in the room
+          const roomName = `college:${collegeId}`;
+          socket.to(roomName).emit('messageRead', {
+            messageId: messageId,
+            userId: userId,
+            readAt: new Date(),
+          });
+        }
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+      }
+    });
+
+    // Handle message delivered receipt
+    socket.on('markMessageDelivered', async (data) => {
+      try {
+        const { messageId, collegeId } = data;
+        if (!messageId || !collegeId) return;
+
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Check if already delivered
+        const alreadyDelivered = message.deliveredTo.some(
+          delivered => delivered.userId.toString() === userId
+        );
+
+        if (!alreadyDelivered) {
+          message.deliveredTo.push({
+            userId: socket.user.userId,
+            deliveredAt: new Date(),
+          });
+          await message.save();
+        }
+      } catch (error) {
+        console.error('Error marking message as delivered:', error);
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
+      const userId = socket.user.userId.toString();
+      
+      // Mark user as offline
+      onlineUsers.delete(userId);
+      
+      // Broadcast user offline status
+      io.emit('userOffline', { userId, isOnline: false });
+      
       console.log(`❌ User disconnected: ${socket.user.email}`);
     });
 
@@ -164,5 +299,22 @@ export const getIO = () => {
     throw new Error('Socket.IO not initialized. Call initializeSocket first.');
   }
   return io;
+};
+
+/**
+ * Get online users (for API endpoints)
+ */
+export const getOnlineUsers = () => {
+  return Array.from(onlineUsers.entries()).map(([userId, data]) => ({
+    userId,
+    ...data,
+  }));
+};
+
+/**
+ * Check if user is online
+ */
+export const isUserOnline = (userId) => {
+  return onlineUsers.has(userId.toString());
 };
 

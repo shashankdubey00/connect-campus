@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
-import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom } from '../services/socketService'
+import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, markMessageRead, markMessageDelivered, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead } from '../services/socketService'
 import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus } from '../services/profileService'
@@ -2623,15 +2623,56 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [swipeStartX, setSwipeStartX] = useState(null)
   const [swipeStartY, setSwipeStartY] = useState(null)
   const [swipeOffset, setSwipeOffset] = useState(0)
+  const [typingUsers, setTypingUsers] = useState(new Map()) // Map of userId -> { name, timestamp }
+  const [onlineUsers, setOnlineUsers] = useState(new Set()) // Set of online user IDs
+  const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
+  const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
   const actionMenuRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const quickEmojiRef = useRef(null)
+  const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
+  const typingTimeoutRef = useRef(null) // Store typing timeout
   const socket = getSocket()
   
   // Top 5 emojis for quick reactions
   const quickEmojis = ['👍', '❤️', '😂', '😮', '😥']
+  
+  // Cleanup function for block message timeout
+  const clearBlockMessageTimeout = () => {
+    if (blockMessageTimeoutRef.current) {
+      clearTimeout(blockMessageTimeoutRef.current)
+      blockMessageTimeoutRef.current = null
+    }
+  }
+  
+  // Set block message with auto-clear (production-safe)
+  const setBlockMessageWithTimeout = (message) => {
+    clearBlockMessageTimeout() // Clear any existing timeout
+    setBlockMessage(message)
+    blockMessageTimeoutRef.current = setTimeout(() => {
+      setBlockMessage(null)
+      blockMessageTimeoutRef.current = null
+    }, 5000)
+  }
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearBlockMessageTimeout()
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      // Stop typing when component unmounts
+      if (isTyping && collegeId) {
+        emitTyping(collegeId, false)
+      }
+    }
+  }, [])
 
   // Update mobile detection on resize
   useEffect(() => {
@@ -2738,7 +2779,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             }),
             date: formatDate(new Date(msg.timestamp)),
             isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
-            timestamp: new Date(msg.timestamp)
+            timestamp: new Date(msg.timestamp),
+            readBy: msg.readBy ? msg.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
+            deliveredTo: msg.deliveredTo ? msg.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
           }))
           
           // Filter out messages from blocked users
@@ -2851,7 +2894,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               }),
               date: formatDate(new Date(message.timestamp)),
               isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
-              timestamp: new Date(message.timestamp)
+              timestamp: new Date(message.timestamp),
+              readBy: message.readBy ? message.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
+              deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
             }
             return newMessages
           } else {
@@ -2868,7 +2913,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               }),
               date: formatDate(new Date(message.timestamp)),
               isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
-              timestamp: new Date(message.timestamp)
+              timestamp: new Date(message.timestamp),
+              readBy: message.readBy ? message.readBy.map(r => ({ userId: r.userId?.toString() || r.userId, readAt: r.readAt })) : [],
+              deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: d.userId?.toString() || d.userId, deliveredAt: d.deliveredAt })) : []
             }
             // Insert message in correct chronological order
             const newMessages = [...prev, formattedMessage].sort((a, b) => 
@@ -2889,16 +2936,80 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Set up message listener
     onReceiveMessage(handleReceiveMessage)
 
+    // Set up typing indicator listeners
+    const handleUserTyping = (data) => {
+      if (data.collegeId === collegeId && data.userId !== String(user?.id || user?._id || '')) {
+        if (data.isTyping) {
+          setTypingUsers(prev => {
+            const newMap = new Map(prev)
+            newMap.set(data.userId, {
+              name: data.userName || 'Someone',
+              timestamp: Date.now()
+            })
+            return newMap
+          })
+        } else {
+          setTypingUsers(prev => {
+            const newMap = new Map(prev)
+            newMap.delete(data.userId)
+            return newMap
+          })
+        }
+      }
+    }
+    onUserTyping(handleUserTyping)
+
+    // Set up online/offline listeners
+    const handleUserOnline = (data) => {
+      if (data.userId) {
+        setOnlineUsers(prev => new Set(prev).add(data.userId))
+      }
+    }
+    const handleUserOffline = (data) => {
+      if (data.userId) {
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(data.userId)
+          return newSet
+        })
+        // Also remove from typing users
+        setTypingUsers(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(data.userId)
+          return newMap
+        })
+      }
+    }
+    onUserOnline(handleUserOnline)
+    onUserOffline(handleUserOffline)
+
+    // Set up read receipt listener
+    const handleMessageRead = (data) => {
+      if (data.messageId) {
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === data.messageId) {
+            const readBy = msg.readBy || []
+            if (!readBy.some(r => String(r.userId) === String(data.userId))) {
+              return {
+                ...msg,
+                readBy: [...readBy, { userId: data.userId, readAt: data.readAt || new Date() }]
+              }
+            }
+          }
+          return msg
+        }))
+      }
+    }
+    onMessageRead(handleMessageRead)
+
     // Set up blocked message listener
     const socketInstance = getSocket()
     if (socketInstance) {
       const handleBlockedMessage = (data) => {
-        setBlockMessage({
+        setBlockMessageWithTimeout({
           text: data.message || 'You cannot send messages because you have blocked users in this chat',
           type: 'blocked'
         })
-        // Clear message after 5 seconds
-        setTimeout(() => setBlockMessage(null), 5000)
       }
       
       socketInstance.on('messageBlocked', handleBlockedMessage)
@@ -2908,6 +3019,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         if (socketInstance) {
           socketInstance.off('receiveMessage', handleReceiveMessage)
           socketInstance.off('messageBlocked', handleBlockedMessage)
+          socketInstance.off('userTyping', handleUserTyping)
+          socketInstance.off('userOnline', handleUserOnline)
+          socketInstance.off('userOffline', handleUserOffline)
+          socketInstance.off('messageRead', handleMessageRead)
         }
       }
     }
@@ -2947,10 +3062,47 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
   }
 
+  // Handle typing indicator
+  const handleInputChange = (e) => {
+    const value = e.target.value
+    setMessageInput(value)
+    
+    if (!collegeId) return
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+    
+    // If user is typing and not already marked as typing
+    if (value.trim().length > 0 && !isTyping) {
+      setIsTyping(true)
+      emitTyping(collegeId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false)
+        emitTyping(collegeId, false)
+      }
+    }, 2000)
+  }
+
   const handleSendMessage = async (e) => {
     e.preventDefault()
     let messageText = messageInput.trim()
     if (!messageText || !collegeId) return
+    
+    // Stop typing indicator
+    if (isTyping) {
+      setIsTyping(false)
+      emitTyping(collegeId, false)
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
+    }
     
     // If replying, clear reply after sending
     if (replyingTo) {
@@ -2959,12 +3111,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
     // Check if user has blocked anyone (prevent sending)
     if (blockedUsers.size > 0) {
-      setBlockMessage({
+      setBlockMessageWithTimeout({
         text: 'You cannot send messages because you have blocked users in this chat',
         type: 'blocked'
       })
-      // Clear message after 5 seconds
-      setTimeout(() => setBlockMessage(null), 5000)
       return
     }
 
@@ -3066,9 +3216,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
   const displayName = isDirectMessage ? chat.name : truncateName(fullCollegeName, 3)
   const displayAvatar = chat.avatar || (college?.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullCollegeName)}&size=50&background=00a8ff&color=fff`)
-  const displayStatus = isDirectMessage 
-    ? (chat.isOnline ? 'Online' : 'Offline')
-    : `${chat.onlineCount || 0} online`
+  // Get typing users list (limit to 5 most recent)
+  const typingUsersList = Array.from(typingUsers.entries())
+    .sort((a, b) => b[1].timestamp - a[1].timestamp)
+    .slice(0, 5)
+    .map(([userId, data]) => data.name)
+
+  // Format typing indicator text
+  const typingText = typingUsersList.length > 0
+    ? typingUsersList.length === 1
+      ? `${typingUsersList[0]} is typing...`
+      : `${typingUsersList[0]} and ${typingUsersList.length - 1} other${typingUsersList.length - 1 > 1 ? 's' : ''} are typing...`
+    : null
+
+  // Calculate online count for this college room
+  const onlineCount = Array.from(onlineUsers).length
+  const displayStatus = typingText || (isDirectMessage 
+    ? (onlineUsers.has(chat.userId) ? 'Online' : '')
+    : `${onlineCount || chat.onlineCount || 0} online`)
   // Check if college is verified
   const isCollegeVerified = college?.isVerified || false
 
@@ -3319,7 +3484,23 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                   </div>
                 )}
               </div>
-              <span className="chat-status">{displayStatus}</span>
+              <span className={`chat-status ${typingText ? 'typing' : ''}`}>
+                {typingText ? (
+                  <>
+                    <span className="typing-dots">
+                      <span>.</span><span>.</span><span>.</span>
+                    </span>
+                    {typingText}
+                  </>
+                ) : (
+                  <>
+                    {!isDirectMessage && onlineUsers.size > 0 && (
+                      <span className="online-indicator"></span>
+                    )}
+                    {displayStatus}
+                  </>
+                )}
+              </span>
             </div>
             {/* Clear Chat Button */}
             <button 
@@ -3421,7 +3602,56 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       }}
                     >
                       <p>{message.text}</p>
-                      <span className="message-time">{message.time}</span>
+                      <div className="message-footer">
+                        <span className="message-time">{message.time}</span>
+                        {message.isOwn && (
+                          <span className={`message-status ${(() => {
+                            const readBy = message.readBy || []
+                            const deliveredTo = message.deliveredTo || []
+                            const currentUserId = String(user?.id || user?._id || '')
+                            
+                            // For group chats, check if read by at least one other user
+                            // For direct chats, check if read by the other user
+                            const isRead = readBy.some(r => String(r.userId) !== currentUserId)
+                            const isDelivered = deliveredTo.some(d => String(d.userId) !== currentUserId)
+                            
+                            return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
+                          })()}`}>
+                            {(() => {
+                              const readBy = message.readBy || []
+                              const deliveredTo = message.deliveredTo || []
+                              const currentUserId = String(user?.id || user?._id || '')
+                              
+              // Check if message is read by at least one other user
+              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
+              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
+                              
+                              if (isRead) {
+                                // Blue double checkmark (read)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7"/>
+                                  </svg>
+                                )
+                              } else if (isDelivered) {
+                                // Gray double checkmark (delivered)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              } else {
+                                // Single checkmark (sent)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              }
+                            })()}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Fragment>
@@ -3676,7 +3906,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           className="chat-input"
           placeholder="Type a message"
           value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
+          onChange={handleInputChange}
           disabled={blockedUsers.size > 0}
         />
         <button type="submit" className="send-btn" disabled={blockedUsers.size > 0}>Send</button>
@@ -3708,8 +3938,46 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const [isBlocked, setIsBlocked] = useState(false)
   const [blockMessage, setBlockMessage] = useState(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
+  const [otherUserTyping, setOtherUserTyping] = useState(false) // Track if other user is typing
+  const [isOtherUserOnline, setIsOtherUserOnline] = useState(false) // Track if other user is online
+  const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
+  const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
+  const typingTimeoutRef = useRef(null) // Store typing timeout
+  
+  // Cleanup function for block message timeout
+  const clearBlockMessageTimeout = () => {
+    if (blockMessageTimeoutRef.current) {
+      clearTimeout(blockMessageTimeoutRef.current)
+      blockMessageTimeoutRef.current = null
+    }
+  }
+  
+  // Set block message with auto-clear (production-safe)
+  const setBlockMessageWithTimeout = (message) => {
+    clearBlockMessageTimeout() // Clear any existing timeout
+    setBlockMessage(message)
+    blockMessageTimeoutRef.current = setTimeout(() => {
+      setBlockMessage(null)
+      blockMessageTimeoutRef.current = null
+    }, 5000)
+  }
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearBlockMessageTimeout()
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      // Stop typing when component unmounts
+      if (isTyping && otherUserId) {
+        emitTypingDirect(otherUserId, false)
+      }
+    }
+  }, [])
 
   // Function to refresh block status
   const refreshBlockStatus = useCallback(async () => {
@@ -3722,16 +3990,17 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         
         // Clear block message if messaging is allowed
         if (blockResponse.canMessage) {
+          clearBlockMessageTimeout()
           setBlockMessage(null)
         } else {
           // Set appropriate block message
           if (blockResponse.blockedByMe) {
-            setBlockMessage({
+            setBlockMessageWithTimeout({
               text: 'You cannot send messages to this user because you have blocked them',
               type: 'blocked'
             })
           } else if (blockResponse.blockedByThem) {
-            setBlockMessage({
+            setBlockMessageWithTimeout({
               text: 'You cannot send messages to this user',
               type: 'blocked'
             })
@@ -3846,7 +4115,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             }),
             date: formatDate(new Date(msg.timestamp)),
             isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
-            timestamp: new Date(msg.timestamp)
+            timestamp: new Date(msg.timestamp),
+            readBy: msg.readBy || [],
+            deliveredTo: msg.deliveredTo || []
           }))
           setMessages(formattedMessages)
           
@@ -3876,10 +4147,119 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     loadMessages()
   }, [otherUserId, user?.id, user?._id])
 
+  // Set up Socket.IO listeners for direct messages
+  useEffect(() => {
+    if (!otherUserId) return
+
+    const socketInstance = getSocket()
+    if (!socketInstance) return
+
+    // Listen for typing indicators
+    const handleUserTypingDirect = (data) => {
+      if (data.userId === otherUserId) {
+        setOtherUserTyping(data.isTyping || false)
+      }
+    }
+    onUserTypingDirect(handleUserTypingDirect)
+
+    // Listen for online/offline status
+    const handleUserOnline = (data) => {
+      if (data.userId === otherUserId) {
+        setIsOtherUserOnline(true)
+      }
+    }
+    const handleUserOffline = (data) => {
+      if (data.userId === otherUserId) {
+        setIsOtherUserOnline(false)
+        setOtherUserTyping(false)
+      }
+    }
+    onUserOnline(handleUserOnline)
+    onUserOffline(handleUserOffline)
+
+    // Listen for read receipts
+    const handleMessageRead = (data) => {
+      if (data.messageId) {
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === data.messageId) {
+            const readBy = msg.readBy || []
+            if (!readBy.some(r => String(r.userId) === String(data.userId))) {
+              return {
+                ...msg,
+                readBy: [...readBy, { userId: data.userId, readAt: data.readAt || new Date() }]
+              }
+            }
+          }
+          return msg
+        }))
+      }
+    }
+    onMessageRead(handleMessageRead)
+
+    return () => {
+      if (socketInstance) {
+        socketInstance.off('userTypingDirect', handleUserTypingDirect)
+        socketInstance.off('userOnline', handleUserOnline)
+        socketInstance.off('userOffline', handleUserOffline)
+        socketInstance.off('messageRead', handleMessageRead)
+      }
+    }
+  }, [otherUserId])
+
+  // Handle typing indicator
+  const handleInputChange = (e) => {
+    const value = e.target.value
+    setMessageInput(value)
+    
+    if (!otherUserId) return
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+    
+    // If user is typing and not already marked as typing
+    if (value.trim().length > 0 && !isTyping) {
+      setIsTyping(true)
+      emitTypingDirect(otherUserId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false)
+        emitTypingDirect(otherUserId, false)
+      }
+    }, 2000)
+  }
+
+  // Mark messages as read when they're visible
+  useEffect(() => {
+    if (!otherUserId || messages.length === 0) return
+    
+    // Find the last message that's not from current user
+    const lastOtherMessage = [...messages].reverse().find(msg => !msg.isOwn)
+    if (lastOtherMessage && lastOtherMessage.id !== lastReadMessageId) {
+      // For direct messages, we need to mark as read via API
+      // The backend will handle this via socket
+      setLastReadMessageId(lastOtherMessage.id)
+    }
+  }, [messages, otherUserId, lastReadMessageId])
+
   const handleSendMessage = async (e) => {
     e.preventDefault()
     const messageText = messageInput.trim()
     if (!messageText || !otherUserId) return
+
+    // Stop typing indicator
+    if (isTyping) {
+      setIsTyping(false)
+      emitTypingDirect(otherUserId, false)
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
+    }
 
     // Refresh block status before sending to ensure it's up to date
     await refreshBlockStatus()
@@ -3944,18 +4324,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         // Check if it's a blocking error
         if (response.message && (response.message.includes('blocked') || response.message.includes('cannot send'))) {
           // Show professional message instead of alert
-          setBlockMessage({
+          setBlockMessageWithTimeout({
             text: response.message || 'You cannot send messages to this user',
             type: 'blocked'
           })
-          setTimeout(() => setBlockMessage(null), 5000)
         } else {
           // For other errors, show professional message
-          setBlockMessage({
+          setBlockMessageWithTimeout({
             text: response.message || 'Failed to send message. Please try again.',
             type: 'error'
           })
-          setTimeout(() => setBlockMessage(null), 5000)
         }
       }
     } catch (error) {
@@ -3968,17 +4346,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       // Show professional error message
       const errorMessage = error.message || 'Error sending message. Please try again.'
       if (errorMessage.includes('blocked') || errorMessage.includes('cannot send')) {
-        setBlockMessage({
+        setBlockMessageWithTimeout({
           text: errorMessage,
           type: 'blocked'
         })
       } else {
-        setBlockMessage({
+        setBlockMessageWithTimeout({
           text: errorMessage,
           type: 'error'
         })
       }
-      setTimeout(() => setBlockMessage(null), 5000)
     }
   }
 
@@ -4057,6 +4434,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           <div className="chat-header-name-row">
             <h3>{displayName}</h3>
           </div>
+          <span className={`chat-status ${otherUserTyping ? 'typing' : ''}`}>
+            {otherUserTyping ? (
+              <>
+                <span className="typing-dots">
+                  <span>.</span><span>.</span><span>.</span>
+                </span>
+                typing...
+              </>
+            ) : (
+              isOtherUserOnline ? 'Online' : ''
+            )}
+          </span>
         </div>
         <button 
           className="clear-chat-btn"
@@ -4090,7 +4479,55 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   <div className={`message ${message.isOwn ? 'own-message' : 'other-message'}`}>
                     <div className="message-content">
                       <p>{message.text}</p>
-                      <span className="message-time">{message.time}</span>
+                      <div className="message-footer">
+                        <span className="message-time">{message.time}</span>
+                        {message.isOwn && (
+                          <span className={`message-status ${(() => {
+                            const readBy = message.readBy || []
+                            const deliveredTo = message.deliveredTo || []
+                            const currentUserId = String(user?.id || user?._id || '')
+                            
+                            // For direct chats, check if read by the other user
+                            const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                            const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                            
+                            return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
+                          })()}`}>
+                            {(() => {
+                              const readBy = message.readBy || []
+                              const deliveredTo = message.deliveredTo || []
+                              const currentUserId = String(user?.id || user?._id || '')
+                              
+                              // Check if message is read by the other user
+                              const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                              const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                              
+                              if (isRead) {
+                                // Blue double checkmark (read)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7"/>
+                                  </svg>
+                                )
+                              } else if (isDelivered) {
+                                // Gray double checkmark (delivered)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              } else {
+                                // Single gray checkmark (sent)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 6L9 17L4 12"></path>
+                                  </svg>
+                                )
+                              }
+                            })()}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Fragment>
@@ -4126,7 +4563,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           className="chat-input"
           placeholder="Type a message"
           value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
+          onChange={handleInputChange}
           disabled={isBlocked}
         />
         <button type="submit" className="send-btn" disabled={isBlocked}>Send</button>

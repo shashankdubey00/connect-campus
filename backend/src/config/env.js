@@ -33,6 +33,31 @@ if (
   process.exit(1);
 }
 
+// Validate MongoDB URI format
+if (process.env.MONGODB_URI && !process.env.MONGODB_URI.startsWith('mongodb://') && !process.env.MONGODB_URI.startsWith('mongodb+srv://')) {
+  console.error('❌ Invalid MONGODB_URI format. Must start with mongodb:// or mongodb+srv://');
+  process.exit(1);
+}
+
+// Validate CLIENT_URL format
+if (process.env.CLIENT_URL && !process.env.CLIENT_URL.startsWith('http://') && !process.env.CLIENT_URL.startsWith('https://')) {
+  console.error('❌ Invalid CLIENT_URL format. Must start with http:// or https://');
+  process.exit(1);
+}
+
+// Production-specific validations
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.PORT) {
+    console.warn('⚠️ PORT not set, using default 5000');
+  }
+  
+  // Warn if using default JWT_SECRET (should never happen in production)
+  if (process.env.JWT_SECRET === 'your-secret-key' || process.env.JWT_SECRET === 'secret') {
+    console.error('❌ CRITICAL: Using default JWT_SECRET in production is insecure!');
+    process.exit(1);
+  }
+}
+
 console.log('✅ Environment variables validated');
 
 

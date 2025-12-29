@@ -145,6 +145,105 @@ export const removeAllListeners = () => {
     socket.removeAllListeners('joinedCollegeRoom');
     socket.removeAllListeners('receiveMessage');
     socket.removeAllListeners('error');
+    socket.removeAllListeners('userTyping');
+    socket.removeAllListeners('userTypingDirect');
+    socket.removeAllListeners('userOnline');
+    socket.removeAllListeners('userOffline');
+    socket.removeAllListeners('messageRead');
+  }
+};
+
+/**
+ * Emit typing indicator
+ * @param {string} collegeId - College ID
+ * @param {boolean} isTyping - Whether user is typing
+ */
+export const emitTyping = (collegeId, isTyping) => {
+  if (socket?.connected && collegeId) {
+    socket.emit('typing', { collegeId, isTyping });
+  }
+};
+
+/**
+ * Emit typing indicator for direct messages
+ * @param {string} receiverId - Receiver user ID
+ * @param {boolean} isTyping - Whether user is typing
+ */
+export const emitTypingDirect = (receiverId, isTyping) => {
+  if (socket?.connected && receiverId) {
+    socket.emit('typingDirect', { receiverId, isTyping });
+  }
+};
+
+/**
+ * Mark message as read
+ * @param {string} messageId - Message ID
+ * @param {string} collegeId - College ID
+ */
+export const markMessageRead = (messageId, collegeId) => {
+  if (socket?.connected && messageId && collegeId) {
+    socket.emit('markMessageRead', { messageId, collegeId });
+  }
+};
+
+/**
+ * Mark message as delivered
+ * @param {string} messageId - Message ID
+ * @param {string} collegeId - College ID
+ */
+export const markMessageDelivered = (messageId, collegeId) => {
+  if (socket?.connected && messageId && collegeId) {
+    socket.emit('markMessageDelivered', { messageId, collegeId });
+  }
+};
+
+/**
+ * Listen for typing indicators
+ * @param {Function} callback - Callback function
+ */
+export const onUserTyping = (callback) => {
+  if (socket) {
+    socket.on('userTyping', callback);
+  }
+};
+
+/**
+ * Listen for typing indicators in direct messages
+ * @param {Function} callback - Callback function
+ */
+export const onUserTypingDirect = (callback) => {
+  if (socket) {
+    socket.on('userTypingDirect', callback);
+  }
+};
+
+/**
+ * Listen for user online status
+ * @param {Function} callback - Callback function
+ */
+export const onUserOnline = (callback) => {
+  if (socket) {
+    socket.on('userOnline', callback);
+  }
+};
+
+/**
+ * Listen for user offline status
+ * @param {Function} callback - Callback function
+ */
+export const onUserOffline = (callback) => {
+  if (socket) {
+    socket.on('userOffline', callback);
+  }
+};
+
+/**
+ * Listen for message read receipts
+ * @param {Function} callback - Callback function
+ */
+export const onMessageRead = (callback) => {
+  if (socket) {
+    socket.on('messageRead', callback);
   }
 };
 

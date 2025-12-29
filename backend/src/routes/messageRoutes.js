@@ -171,18 +171,20 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     // Filter out messages deleted "for me" by this user
     const messages = allMessages.filter(msg => !deletedIdsSet.has(msg._id.toString()));
 
-    res.json({
-      success: true,
-      count: messages.length,
-      messages: messages.map(msg => ({
-        id: msg._id.toString(),
-        senderId: msg.senderId.toString(),
-        senderName: msg.senderName,
-        collegeId: msg.collegeId,
-        text: msg.text,
-        timestamp: msg.timestamp,
-      })),
-    });
+          res.json({
+            success: true,
+            count: messages.length,
+            messages: messages.map(msg => ({
+              id: msg._id.toString(),
+              senderId: msg.senderId.toString(),
+              senderName: msg.senderName,
+              collegeId: msg.collegeId,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              readBy: msg.readBy || [],
+              deliveredTo: msg.deliveredTo || [],
+            })),
+          });
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({
