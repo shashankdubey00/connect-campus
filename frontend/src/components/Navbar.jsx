@@ -18,13 +18,6 @@ const Navbar = ({ isScrolled }) => {
         const data = await verifyAuth()
         if (data.success) {
           setUser(data.user)
-          // Debug: Log user data
-          console.log('🔍 User data from API:', {
-            googleId: data.user?.googleId,
-            hasPassword: data.user?.hasPassword,
-            email: data.user?.email,
-            fullUser: data.user
-          })
         } else {
           setUser(null)
         }

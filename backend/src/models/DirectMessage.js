@@ -28,6 +28,28 @@ const directMessageSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
+    deliveredTo: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      deliveredAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
+    readBy: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      readAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
   },
   {
     timestamps: true,

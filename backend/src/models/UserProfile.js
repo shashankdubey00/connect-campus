@@ -64,6 +64,11 @@ const userProfileSchema = new mongoose.Schema(
       },
       rejectionReason: String,
     },
+    // Track last seen time for online status
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,

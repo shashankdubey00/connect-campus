@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
-import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, markMessageRead, markMessageDelivered, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead } from '../services/socketService'
+import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate } from '../services/socketService'
 import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
-import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus } from '../services/profileService'
+import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus, getCollegeActiveStudentsCount } from '../services/profileService'
 import { sendDirectMessage, getDirectMessages, clearDirectMessages, getDirectMessageConversations } from '../services/directMessageService'
 import EmojiPicker from 'emoji-picker-react'
 import './Chat.css'
@@ -63,10 +63,8 @@ const Chat = () => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        console.log('🔄 Loading user data...')
         setIsLoading(true)
         const data = await verifyAuth()
-        console.log('✅ User data loaded:', data.success ? 'Success' : 'Failed')
         if (data.success) {
           setUser(data.user)
           
@@ -77,23 +75,15 @@ const Chat = () => {
             if (socketInstance) {
               // Wait for connection to be established
               socketInstance.once('connect', () => {
-                console.log('✅ Socket.IO connected on initial load')
-                
                 // Set up Socket.IO listeners
-                onJoinedRoom((data) => {
-                  console.log('✅ Joined college room:', data);
-                });
-                
+                onJoinedRoom(() => {});
                 onSocketError((error) => {
                   console.error('Socket error:', error);
                 });
               })
               
               // Set up listeners even if not connected yet
-              onJoinedRoom((data) => {
-                console.log('✅ Joined college room:', data);
-              });
-              
+              onJoinedRoom(() => {});
               onSocketError((error) => {
                 console.error('Socket error:', error);
               });
@@ -494,6 +484,9 @@ const Chat = () => {
             collegeId: collegeId,
             name: collegeName,
             lastMessage: college.lastMessage?.text || 'No messages yet',
+            lastMessageIsOwn: college.lastMessage?.lastMessageIsOwn === true,
+            lastMessageDeliveredTo: college.lastMessage?.lastMessageDeliveredTo || [],
+            lastMessageReadBy: college.lastMessage?.lastMessageReadBy || [],
             timestamp: college.lastMessage?.timestamp ? formatChatTimestamp(college.lastMessage.timestamp) : '',
             unreadCount: unreadCounts[collegeId] || 0,
             onlineCount: 0,
@@ -529,6 +522,9 @@ const Chat = () => {
             userId: userId,
             name: userName,
             lastMessage: conversation.lastMessage || 'No messages yet',
+            lastMessageIsOwn: conversation.lastMessageIsOwn || false,
+            lastMessageDeliveredTo: conversation.lastMessageDeliveredTo || [],
+            lastMessageReadBy: conversation.lastMessageReadBy || [],
             timestamp: conversation.lastMessageTime ? formatChatTimestamp(conversation.lastMessageTime) : '',
             unreadCount: 0, // TODO: Implement unread count for direct messages
             onlineCount: 0,
@@ -548,9 +544,13 @@ const Chat = () => {
           const existing = existingMap.get(newChat.id)
           if (existing) {
             // Update existing chat with latest message info, but preserve unread count
+            // Always use new chat's status fields if they exist (backend is source of truth)
             existingMap.set(newChat.id, {
               ...existing,
               lastMessage: newChat.lastMessage,
+              lastMessageIsOwn: newChat.lastMessageIsOwn !== undefined ? newChat.lastMessageIsOwn : existing.lastMessageIsOwn,
+              lastMessageDeliveredTo: newChat.lastMessageDeliveredTo !== undefined ? newChat.lastMessageDeliveredTo : (existing.lastMessageDeliveredTo || []),
+              lastMessageReadBy: newChat.lastMessageReadBy !== undefined ? newChat.lastMessageReadBy : (existing.lastMessageReadBy || []),
               timestamp: newChat.timestamp,
               lastMessageTime: newChat.lastMessageTime,
               avatar: newChat.avatar,
@@ -819,6 +819,9 @@ const Chat = () => {
   const handleJoinLiveChat = (college) => {
     saveNavigationState() // Save current state before navigating
     const collegeId = college.aisheCode || college.name || college.id
+    const collegeName = college.name || 'College Chat'
+    const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+    
     // Find chat in the actual chats state
     const chat = chats.find(c => 
       c.type === 'college' && 
@@ -826,6 +829,7 @@ const Chat = () => {
     )
     
     if (chat) {
+      // Chat exists, open it directly
       setSelectedChat(chat)
       setSelectedCollege(college)
       setView('live-chat')
@@ -833,8 +837,53 @@ const Chat = () => {
         setShowChatList(false)
       }
     } else {
-      // If chat doesn't exist, create it and open it
-      handleOpenCollegeChat(college)
+      // If chat doesn't exist, create it and open live-chat view directly
+      const newChat = {
+        id: `college-${collegeId}`,
+        type: 'college',
+        collegeId: collegeId,
+        name: collegeName,
+        lastMessage: 'No messages yet',
+        timestamp: '',
+        unreadCount: 0,
+        onlineCount: 0,
+        avatar: collegeLogo,
+        college: college,
+        lastMessageTime: null
+      }
+      
+      // Add chat to list
+      setChats(prev => {
+        const existing = prev.find(c => c.id === newChat.id)
+        if (existing) return prev
+        return [newChat, ...prev]
+      })
+      
+      // Load message history in background
+      getCollegeChatInfo(collegeId).then(chatInfo => {
+        if (chatInfo.success) {
+          setChats(prevChats => prevChats.map(c => 
+            c.id === newChat.id
+              ? {
+                  ...c,
+                  lastMessage: chatInfo.lastMessage || 'No messages yet',
+                  timestamp: chatInfo.lastMessageTime ? formatChatTimestamp(chatInfo.lastMessageTime) : '',
+                  lastMessageTime: chatInfo.lastMessageTime
+                }
+              : c
+          ))
+        }
+      }).catch(error => {
+        console.error('Error loading chat info:', error)
+      })
+      
+      // Open live-chat view directly
+      setSelectedChat(newChat)
+      setSelectedCollege(college)
+      setView('live-chat')
+      if (isMobileView) {
+        setShowChatList(false)
+      }
     }
   }
 
@@ -1013,10 +1062,15 @@ const Chat = () => {
   }
 
   // Update chat list when direct message is sent or received
-  const updateChatListOnDirectMessage = useCallback((userId, userName, userAvatar, messageText, messageTimestamp, isOwnMessage = false) => {
+  const updateChatListOnDirectMessage = useCallback((userId, userName, userAvatar, messageText, messageTimestamp, isOwnMessage = false, deliveredTo = [], readBy = []) => {
     setChats(prev => {
       const chatId = `direct-${userId}`
       const chatIndex = prev.findIndex(c => c.id === chatId)
+      
+      // Format message preview with status
+      const messagePreview = isOwnMessage 
+        ? truncateMessage(messageText)
+        : truncateMessage(messageText)
       
       if (chatIndex === -1) {
         // Chat doesn't exist, create new one
@@ -1026,7 +1080,10 @@ const Chat = () => {
           userId: userId,
           name: userName,
           avatar: userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`,
-          lastMessage: truncateMessage(messageText),
+          lastMessage: messagePreview,
+          lastMessageIsOwn: isOwnMessage,
+          lastMessageDeliveredTo: deliveredTo || [],
+          lastMessageReadBy: readBy || [],
           timestamp: formatChatTimestamp(messageTimestamp),
           lastMessageTime: messageTimestamp,
           unreadCount: 0
@@ -1045,9 +1102,22 @@ const Chat = () => {
       const chat = { ...updatedChats[chatIndex] }
       
       // Update last message and timestamp
-      chat.lastMessage = truncateMessage(messageText)
-      chat.timestamp = formatChatTimestamp(messageTimestamp)
-      chat.lastMessageTime = messageTimestamp
+      // If messageText is "No messages yet", don't update timestamp to keep original order
+      if (messageText !== 'No messages yet') {
+        chat.lastMessage = messagePreview
+        chat.lastMessageIsOwn = isOwnMessage
+        chat.lastMessageDeliveredTo = deliveredTo || []
+        chat.lastMessageReadBy = readBy || []
+        chat.timestamp = formatChatTimestamp(messageTimestamp)
+        chat.lastMessageTime = messageTimestamp
+      } else {
+        // When clearing chat, just update the message text, keep existing timestamp
+        chat.lastMessage = 'No messages yet'
+        chat.lastMessageIsOwn = false
+        chat.lastMessageDeliveredTo = []
+        chat.lastMessageReadBy = []
+        // Keep existing timestamp and lastMessageTime to preserve position
+      }
       
       // Only increment unread count if message is not from current user and chat is not open
       if (!isOwnMessage && selectedChat?.id !== chatId) {
@@ -1070,7 +1140,7 @@ const Chat = () => {
   }, [selectedChat])
 
   // Update chat list when message is sent or received
-  const updateChatListOnMessage = useCallback((collegeId, messageText, messageTimestamp, isOwnMessage = false) => {
+  const updateChatListOnMessage = useCallback((collegeId, messageText, messageTimestamp, isOwnMessage = false, deliveredTo = [], readBy = []) => {
     setChats(prev => {
       const chatIndex = prev.findIndex(c => c.collegeId === collegeId)
       
@@ -1082,6 +1152,9 @@ const Chat = () => {
           const updatedChats = [...prev]
           const chat = { ...existingChat }
           chat.lastMessage = truncateMessage(messageText)
+          chat.lastMessageIsOwn = isOwnMessage
+          chat.lastMessageDeliveredTo = deliveredTo || []
+          chat.lastMessageReadBy = readBy || []
           chat.timestamp = formatChatTimestamp(messageTimestamp)
           chat.lastMessageTime = messageTimestamp
           chat.unreadCount = isOwnMessage || selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0)
@@ -1105,6 +1178,9 @@ const Chat = () => {
             name: collegeName,
             avatar: collegeLogo,
             lastMessage: truncateMessage(messageText),
+            lastMessageIsOwn: isOwnMessage,
+            lastMessageDeliveredTo: deliveredTo || [],
+            lastMessageReadBy: readBy || [],
             timestamp: formatChatTimestamp(messageTimestamp),
             lastMessageTime: messageTimestamp,
             unreadCount: 0,
@@ -1124,9 +1200,22 @@ const Chat = () => {
       const chat = { ...updatedChats[chatIndex] }
       
       // Update last message and timestamp
-      chat.lastMessage = truncateMessage(messageText)
-      chat.timestamp = formatChatTimestamp(messageTimestamp)
-      chat.lastMessageTime = messageTimestamp
+      // If messageText is "No messages yet", don't update timestamp to keep original order
+      if (messageText !== 'No messages yet') {
+        chat.lastMessage = truncateMessage(messageText)
+        chat.lastMessageIsOwn = isOwnMessage
+        chat.lastMessageDeliveredTo = deliveredTo || []
+        chat.lastMessageReadBy = readBy || []
+        chat.timestamp = formatChatTimestamp(messageTimestamp)
+        chat.lastMessageTime = messageTimestamp
+      } else {
+        // When clearing chat, just update the message text, keep existing timestamp
+        chat.lastMessage = 'No messages yet'
+        chat.lastMessageIsOwn = false
+        chat.lastMessageDeliveredTo = []
+        chat.lastMessageReadBy = []
+        // Keep existing timestamp and lastMessageTime to preserve position
+      }
       
       // Only increment unread count if:
       // 1. Message is not from current user
@@ -1159,8 +1248,15 @@ const Chat = () => {
     const collegeId = message.collegeId
     const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
     
-    // Update chat list
-    updateChatListOnMessage(collegeId, message.text, message.timestamp, isOwnMessage)
+    // Update chat list with delivery and read status
+    updateChatListOnMessage(
+      collegeId, 
+      message.text, 
+      message.timestamp, 
+      isOwnMessage,
+      message.deliveredTo || [],
+      message.readBy || []
+    )
   }, [user, updateChatListOnMessage])
 
   // Set up Socket.IO message listener after handleNewMessage is defined
@@ -1538,7 +1634,48 @@ const Chat = () => {
                       </span>
                     </div>
                     <div className="panel-item-preview">
-                      <span className="panel-item-message">{truncateMessage(chat.lastMessage) || 'No messages yet'}</span>
+                      <span className="panel-item-message">
+                        {chat.lastMessageIsOwn && (() => {
+                          const readBy = chat.lastMessageReadBy || []
+                          const deliveredTo = chat.lastMessageDeliveredTo || []
+                          const currentUserId = String(user?.id || user?._id || '')
+                          
+                          // For college messages, always show single tick (matching chat view)
+                          if (chat.type === 'college') {
+                            return (
+                              <>
+                                <span style={{ color: '#8696A0', marginRight: '4px' }}>✓</span>
+                                <span>You: </span>
+                              </>
+                            )
+                          }
+                          
+                          // For direct messages, check if other user read/delivered
+                          const otherUserId = chat.userId
+                          const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                          const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                          
+                          let statusIcon = ''
+                          if (isRead) {
+                            // Blue double checkmark (read)
+                            statusIcon = '✓✓'
+                          } else if (isDelivered) {
+                            // Gray double checkmark (delivered)
+                            statusIcon = '✓✓'
+                          } else {
+                            // Gray single checkmark (sent)
+                            statusIcon = '✓'
+                          }
+                          
+                          return (
+                            <>
+                              <span style={{ color: isRead ? '#4FC3F7' : '#8696A0', marginRight: '4px' }}>{statusIcon}</span>
+                              <span>You: </span>
+                            </>
+                          )
+                        })()}
+                        {truncateMessage(chat.lastMessage) || 'No messages yet'}
+                      </span>
                       {chat.unreadCount > 0 && (
                         <span className="panel-item-unread">{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</span>
                       )}
@@ -1637,7 +1774,48 @@ const Chat = () => {
                       </span>
                     </div>
                     <div className="panel-item-preview">
-                      <span className="panel-item-message">{truncateMessage(chat.lastMessage) || 'No messages yet'}</span>
+                      <span className="panel-item-message">
+                        {chat.lastMessageIsOwn && (() => {
+                          const readBy = chat.lastMessageReadBy || []
+                          const deliveredTo = chat.lastMessageDeliveredTo || []
+                          const currentUserId = String(user?.id || user?._id || '')
+                          
+                          // For college messages, always show single tick (matching chat view)
+                          if (chat.type === 'college') {
+                            return (
+                              <>
+                                <span style={{ color: '#8696A0', marginRight: '4px' }}>✓</span>
+                                <span>You: </span>
+                              </>
+                            )
+                          }
+                          
+                          // For direct messages, check if other user read/delivered
+                          const otherUserId = chat.userId
+                          const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                          const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                          
+                          let statusIcon = ''
+                          if (isRead) {
+                            // Blue double checkmark (read)
+                            statusIcon = '✓✓'
+                          } else if (isDelivered) {
+                            // Gray double checkmark (delivered)
+                            statusIcon = '✓✓'
+                          } else {
+                            // Gray single checkmark (sent)
+                            statusIcon = '✓'
+                          }
+                          
+                          return (
+                            <>
+                              <span style={{ color: isRead ? '#4FC3F7' : '#8696A0', marginRight: '4px' }}>{statusIcon}</span>
+                              <span>You: </span>
+                            </>
+                          )
+                        })()}
+                        {truncateMessage(chat.lastMessage) || 'No messages yet'}
+                      </span>
                       {chat.unreadCount > 0 && (
                         <span className="panel-item-unread">{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</span>
                       )}
@@ -1755,6 +1933,26 @@ const Chat = () => {
       const college = selectedChat.type === 'college' 
         ? selectedChat.college
         : null
+      
+      // Ensure we have required data
+      if (!selectedChat && !college) {
+        console.error('LiveChatView: Missing chat or college data', { selectedChat, college })
+        return (
+          <div className="live-chat-view">
+            <div className="chat-header-bar">
+              <button className="chat-header-back-btn" onClick={() => { setView('list'); if (isMobileView) setShowChatList(true) }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <p>Error loading chat. Please go back and try again.</p>
+            </div>
+          </div>
+        )
+      }
+      
       return <LiveChatView chat={selectedChat} college={college} user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onViewProfile={() => college && handleViewCollegeProfile(college)} onViewStudentProfile={handleViewStudentProfile} onMessageSent={updateChatListOnMessage} />
     }
     if (view === 'student-profile') {
@@ -2626,6 +2824,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [typingUsers, setTypingUsers] = useState(new Map()) // Map of userId -> { name, timestamp }
   const [onlineUsers, setOnlineUsers] = useState(new Set()) // Set of online user IDs
   const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
+  const [collegeActiveCount, setCollegeActiveCount] = useState(null) // Track active students count for college
   const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
@@ -2668,11 +2867,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         clearTimeout(typingTimeoutRef.current)
       }
       // Stop typing when component unmounts
-      if (isTyping && collegeId) {
-        emitTyping(collegeId, false)
-      }
+      // Note: collegeId and isTyping are captured in closure
     }
-  }, [])
+  }, [isTyping]) // Add isTyping to dependencies
 
   // Update mobile detection on resize
   useEffect(() => {
@@ -2685,6 +2882,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
   // Get college ID
   const collegeId = college?.aisheCode || chat?.collegeId || college?.name
+
+  // Safety check: if no collegeId, show error message
+  if (!collegeId && chat?.type === 'college') {
+    return (
+      <div className="live-chat-view">
+        <div className="chat-header-bar">
+          <button className="chat-header-back-btn" onClick={onBack}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <p>Error: College information not found. Please go back and try again.</p>
+        </div>
+      </div>
+    )
+  }
 
   // Format date helper
   const formatDate = (date) => {
@@ -2822,6 +3037,31 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     loadMessages()
   }, [collegeId, chat.type, user?.id])
 
+  // Fetch active students count for college chat (last 24 hours)
+  useEffect(() => {
+    if (!collegeId || chat.type !== 'college') {
+      setCollegeActiveCount(null)
+      return
+    }
+
+    const fetchActiveCount = async () => {
+      try {
+        const response = await getCollegeActiveStudentsCount(collegeId)
+        if (response.success) {
+          setCollegeActiveCount(response.activeCount)
+        }
+      } catch (error) {
+        console.error('Error fetching active students count:', error)
+        setCollegeActiveCount(0)
+      }
+    }
+
+    fetchActiveCount()
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchActiveCount, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [collegeId, chat.type])
+
   // Set up Socket.IO connection and listeners for real-time messages
   useEffect(() => {
     if (!collegeId || chat.type !== 'college') return
@@ -2882,6 +3122,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           if (optimisticIndex !== -1) {
             // Replace optimistic message with real one
             const newMessages = [...prev]
+            const isOwn = String(message.senderId) === String(user?.id || user?._id || '')
             newMessages[optimisticIndex] = {
               id: message.id,
               text: message.text,
@@ -2893,11 +3134,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 hour12: true 
               }),
               date: formatDate(new Date(message.timestamp)),
-              isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
+              isOwn: isOwn,
               timestamp: new Date(message.timestamp),
               readBy: message.readBy ? message.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
               deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
             }
+            
+            // Update chat list if this is our own message
+            if (isOwn && onMessageSent && message.collegeId) {
+              onMessageSent(
+                message.collegeId,
+                message.text,
+                message.timestamp,
+                true,
+                message.deliveredTo || [],
+                message.readBy || []
+              )
+            }
+            
             return newMessages
           } else {
             // New message from someone else, add it
@@ -3050,6 +3304,18 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       if (response.success) {
         setMessages([])
         setShowClearConfirm(false)
+        
+        // Update chat list to show "No messages yet" instead of removing the chat
+        if (onMessageSent) {
+          onMessageSent(
+            collegeId,
+            'No messages yet',
+            new Date(),
+            false,
+            [],
+            []
+          )
+        }
       } else {
         setClearError(response.message || 'Failed to clear chat. Please try again.')
       }
@@ -3072,21 +3338,29 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
     }
     
     // If user is typing and not already marked as typing
-    if (value.trim().length > 0 && !isTyping) {
-      setIsTyping(true)
-      emitTyping(collegeId, true)
-    }
-    
-    // Set timeout to stop typing after 2 seconds of inactivity
-    typingTimeoutRef.current = setTimeout(() => {
+    if (value.trim().length > 0) {
+      if (!isTyping) {
+        setIsTyping(true)
+        emitTyping(collegeId, true)
+      }
+      
+      // Set timeout to stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false)
+        emitTyping(collegeId, false)
+        typingTimeoutRef.current = null
+      }, 2000)
+    } else {
+      // Input is empty, stop typing immediately
       if (isTyping) {
         setIsTyping(false)
         emitTyping(collegeId, false)
       }
-    }, 2000)
+    }
   }
 
   const handleSendMessage = async (e) => {
@@ -3188,8 +3462,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         console.log('✅ Message sent via socket')
         
         // Update chat list immediately (optimistic update)
+        // Message is just sent, so no delivery/read status yet
         if (onMessageSent && collegeId) {
-          onMessageSent(collegeId, messageText, new Date(), true)
+          onMessageSent(collegeId, messageText, new Date(), true, [], [])
         }
       } else {
         console.error('Socket not connected, cannot send message')
@@ -3229,11 +3504,32 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       : `${typingUsersList[0]} and ${typingUsersList.length - 1} other${typingUsersList.length - 1 > 1 ? 's' : ''} are typing...`
     : null
 
-  // Calculate online count for this college room
-  const onlineCount = Array.from(onlineUsers).length
-  const displayStatus = typingText || (isDirectMessage 
-    ? (onlineUsers.has(chat.userId) ? 'Online' : '')
-    : `${onlineCount || chat.onlineCount || 0} online`)
+  // Format last seen time for display
+  const formatLastSeen = (lastSeenDate) => {
+    if (!lastSeenDate) return ''
+    
+    const now = new Date()
+    const lastSeen = new Date(lastSeenDate)
+    const diffMs = now - lastSeen
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Last seen just now'
+    if (diffMins < 60) return `Last seen ${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `Last seen ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    if (diffDays === 1) return 'Last seen yesterday'
+    if (diffDays < 7) return `Last seen ${diffDays} days ago`
+    
+    // For older dates, show actual date
+    return `Last seen ${lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: lastSeen.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })}`
+  }
+
+  // Calculate display status for college chat (shows active students count)
+  // Note: LiveChatView is only for college chats, not direct messages
+  const displayStatus = typingText || (collegeActiveCount !== null 
+    ? `${collegeActiveCount} student${collegeActiveCount !== 1 ? 's' : ''} active today`
+    : 'Loading...')
   // Check if college is verified
   const isCollegeVerified = college?.isVerified || false
 
@@ -3941,6 +4237,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
   const [otherUserTyping, setOtherUserTyping] = useState(false) // Track if other user is typing
   const [isOtherUserOnline, setIsOtherUserOnline] = useState(false) // Track if other user is online
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState(null) // Track other user's last seen time
+  const [collegeActiveCount, setCollegeActiveCount] = useState(null) // Track active students count for college
   const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
@@ -4054,6 +4352,30 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Keep picker open to allow multiple emoji selections
   }
 
+  // Fetch other user's last seen time for direct messages
+  useEffect(() => {
+    if (!otherUserId) {
+      setOtherUserLastSeen(null)
+      return
+    }
+
+    const fetchLastSeen = async () => {
+      try {
+        const response = await getUserProfile(otherUserId)
+        if (response.success && response.user?.profile?.lastSeen) {
+          setOtherUserLastSeen(new Date(response.user.profile.lastSeen))
+        }
+      } catch (error) {
+        console.error('Error fetching last seen:', error)
+      }
+    }
+
+    fetchLastSeen()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchLastSeen, 30000)
+    return () => clearInterval(interval)
+  }, [otherUserId])
+
   // Fetch other user profile and check block status
   useEffect(() => {
     const loadOtherUser = async () => {
@@ -4103,23 +4425,71 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setLoading(true)
         const response = await getDirectMessages(otherUserId)
         if (response.success) {
-          const formattedMessages = response.messages.map(msg => ({
-            id: msg.id,
-            text: msg.text,
-            sender: msg.senderName,
-            senderId: msg.senderId,
-            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            date: formatDate(new Date(msg.timestamp)),
-            isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
-            timestamp: new Date(msg.timestamp),
-            readBy: msg.readBy || [],
-            deliveredTo: msg.deliveredTo || []
-          }))
+          const currentUserId = String(user?.id || user?._id || '')
+          const formattedMessages = response.messages.map(msg => {
+            const isOwn = String(msg.senderId) === String(currentUserId)
+            // If this is a received message (not our own), mark it as delivered and read
+            if (!isOwn) {
+              // Mark as delivered first (if not already)
+              const alreadyDelivered = msg.deliveredTo?.some(d => String(d.userId) === currentUserId)
+              if (!alreadyDelivered) {
+                const socketInstance = getSocket()
+                if (socketInstance?.connected) {
+                  markDirectMessageDelivered(msg.id)
+                  // Wait for delivered to be processed before marking as read
+                  setTimeout(() => {
+                    // Mark as read when opening chat (if not already read)
+                    const alreadyRead = msg.readBy?.some(r => String(r.userId) === currentUserId)
+                    if (!alreadyRead) {
+                      markDirectMessageRead(msg.id)
+                    }
+                  }, 1000) // 1 second delay to ensure delivered status is processed first
+                }
+              } else {
+                // Already delivered, just mark as read
+                const alreadyRead = msg.readBy?.some(r => String(r.userId) === currentUserId)
+                if (!alreadyRead) {
+                  const socketInstance = getSocket()
+                  if (socketInstance?.connected) {
+                    setTimeout(() => {
+                      markDirectMessageRead(msg.id)
+                    }, 500)
+                  }
+                }
+              }
+            }
+            return {
+              id: msg.id,
+              text: msg.text,
+              sender: msg.senderName,
+              senderId: msg.senderId,
+              time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+              date: formatDate(new Date(msg.timestamp)),
+              isOwn: isOwn,
+              timestamp: new Date(msg.timestamp),
+              readBy: msg.readBy || [],
+              deliveredTo: msg.deliveredTo || []
+            }
+          })
           setMessages(formattedMessages)
+          
+          // Update chat list with last message status if it's our message
+          if (formattedMessages.length > 0) {
+            const lastMessage = formattedMessages[formattedMessages.length - 1]
+            if (lastMessage.isOwn && onMessageSent && otherUser) {
+              const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+              const userAvatar = otherUser.profile?.profilePicture 
+                ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                    ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                    : otherUser.profile.profilePicture)
+                : null
+              onMessageSent(otherUserId, userName, userAvatar, lastMessage.text, lastMessage.timestamp, true, lastMessage.deliveredTo || [], lastMessage.readBy || [])
+            }
+          }
           
           // Scroll to bottom after messages are loaded and DOM is updated
           setTimeout(() => {
@@ -4196,15 +4566,141 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
     onMessageRead(handleMessageRead)
 
+    // Listen for new direct messages (when we receive a message)
+    const handleNewDirectMessage = (message) => {
+      console.log('📬 New direct message received:', message)
+      if (String(message.receiverId) === String(user?.id || user?._id || '')) {
+        // This is a message for us
+        const formattedMessage = {
+          id: message.id,
+          text: message.text,
+          sender: message.senderName,
+          senderId: message.senderId,
+          time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          date: formatDate(new Date(message.timestamp)),
+          isOwn: false,
+          timestamp: new Date(message.timestamp),
+          readBy: message.readBy || [],
+          deliveredTo: message.deliveredTo || []
+        }
+        
+        setMessages(prev => {
+          // Check for duplicates
+          if (prev.some(m => m.id === message.id)) {
+            return prev
+          }
+          return [...prev, formattedMessage].sort((a, b) => 
+            new Date(a.timestamp) - new Date(b.timestamp)
+          )
+        })
+        
+        // Automatically mark as delivered when we receive it
+        console.log('✅ Auto-marking received message as delivered:', message.id)
+        markDirectMessageDelivered(message.id)
+        
+        // Update chat list
+        if (onMessageSent) {
+          const senderName = message.senderName || 'User'
+          onMessageSent(message.senderId, senderName, null, message.text, message.timestamp, false, message.deliveredTo || [], message.readBy || [])
+        }
+      }
+    }
+    onNewDirectMessage(handleNewDirectMessage)
+
+    // Listen for message sent confirmation
+    const handleDirectMessageSent = (message) => {
+      console.log('✅ Message sent confirmation received:', message)
+      // Replace optimistic message with real one
+      setMessages(prev => prev.map(msg => 
+        msg.isOptimistic && msg.text === message.text
+          ? {
+              ...msg,
+              id: message.id,
+              isOptimistic: false,
+              deliveredTo: message.deliveredTo || [],
+              readBy: message.readBy || []
+            }
+          : msg
+      ))
+    }
+    onDirectMessageSent(handleDirectMessageSent)
+
+    // Listen for message status updates (delivered/read)
+    const handleMessageUpdate = (data) => {
+      console.log('📬 Message status update received:', data)
+      if (data.messageId) {
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === data.messageId && msg.isOwn) {
+            if (data.status === 'delivered') {
+              const deliveredTo = msg.deliveredTo || []
+              const alreadyDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+              if (!alreadyDelivered) {
+                console.log('✅ Updating message to delivered:', msg.id)
+                const updatedMsg = {
+                  ...msg,
+                  deliveredTo: [...deliveredTo, { userId: otherUserId, deliveredAt: new Date() }]
+                }
+                
+                // Update chat list
+                if (onMessageSent && otherUser) {
+                  const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+                  const userAvatar = otherUser.profile?.profilePicture 
+                    ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                        ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        : otherUser.profile.profilePicture)
+                    : null
+                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy)
+                }
+                
+                return updatedMsg
+              }
+            } else if (data.status === 'read') {
+              const readBy = msg.readBy || []
+              const alreadyRead = readBy.some(r => String(r.userId) === String(otherUserId))
+              if (!alreadyRead) {
+                console.log('✅ Updating message to read:', msg.id)
+                const updatedMsg = {
+                  ...msg,
+                  readBy: [...readBy, { userId: otherUserId, readAt: new Date() }]
+                }
+                
+                // Update chat list
+                if (onMessageSent && otherUser) {
+                  const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+                  const userAvatar = otherUser.profile?.profilePicture 
+                    ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                        ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        : otherUser.profile.profilePicture)
+                    : null
+                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy)
+                }
+                
+                return updatedMsg
+              }
+            }
+          }
+          return msg
+        }))
+      }
+    }
+    onMessageUpdate(handleMessageUpdate)
+
     return () => {
       if (socketInstance) {
         socketInstance.off('userTypingDirect', handleUserTypingDirect)
         socketInstance.off('userOnline', handleUserOnline)
         socketInstance.off('userOffline', handleUserOffline)
         socketInstance.off('messageRead', handleMessageRead)
+        socketInstance.off('newDirectMessage', handleNewDirectMessage)
+        socketInstance.off('directMessageSent', handleDirectMessageSent)
+        socketInstance.off('message:update', handleMessageUpdate)
       }
     }
-  }, [otherUserId])
+  }, [otherUserId, user?.id, user?._id])
 
   // Handle typing indicator
   const handleInputChange = (e) => {
@@ -4216,21 +4712,29 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
     }
     
     // If user is typing and not already marked as typing
-    if (value.trim().length > 0 && !isTyping) {
-      setIsTyping(true)
-      emitTypingDirect(otherUserId, true)
-    }
-    
-    // Set timeout to stop typing after 2 seconds of inactivity
-    typingTimeoutRef.current = setTimeout(() => {
+    if (value.trim().length > 0) {
+      if (!isTyping) {
+        setIsTyping(true)
+        emitTypingDirect(otherUserId, true)
+      }
+      
+      // Set timeout to stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false)
+        emitTypingDirect(otherUserId, false)
+        typingTimeoutRef.current = null
+      }, 2000)
+    } else {
+      // Input is empty, stop typing immediately
       if (isTyping) {
         setIsTyping(false)
         emitTypingDirect(otherUserId, false)
       }
-    }, 2000)
+    }
   }
 
   // Mark messages as read when they're visible
@@ -4247,9 +4751,17 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }, [messages, otherUserId, lastReadMessageId])
 
   const handleSendMessage = async (e) => {
+    console.log('🔵 ===== handleSendMessage CALLED =====')
     e.preventDefault()
     const messageText = messageInput.trim()
-    if (!messageText || !otherUserId) return
+    console.log('📝 Message text:', messageText, 'Other user ID:', otherUserId)
+    
+    console.log('🔵 handleSendMessage called', { messageText, otherUserId, isBlocked })
+    
+    if (!messageText || !otherUserId) {
+      console.warn('⚠️ Cannot send message - missing text or otherUserId')
+      return
+    }
 
     // Stop typing indicator
     if (isTyping) {
@@ -4266,10 +4778,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Check if user is blocked (re-check after refresh)
     if (isBlocked) {
+      console.warn('⚠️ Cannot send message - user is blocked')
       // Block message should already be set by refreshBlockStatus
       return
     }
 
+    console.log('📝 Creating optimistic message...')
     // Create optimistic message
     const optimisticMessage = {
       id: `temp-${Date.now()}`,
@@ -4291,53 +4805,26 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setMessageInput('')
 
     try {
-      const response = await sendDirectMessage(otherUserId, messageText)
-      if (response.success) {
-        // Replace optimistic message with real one
-        setMessages(prev => prev.map(msg => 
-          msg.id === optimisticMessage.id 
-            ? {
-                ...optimisticMessage,
-                id: response.message.id,
-                isOptimistic: false
-              }
-            : msg
-        ))
+      console.log('📤 Sending direct message via Socket.IO to:', otherUserId, 'Text:', messageText)
+      const sent = sendDirectMessageSocket(otherUserId, messageText)
+      if (sent) {
+        console.log('✅ Message sent via Socket.IO. Waiting for confirmation...')
+        // Message will be updated when we receive directMessageSent event
         
-        // Update chat list
-        if (onMessageSent && otherUser) {
-          const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-          const userAvatar = otherUser.profile?.profilePicture 
-            ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                : otherUser.profile.profilePicture)
-            : null
-          onMessageSent(otherUserId, userName, userAvatar, messageText, response.message.timestamp, true)
-        }
+        // Update chat list (status will be updated when we receive directMessageSent event)
+        // The handleDirectMessageSent will update the chat list with proper status
       } else {
+        console.error('❌ Failed to send message - socket not connected')
         // Remove optimistic message on error
         setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id))
-        
-        // Refresh block status in case it changed
-        await refreshBlockStatus()
-        
-        // Check if it's a blocking error
-        if (response.message && (response.message.includes('blocked') || response.message.includes('cannot send'))) {
-          // Show professional message instead of alert
-          setBlockMessageWithTimeout({
-            text: response.message || 'You cannot send messages to this user',
-            type: 'blocked'
-          })
-        } else {
-          // For other errors, show professional message
-          setBlockMessageWithTimeout({
-            text: response.message || 'Failed to send message. Please try again.',
-            type: 'error'
-          })
-        }
+        setBlockMessageWithTimeout({
+          text: 'Failed to send message. Please check your connection.',
+          type: 'error'
+        })
       }
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('❌ ERROR sending message:', error)
+      // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id))
       
       // Refresh block status in case it changed
@@ -4366,6 +4853,26 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       if (response.success) {
         setMessages([])
         setShowClearConfirm(false)
+        
+        // Update chat list to show "No messages yet" instead of removing the chat
+        if (onMessageSent && otherUser) {
+          const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+          const userAvatar = otherUser.profile?.profilePicture 
+            ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                : otherUser.profile.profilePicture)
+            : null
+          onMessageSent(
+            otherUserId,
+            userName,
+            userAvatar,
+            'No messages yet',
+            new Date(),
+            false,
+            [],
+            []
+          )
+        }
       } else {
         alert('Failed to clear chat. Please try again.')
       }
@@ -4415,6 +4922,27 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         : otherUser.profile.profilePicture)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=50&background=00a8ff&color=fff`
 
+  // Format last seen time for display
+  const formatLastSeen = (lastSeenDate) => {
+    if (!lastSeenDate) return ''
+    
+    const now = new Date()
+    const lastSeen = new Date(lastSeenDate)
+    const diffMs = now - lastSeen
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Last seen just now'
+    if (diffMins < 60) return `Last seen ${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `Last seen ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    if (diffDays === 1) return 'Last seen yesterday'
+    if (diffDays < 7) return `Last seen ${diffDays} days ago`
+    
+    // For older dates, show actual date
+    return `Last seen ${lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: lastSeen.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })}`
+  }
+
   return (
     <div className="live-chat-view">
       <div className="chat-header-bar">
@@ -4443,7 +4971,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                 typing...
               </>
             ) : (
-              isOtherUserOnline ? 'Online' : ''
+              isOtherUserOnline 
+                ? 'Online' 
+                : (otherUserLastSeen ? formatLastSeen(otherUserLastSeen) : '')
             )}
           </span>
         </div>
@@ -4485,20 +5015,13 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                           <span className={`message-status ${(() => {
                             const readBy = message.readBy || []
                             const deliveredTo = message.deliveredTo || []
-                            const currentUserId = String(user?.id || user?._id || '')
-                            
-                            // For direct chats, check if read by the other user
                             const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
                             const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
-                            
                             return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
                           })()}`}>
                             {(() => {
                               const readBy = message.readBy || []
                               const deliveredTo = message.deliveredTo || []
-                              const currentUserId = String(user?.id || user?._id || '')
-                              
-                              // Check if message is read by the other user
                               const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
                               const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
                               
@@ -4517,10 +5040,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                                   </svg>
                                 )
                               } else {
-                                // Single gray checkmark (sent)
+                                // Gray single checkmark (sent)
                                 return (
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20 6L9 17L4 12"></path>
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
                                   </svg>
                                 )
                               }

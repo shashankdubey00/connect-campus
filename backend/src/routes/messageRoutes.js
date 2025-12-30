@@ -2,6 +2,7 @@ import express from 'express';
 import Message from '../models/Message.js';
 import DeletedMessage from '../models/DeletedMessage.js';
 import Follow from '../models/Follow.js';
+import ChatHistory from '../models/ChatHistory.js';
 import { protect } from '../middleware/authMiddleware.js';
 import College from '../../models/College.js';
 
@@ -20,6 +21,47 @@ router.delete('/college/:collegeId/clear', protect, async (req, res) => {
       collegeId: decodedCollegeId,
       senderId: userId
     });
+
+    // Always track that user has interacted with this college chat (even if cleared)
+    // This ensures the chat persists in the list after refresh
+    // Use setOnInsert to only set clearedAt on insert, and $set to always update lastInteractionAt
+    try {
+      const historyResult = await ChatHistory.findOneAndUpdate(
+        {
+          userId: userId,
+          collegeId: decodedCollegeId,
+          chatType: 'college',
+        },
+        {
+          $set: {
+            lastInteractionAt: new Date(),
+            clearedAt: new Date(),
+          },
+          $setOnInsert: {
+            userId: userId,
+            collegeId: decodedCollegeId,
+            chatType: 'college',
+          }
+        },
+        { upsert: true, new: true }
+      );
+      console.log(`✅ ChatHistory updated for college ${decodedCollegeId}, userId ${userId.toString()}`);
+    } catch (error) {
+      console.error('❌ Error tracking cleared college chat:', error);
+      // Try to create it anyway if update failed
+      try {
+        await ChatHistory.create({
+          userId: userId,
+          collegeId: decodedCollegeId,
+          chatType: 'college',
+          lastInteractionAt: new Date(),
+          clearedAt: new Date(),
+        });
+        console.log(`✅ ChatHistory created (fallback) for college ${decodedCollegeId}`);
+      } catch (createError) {
+        console.error('❌ Error creating ChatHistory (fallback):', createError);
+      }
+    }
 
     res.json({
       success: true,
@@ -211,8 +253,23 @@ router.get('/user/colleges', protect, async (req, res) => {
     const follows = await Follow.find({ userId }).lean();
     const collegeIdsFromFollows = follows.map(f => f.collegeId);
 
-    // Combine both lists and get unique college IDs
-    const allCollegeIds = [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows])];
+    // Find colleges where user has deleted messages (indicating previous interaction)
+    const deletedMessages = await DeletedMessage.distinct('collegeId', {
+      userId: userId,
+      messageType: 'college',
+      collegeId: { $exists: true, $ne: null }
+    });
+
+    // Find colleges from chat history (including cleared chats)
+    const chatHistory = await ChatHistory.find({
+      userId: userId,
+      chatType: 'college',
+      collegeId: { $exists: true, $ne: null }
+    }).select('collegeId').lean();
+    const collegeIdsFromHistory = chatHistory.map(ch => ch.collegeId).filter(id => id); // Filter out any null/undefined
+
+    // Combine all lists and get unique college IDs
+    const allCollegeIds = [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows, ...deletedMessages, ...collegeIdsFromHistory])];
 
     // If no colleges found (user hasn't sent messages or followed any), return empty array
     if (allCollegeIds.length === 0) {
@@ -230,32 +287,73 @@ router.get('/user/colleges', protect, async (req, res) => {
       ]
     }).lean();
 
-    // Get last message for each college (from all users since it's a group chat)
-    const collegesWithMessages = await Promise.all(
-      colleges.map(async (college) => {
-        const collegeId = college.aisheCode || college.name;
-        
-        // Get last message for this college (from all users since it's a group chat)
-        const lastMessage = await Message.findOne({ collegeId })
-          .sort({ timestamp: -1 })
-          .lean();
+    // Optimize: Get all last messages in a single aggregation query instead of N queries
+    const collegeIds = colleges.map(c => c.aisheCode || c.name);
+    
+    // Use aggregation to get the last message for each college in one query
+    const lastMessagesByCollege = await Message.aggregate([
+      { $match: { collegeId: { $in: collegeIds } } },
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: '$collegeId',
+          lastMessage: { $first: '$$ROOT' }
+        }
+      }
+    ]);
 
-        return {
-          id: college._id.toString(),
-          aisheCode: college.aisheCode,
-          name: college.name,
-          state: college.state,
-          district: college.district,
-          logo: college.logo,
-          lastMessage: lastMessage ? {
-            text: lastMessage.text,
-            timestamp: lastMessage.timestamp,
-            senderId: lastMessage.senderId.toString(),
-            senderName: lastMessage.senderName
-          } : null
-        };
-      })
-    );
+    // Create a map for O(1) lookup
+    const lastMessageMap = new Map();
+    lastMessagesByCollege.forEach(item => {
+      lastMessageMap.set(item._id, item.lastMessage);
+    });
+
+    // Combine colleges with their last messages
+    const collegesWithMessages = colleges.map((college) => {
+      const collegeId = college.aisheCode || college.name;
+      const lastMessage = lastMessageMap.get(collegeId);
+
+      // Check if last message was sent by current user
+      // Handle both ObjectId and string comparisons
+      let isLastMessageOwn = false;
+      if (lastMessage && lastMessage.senderId) {
+        // Convert both to strings for reliable comparison
+        // Handle MongoDB ObjectId objects
+        let senderIdStr;
+        if (lastMessage.senderId && typeof lastMessage.senderId === 'object' && lastMessage.senderId.toString) {
+          senderIdStr = lastMessage.senderId.toString();
+        } else {
+          senderIdStr = String(lastMessage.senderId);
+        }
+        
+        let userIdStr;
+        if (userId && typeof userId === 'object' && userId.toString) {
+          userIdStr = userId.toString();
+        } else {
+          userIdStr = String(userId);
+        }
+        
+        isLastMessageOwn = senderIdStr === userIdStr;
+      }
+
+      return {
+        id: college._id.toString(),
+        aisheCode: college.aisheCode,
+        name: college.name,
+        state: college.state,
+        district: college.district,
+        logo: college.logo,
+        lastMessage: lastMessage ? {
+          text: lastMessage.text,
+          timestamp: lastMessage.timestamp,
+          senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
+          senderName: lastMessage.senderName,
+          lastMessageIsOwn: isLastMessageOwn,
+          lastMessageDeliveredTo: lastMessage.deliveredTo || [],
+          lastMessageReadBy: lastMessage.readBy || [],
+        } : null // null means no messages, but chat should still appear
+      };
+    });
 
     res.json({
       success: true,

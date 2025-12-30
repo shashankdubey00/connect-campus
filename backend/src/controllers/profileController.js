@@ -857,3 +857,47 @@ export const checkBlockStatus = async (req, res) => {
   }
 };
 
+/**
+ * Get count of active students for a college (active in last 24 hours)
+ * Used for college group chat status display
+ */
+export const getCollegeActiveStudentsCount = async (req, res) => {
+  try {
+    const { collegeId } = req.query;
+
+    if (!collegeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'College ID is required',
+      });
+    }
+
+    // Calculate 24 hours ago
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+    // Count users who:
+    // 1. Belong to this college (by aisheCode or name)
+    // 2. Have been active in the last 24 hours (lastSeen >= 24 hours ago)
+    const activeCount = await UserProfile.countDocuments({
+      $or: [
+        { 'college.aisheCode': collegeId },
+        { 'college.name': collegeId },
+      ],
+      lastSeen: { $gte: twentyFourHoursAgo },
+    });
+
+    res.json({
+      success: true,
+      activeCount,
+      collegeId,
+    });
+  } catch (error) {
+    console.error('Error getting active students count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+

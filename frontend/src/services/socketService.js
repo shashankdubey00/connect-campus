@@ -247,3 +247,66 @@ export const onMessageRead = (callback) => {
   }
 };
 
+/**
+ * Send direct message via Socket.IO
+ * @param {string} receiverId - Receiver user ID
+ * @param {string} text - Message text
+ */
+export const sendDirectMessageSocket = (receiverId, text) => {
+  if (socket?.connected && receiverId && text) {
+    socket.emit('sendDirectMessage', { receiverId, text });
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Mark direct message as delivered
+ * @param {string} messageId - Message ID
+ */
+export const markDirectMessageDelivered = (messageId) => {
+  if (socket?.connected && messageId) {
+    socket.emit('message:delivered', { messageId });
+  }
+};
+
+/**
+ * Mark direct message as read
+ * @param {string} messageId - Message ID
+ */
+export const markDirectMessageRead = (messageId) => {
+  if (socket?.connected && messageId) {
+    socket.emit('message:read', { messageId });
+  }
+};
+
+/**
+ * Listen for new direct messages
+ * @param {Function} callback - Callback function
+ */
+export const onNewDirectMessage = (callback) => {
+  if (socket) {
+    socket.on('newDirectMessage', callback);
+  }
+};
+
+/**
+ * Listen for direct message sent confirmation
+ * @param {Function} callback - Callback function
+ */
+export const onDirectMessageSent = (callback) => {
+  if (socket) {
+    socket.on('directMessageSent', callback);
+  }
+};
+
+/**
+ * Listen for message status updates (delivered/read)
+ * @param {Function} callback - Callback function
+ */
+export const onMessageUpdate = (callback) => {
+  if (socket) {
+    socket.on('message:update', callback);
+  }
+};
+

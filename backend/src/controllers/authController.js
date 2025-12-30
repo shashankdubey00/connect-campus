@@ -1,3 +1,16 @@
+/**
+ * Authentication Controller
+ * 
+ * Handles all authentication-related operations including:
+ * - User registration (signup)
+ * - User login
+ * - Password reset (OTP-based)
+ * - Google OAuth authentication
+ * - JWT token management
+ * 
+ * @module controllers/authController
+ */
+
 import User from '../models/User.js';
 import UserProfile from '../models/UserProfile.js';
 import jwt from 'jsonwebtoken';
@@ -5,7 +18,19 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { sendOTPEmail } from '../utils/emailService.js';
 
-// Password strength validation
+/**
+ * Validates password strength
+ * 
+ * Requirements:
+ * - Minimum 8 characters
+ * - At least one uppercase letter
+ * - At least one lowercase letter
+ * - At least one number
+ * - At least one special character
+ * 
+ * @param {string} password - Password to validate
+ * @returns {boolean} - True if password meets requirements
+ */
 const isStrongPassword = (password) => {
   return (
     password.length >= 8 &&
@@ -16,7 +41,13 @@ const isStrongPassword = (password) => {
   );
 };
 
-// Generate JWT token
+/**
+ * Generates JWT token for user authentication
+ * 
+ * @param {string|ObjectId} userId - User ID
+ * @param {string} role - User role (default: 'student')
+ * @returns {string} - JWT token
+ */
 const generateToken = (userId, role = 'student') => {
   return jwt.sign(
     { userId: userId.toString(), role },
@@ -25,7 +56,19 @@ const generateToken = (userId, role = 'student') => {
   );
 };
 
-// Register new user
+/**
+ * Register a new user
+ * 
+ * Creates a new user account with email and password.
+ * Also creates a default user profile.
+ * 
+ * @route POST /api/auth/signup
+ * @access Public
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.email - User email
+ * @param {string} req.body.password - User password
+ * @returns {Object} Response with user data and JWT token
+ */
 export const signup = async (req, res) => {
   try {
     const { email, password } = req.body;

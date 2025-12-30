@@ -228,6 +228,74 @@ MONGODB_URI=your_mongodb_connection_string
 PORT=5000
 ```
 
-## License
+## 📚 Documentation
+
+For developers and maintainers:
+
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - How to contribute to this project
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design decisions
+- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Complete API reference
+- **[AUTHENTICATION_SETUP_GUIDE.md](./AUTHENTICATION_SETUP_GUIDE.md)** - Authentication setup guide
+
+## 🛠 For Developers
+
+### Code Quality
+
+- **Linting**: Follow ESLint rules (if configured)
+- **Comments**: Add JSDoc comments for functions
+- **Error Handling**: Use structured error handling
+- **Logging**: Use the logger utility (`backend/src/utils/logger.js`)
+
+### Project Structure
+
+- **Backend**: MVC pattern (Models, Controllers, Routes)
+- **Frontend**: Component-based architecture
+- **Services**: API calls abstracted in service layer
+- **Utils**: Reusable helper functions
+
+### Environment Setup
+
+1. Copy `.env.example` files:
+
+   ```bash
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env
+   ```
+
+2. Fill in required variables (see `.env.example` files for details)
+
+3. Start development servers:
+   ```bash
+   npm run dev
+   ```
+
+### Adding New Features
+
+1. **Backend**:
+
+   - Create controller in `backend/src/controllers/`
+   - Add routes in `backend/src/routes/`
+   - Update models if needed
+   - Add JSDoc comments
+
+2. **Frontend**:
+   - Create components in `frontend/src/components/`
+   - Add pages in `frontend/src/pages/`
+   - Create services in `frontend/src/services/`
+   - Update routes in `App.jsx`
+
+### Best Practices
+
+- ✅ Write clear, self-documenting code
+- ✅ Add comments for complex logic
+- ✅ Handle errors gracefully
+- ✅ Use consistent naming conventions
+- ✅ Test your changes
+- ✅ Update documentation
+- ❌ Don't commit `.env` files
+- ❌ Don't use `console.log` (use logger)
+- ❌ Don't hardcode values (use environment variables)
+
+## 📝 License
 
 This project is private and proprietary.

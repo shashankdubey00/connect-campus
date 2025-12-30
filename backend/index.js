@@ -3,6 +3,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import connectDB from './config/db.js';
@@ -14,12 +15,34 @@ import directMessageRoutes from './src/routes/directMessageRoutes.js';
 import passport from './src/config/passport.js';
 import { initializeSocket } from './src/socket/socketServer.js';
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Connect to MongoDB and start server
+const startServer = async () => {
+  try {
+    // Wait for MongoDB connection before starting server
+    await connectDB();
+    
+    // Start server only after MongoDB is connected
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`🔌 Socket.IO is ready for real-time messaging`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
+
+// Compression middleware (should be early in the middleware stack)
+app.use(compression());
 
 // Security headers
 app.use((req, res, next) => {
@@ -107,16 +130,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Initialize Socket.IO
+// Initialize Socket.IO (will be ready when server starts)
 initializeSocket(server);
-
-// Start server with error handling
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🔌 Socket.IO is ready for real-time messaging`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-});
 
 // Handle server errors
 server.on('error', (error) => {

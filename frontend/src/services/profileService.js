@@ -242,3 +242,15 @@ export const getUserColleges = async (userId) => {
   });
 };
 
+/**
+ * Get active students count for a college (active in last 24 hours)
+ * @param {String} collegeId - College ID (aisheCode or name)
+ * @returns {Promise} API response with activeCount
+ */
+export const getCollegeActiveStudentsCount = async (collegeId) => {
+  const params = new URLSearchParams({ collegeId });
+  return await api(`/api/profile/college-active-count?${params}`, {
+    method: 'GET',
+  });
+};
+

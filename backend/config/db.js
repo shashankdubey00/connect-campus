@@ -3,15 +3,18 @@ import mongoose from 'mongoose';
 const connectDB = async () => {
   try {
     const options = {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      minPoolSize: 2, // Maintain at least 2 socket connections
-      maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+      serverSelectionTimeoutMS: 5000, // Reduced from 10000
+      socketTimeoutMS: 30000, // Reduced from 45000
+      connectTimeoutMS: 5000, // Reduced from 10000
+      maxPoolSize: 50, // Increased from 10 for better concurrency
+      minPoolSize: 5, // Increased from 2
+      maxIdleTimeMS: 60000, // Increased from 30000 to keep connections longer
       retryWrites: true, // Retry write operations on network errors
-      w: 'majority', // Write concern: wait for majority of replicas
+      w: 1, // Changed from 'majority' to 1 for faster writes (single replica confirmation)
     };
+    
+    // Disable Mongoose buffering (set globally, not in connection options)
+    mongoose.set('bufferCommands', false);
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, options);
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);

@@ -1,8 +1,10 @@
 import { Server } from 'socket.io';
 import { authenticateSocket } from '../middleware/socketAuth.js';
 import Message from '../models/Message.js';
+import DirectMessage from '../models/DirectMessage.js';
 import UserProfile from '../models/UserProfile.js';
 import Block from '../models/Block.js';
+import ChatHistory from '../models/ChatHistory.js';
 
 let io;
 
@@ -26,9 +28,20 @@ export const initializeSocket = (server) => {
   const onlineUsers = new Map(); // userId -> { socketId, email, lastSeen }
 
   // Connection handler
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = socket.user.userId.toString();
     const userEmail = socket.user.email;
+    
+    // Update last seen time in database
+    try {
+      await UserProfile.findOneAndUpdate(
+        { userId: socket.user.userId },
+        { lastSeen: new Date() },
+        { upsert: false }
+      );
+    } catch (error) {
+      console.error('Error updating last seen:', error);
+    }
     
     // Mark user as online
     onlineUsers.set(userId, {
@@ -41,7 +54,12 @@ export const initializeSocket = (server) => {
     // Broadcast user online status to all connected clients
     io.emit('userOnline', { userId, isOnline: true });
     
-    console.log(`✅ User connected: ${userEmail} (College: ${socket.collegeId || 'None'})`);
+    // Log connection (only show college if user has one)
+    if (socket.collegeId) {
+      console.log(`✅ User connected: ${userEmail} (College: ${socket.collegeId})`);
+    } else {
+      console.log(`✅ User connected: ${userEmail}`);
+    }
 
     // Join user to their personal room for direct messages
     socket.join(`user:${userId}`);
@@ -59,8 +77,12 @@ export const initializeSocket = (server) => {
         roomName: roomName,
       });
     } else {
-      // User doesn't belong to a college yet
-      console.log(`⚠️ User ${userEmail} connected but doesn't belong to a college yet`);
+      // User doesn't belong to a college yet - this is normal for new users
+      // Only log in debug mode to reduce console noise
+      // Users can join a college room later via the 'joinCollegeRoom' event
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`ℹ️ User ${userEmail} connected (no college assigned yet - they can join one later)`);
+      }
     }
 
     // Handle joinCollegeRoom event - allow joining any college room
@@ -138,6 +160,27 @@ export const initializeSocket = (server) => {
         const savedMessage = await message.save();
         
         console.log(`💾 Message saved to DB: ${savedMessage._id} for college: ${messageCollegeId}`);
+
+        // Track chat history to ensure chat persists even if all messages are cleared
+        try {
+          await ChatHistory.findOneAndUpdate(
+            {
+              userId: socket.user.userId,
+              collegeId: messageCollegeId,
+              chatType: 'college',
+            },
+            {
+              userId: socket.user.userId,
+              collegeId: messageCollegeId,
+              chatType: 'college',
+              lastInteractionAt: new Date(),
+            },
+            { upsert: true }
+          );
+        } catch (error) {
+          // Non-critical, log but don't fail
+          console.error('Error tracking chat history:', error);
+        }
 
         // Mark message as delivered to sender immediately
         savedMessage.deliveredTo.push({
@@ -241,7 +284,7 @@ export const initializeSocket = (server) => {
       }
     });
 
-    // Handle message delivered receipt
+    // Handle message delivered receipt (for college messages)
     socket.on('markMessageDelivered', async (data) => {
       try {
         const { messageId, collegeId } = data;
@@ -269,9 +312,204 @@ export const initializeSocket = (server) => {
       }
     });
 
+    // Handle sending direct message via Socket.IO
+    socket.on('sendDirectMessage', async (data) => {
+      try {
+        const { receiverId, text } = data;
+        const senderId = socket.user.userId.toString();
+
+        if (!receiverId || !text || !text.trim()) {
+          socket.emit('error', { message: 'Receiver ID and message text are required' });
+          return;
+        }
+
+        if (String(senderId) === String(receiverId)) {
+          socket.emit('error', { message: 'You cannot send a message to yourself' });
+          return;
+        }
+
+        // Check if sender is blocked by receiver
+        const isBlocked = await Block.findOne({
+          blockerId: receiverId,
+          blockedId: senderId,
+        });
+
+        if (isBlocked) {
+          socket.emit('error', { message: 'You cannot send messages to this user' });
+          return;
+        }
+
+        // Check if receiver is blocked by sender
+        const hasBlocked = await Block.findOne({
+          blockerId: senderId,
+          blockedId: receiverId,
+        });
+
+        if (hasBlocked) {
+          socket.emit('error', { message: 'You have blocked this user' });
+          return;
+        }
+
+        // Get sender name
+        const senderProfile = await UserProfile.findOne({ userId: senderId });
+        const senderName = senderProfile?.displayName || 
+                          `${senderProfile?.firstName || ''} ${senderProfile?.lastName || ''}`.trim() ||
+                          socket.user.email.split('@')[0];
+
+        // Create message
+        const message = new DirectMessage({
+          senderId,
+          receiverId,
+          senderName,
+          text: text.trim(),
+        });
+
+        await message.save();
+
+        // Track chat history to ensure chat persists even if all messages are cleared
+        try {
+          await ChatHistory.findOneAndUpdate(
+            {
+              userId: socket.user.userId,
+              otherUserId: receiverId,
+              chatType: 'direct',
+            },
+            {
+              userId: socket.user.userId,
+              otherUserId: receiverId,
+              chatType: 'direct',
+              lastInteractionAt: new Date(),
+            },
+            { upsert: true }
+          );
+        } catch (error) {
+          // Non-critical, log but don't fail
+          console.error('Error tracking chat history:', error);
+        }
+
+        // Format message for sending
+        const messageToSend = {
+          id: message._id.toString(),
+          senderId: message.senderId.toString(),
+          receiverId: message.receiverId.toString(),
+          senderName: message.senderName,
+          text: message.text,
+          timestamp: message.timestamp,
+          deliveredTo: [],
+          readBy: [],
+        };
+
+        // Send to receiver
+        io.to(`user:${receiverId}`).emit('newDirectMessage', messageToSend);
+
+        // Send confirmation to sender
+        socket.emit('directMessageSent', messageToSend);
+
+        console.log(`💬 Direct message sent from ${senderId} to ${receiverId}`);
+      } catch (error) {
+        console.error('Error sending direct message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
+    });
+
+    // Handle message:delivered event (receiver confirms delivery)
+    socket.on('message:delivered', async (data) => {
+      try {
+        const { messageId } = data;
+        if (!messageId) return;
+
+        const message = await DirectMessage.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Only mark as delivered if current user is the receiver
+        if (String(message.receiverId) !== userId) {
+          return; // Not the receiver, ignore
+        }
+
+        // Check if already delivered
+        const alreadyDelivered = message.deliveredTo.some(
+          delivered => String(delivered.userId) === userId
+        );
+
+        if (!alreadyDelivered) {
+          message.deliveredTo.push({
+            userId: socket.user.userId,
+            deliveredAt: new Date(),
+          });
+          await message.save();
+
+          // Notify sender that message was delivered
+          const senderId = message.senderId.toString();
+          io.to(`user:${senderId}`).emit('message:update', {
+            messageId: messageId,
+            status: 'delivered',
+            receiverId: userId,
+          });
+          console.log(`✅ Message ${messageId} marked as delivered. Notified sender: ${senderId}`);
+        }
+      } catch (error) {
+        console.error('Error marking message as delivered:', error);
+      }
+    });
+
+    // Handle message:read event (receiver marks as read)
+    socket.on('message:read', async (data) => {
+      try {
+        const { messageId } = data;
+        if (!messageId) return;
+
+        const message = await DirectMessage.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Only mark as read if current user is the receiver
+        if (String(message.receiverId) !== userId) {
+          return; // Not the receiver, ignore
+        }
+
+        // Check if already read
+        const alreadyRead = message.readBy.some(
+          read => String(read.userId) === userId
+        );
+
+        if (!alreadyRead) {
+          message.readBy.push({
+            userId: socket.user.userId,
+            readAt: new Date(),
+          });
+          await message.save();
+
+          // Notify sender that message was read
+          const senderId = message.senderId.toString();
+          io.to(`user:${senderId}`).emit('message:update', {
+            messageId: messageId,
+            status: 'read',
+            receiverId: userId,
+          });
+          console.log(`✅ Message ${messageId} marked as read. Notified sender: ${senderId}`);
+        }
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+      }
+    });
+
     // Handle disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       const userId = socket.user.userId.toString();
+      
+      // Update last seen time in database before disconnecting
+      try {
+        await UserProfile.findOneAndUpdate(
+          { userId: socket.user.userId },
+          { lastSeen: new Date() },
+          { upsert: false }
+        );
+      } catch (error) {
+        console.error('Error updating last seen on disconnect:', error);
+      }
       
       // Mark user as offline
       onlineUsers.delete(userId);

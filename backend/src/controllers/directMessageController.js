@@ -2,6 +2,8 @@ import DirectMessage from '../models/DirectMessage.js';
 import Block from '../models/Block.js';
 import UserProfile from '../models/UserProfile.js';
 import User from '../models/User.js';
+import DeletedMessage from '../models/DeletedMessage.js';
+import ChatHistory from '../models/ChatHistory.js';
 import mongoose from 'mongoose';
 
 /**
@@ -77,6 +79,7 @@ export const sendDirectMessage = async (req, res) => {
         senderName: message.senderName,
         text: message.text,
         timestamp: message.timestamp,
+        deliveredTo: message.deliveredTo || [],
       },
     });
   } catch (error) {
@@ -151,6 +154,8 @@ export const getDirectMessages = async (req, res) => {
         senderName: msg.senderName,
         text: msg.text,
         timestamp: msg.timestamp,
+        deliveredTo: msg.deliveredTo || [],
+        readBy: msg.readBy || [],
       })),
     });
   } catch (error) {
@@ -178,10 +183,40 @@ export const getDirectMessageConversations = async (req, res) => {
       .select('senderId')
       .lean();
 
-    // Get unique user IDs
+    // Get unique user IDs from messages
     const userIds = new Set();
     sentMessages.forEach(msg => userIds.add(msg.receiverId.toString()));
     receivedMessages.forEach(msg => userIds.add(msg.senderId.toString()));
+
+    // Also include users where messages were deleted (indicating previous interaction)
+    const deletedDirectMessages = await DeletedMessage.find({
+      userId: currentUserId,
+      messageType: 'direct',
+      otherUserId: { $exists: true, $ne: null }
+    })
+      .select('otherUserId')
+      .lean();
+    
+    deletedDirectMessages.forEach(deleted => {
+      if (deleted.otherUserId) {
+        userIds.add(deleted.otherUserId.toString());
+      }
+    });
+
+    // Also include users from chat history (including cleared chats)
+    const chatHistory = await ChatHistory.find({
+      userId: currentUserId,
+      chatType: 'direct',
+      otherUserId: { $exists: true, $ne: null }
+    })
+      .select('otherUserId')
+      .lean();
+    
+    chatHistory.forEach(history => {
+      if (history.otherUserId) {
+        userIds.add(history.otherUserId.toString());
+      }
+    });
 
     // Get last message for each conversation
     const conversations = await Promise.all(
@@ -199,12 +234,18 @@ export const getDirectMessageConversations = async (req, res) => {
         const userProfile = await UserProfile.findOne({ userId }).lean();
         const user = await User.findById(userId).select('email').lean();
 
+        // Check if last message was sent by current user
+        const isLastMessageOwn = lastMessage && String(lastMessage.senderId) === String(currentUserId);
+
         return {
           userId: userId,
           name: userProfile?.displayName || user?.email?.split('@')[0] || 'User',
           profilePicture: userProfile?.profilePicture || null,
-          lastMessage: lastMessage?.text || '',
+          lastMessage: lastMessage?.text || '', // Empty string means no messages, but conversation should still appear
           lastMessageTime: lastMessage?.timestamp || null,
+          lastMessageIsOwn: isLastMessageOwn || false,
+          lastMessageDeliveredTo: lastMessage?.deliveredTo || [],
+          lastMessageReadBy: lastMessage?.readBy || [],
         };
       })
     );
@@ -251,6 +292,28 @@ export const clearDirectMessages = async (req, res) => {
         { senderId: otherUserId, receiverId: currentUserId },
       ],
     });
+
+    // Always track that user has interacted with this direct chat (even if cleared)
+    // This ensures the chat persists in the list after refresh
+    try {
+      await ChatHistory.findOneAndUpdate(
+        {
+          userId: currentUserId,
+          otherUserId: otherUserId,
+          chatType: 'direct',
+        },
+        {
+          userId: currentUserId,
+          otherUserId: otherUserId,
+          chatType: 'direct',
+          lastInteractionAt: new Date(),
+          clearedAt: new Date(),
+        },
+        { upsert: true }
+      );
+    } catch (error) {
+      console.error('Error tracking cleared direct chat:', error);
+    }
 
     res.json({
       success: true,

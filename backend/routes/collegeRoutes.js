@@ -3,6 +3,21 @@ import College from '../models/College.js';
 
 const router = express.Router();
 
+// Simple in-memory cache for states and districts (clears every 5 minutes)
+const cache = {
+  states: null,
+  districts: {},
+  statesTimestamp: null,
+  districtsTimestamps: {},
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+};
+
+// Helper to check if cache is valid
+const isCacheValid = (timestamp) => {
+  if (!timestamp) return false;
+  return Date.now() - timestamp < cache.CACHE_DURATION;
+};
+
 // Search colleges with optional filters
 router.get('/search', async (req, res) => {
   try {
@@ -44,12 +59,6 @@ router.get('/search', async (req, res) => {
     // Execute query
     const colleges = await searchQuery.select('aisheCode name state district').lean();
 
-    console.log(`Search - Query: "${query || 'none'}", State: "${state || 'all'}", District: "${district || 'all'}"`);
-    console.log(`Search - Found ${colleges.length} colleges (limit: ${searchLimit})`);
-    if (colleges.length > 0) {
-      console.log(`Search - Sample colleges:`, colleges.slice(0, 3).map(c => c.name));
-    }
-
     res.json({
       success: true,
       count: colleges.length,
@@ -65,10 +74,24 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Get all unique states
+// Get all unique states (with caching)
 router.get('/states', async (req, res) => {
   try {
+    // Check cache first
+    if (cache.states && isCacheValid(cache.statesTimestamp)) {
+      return res.json({
+        success: true,
+        states: cache.states
+      });
+    }
+
+    // Fetch from database
     const states = await College.distinct('state').sort();
+    
+    // Update cache
+    cache.states = states;
+    cache.statesTimestamp = Date.now();
+    
     res.json({
       success: true,
       states
@@ -83,7 +106,7 @@ router.get('/states', async (req, res) => {
   }
 });
 
-// Get districts for a specific state
+// Get districts for a specific state (with caching)
 router.get('/districts', async (req, res) => {
   try {
     const { state } = req.query;
@@ -95,7 +118,22 @@ router.get('/districts', async (req, res) => {
       });
     }
 
-    const districts = await College.distinct('district', { state: state.trim() }).sort();
+    const stateKey = state.trim();
+    
+    // Check cache first
+    if (cache.districts[stateKey] && isCacheValid(cache.districtsTimestamps[stateKey])) {
+      return res.json({
+        success: true,
+        districts: cache.districts[stateKey]
+      });
+    }
+
+    // Fetch from database
+    const districts = await College.distinct('district', { state: stateKey }).sort();
+    
+    // Update cache
+    cache.districts[stateKey] = districts;
+    cache.districtsTimestamps[stateKey] = Date.now();
     
     res.json({
       success: true,
