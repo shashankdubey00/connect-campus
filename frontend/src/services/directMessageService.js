@@ -55,3 +55,29 @@ export const clearDirectMessages = async (otherUserId) => {
   });
 };
 
+/**
+ * Delete a single direct message (delete for me)
+ * @param {String} messageId - Message ID
+ * @returns {Promise} API response
+ */
+export const deleteDirectMessage = async (messageId) => {
+  return await api(`/api/direct-messages/message/${encodeURIComponent(messageId)}`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * Delete all messages with a user and remove from chat list
+ * @param {String} otherUserId - Other user ID
+ * @returns {Promise} API response
+ */
+export const deleteAllDirectMessages = async (otherUserId) => {
+  return await api('/api/direct-messages/delete-all', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ otherUserId }),
+  });
+};
+

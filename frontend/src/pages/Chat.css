@@ -4995,6 +4995,44 @@
   color: var(--right-text, #e9edef);
 }
 
+.chat-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-selection-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--btn-secondary, #2a3942);
+  border: none;
+  border-radius: 6px;
+  color: var(--right-text, #e9edef);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chat-selection-action-btn:hover {
+  background-color: var(--btn-secondary-hover, #3a4a52);
+}
+
+.chat-selection-action-btn.chat-selection-delete-btn {
+  background-color: var(--btn-danger, #e74c3c);
+  color: #fff;
+}
+
+.chat-selection-action-btn.chat-selection-delete-btn:hover {
+  background-color: var(--btn-danger-hover, #c0392b);
+}
+
+.chat-selection-action-btn svg {
+  flex-shrink: 0;
+}
+
 .chat-selection-cancel-btn {
   background: none;
   border: none;

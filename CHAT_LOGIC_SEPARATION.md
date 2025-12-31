@@ -82,3 +82,5 @@ frontend/src/
 2. **Multi-select Actions**: Add copy, archive, mute options for selected chats
 3. **Better Error Recovery**: Implement retry mechanism for failed messages
 
+
+

@@ -359,3 +359,119 @@ export const clearDirectMessages = async (req, res) => {
   }
 };
 
+/**
+ * Delete all direct messages with a user and remove from chat list
+ */
+export const deleteAllDirectMessages = async (req, res) => {
+  try {
+    const { otherUserId } = req.body;
+    const currentUserId = req.user.userId;
+
+    console.log('deleteAllDirectMessages called:', { otherUserId, currentUserId });
+
+    if (!otherUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Other user ID is required',
+      });
+    }
+
+    // Convert to ObjectId if needed
+    const otherUserIdObj = mongoose.Types.ObjectId.isValid(otherUserId) 
+      ? new mongoose.Types.ObjectId(otherUserId) 
+      : otherUserId;
+    const currentUserIdObj = mongoose.Types.ObjectId.isValid(currentUserId) 
+      ? new mongoose.Types.ObjectId(currentUserId) 
+      : currentUserId;
+
+    // Delete all messages between the two users
+    const deleteResult = await DirectMessage.deleteMany({
+      $or: [
+        { senderId: currentUserIdObj, receiverId: otherUserIdObj },
+        { senderId: otherUserIdObj, receiverId: currentUserIdObj },
+      ],
+    });
+
+    console.log('Deleted messages count:', deleteResult.deletedCount);
+
+    // Remove ChatHistory to remove chat from list
+    const historyResult = await ChatHistory.deleteMany({
+      userId: currentUserIdObj,
+      otherUserId: otherUserIdObj,
+      chatType: 'direct',
+    });
+
+    console.log('Deleted chat history count:', historyResult.deletedCount);
+
+    res.json({
+      success: true,
+      message: 'All messages deleted and chat removed',
+      deletedCount: deleteResult.deletedCount,
+      historyDeletedCount: historyResult.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting all direct messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting messages',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Delete a single direct message (permanently delete from database)
+ */
+export const deleteDirectMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.userId;
+
+    if (!messageId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message ID is required',
+      });
+    }
+
+    // Find the message
+    const message = await DirectMessage.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    // Check if user is the sender or receiver
+    const isSender = String(message.senderId) === String(userId);
+    const isReceiver = String(message.receiverId) === String(userId);
+
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to delete this message',
+      });
+    }
+
+    // Permanently delete the message from database
+    await DirectMessage.findByIdAndDelete(messageId);
+
+    // Also delete any DeletedMessage records for this message (cleanup)
+    await DeletedMessage.deleteMany({ messageId: messageId });
+
+    res.json({
+      success: true,
+      message: 'Message deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting direct message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting message',
+      error: error.message,
+    });
+  }
+};
+

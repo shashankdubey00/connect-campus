@@ -60,5 +60,16 @@ export const deleteMessageForAll = async (messageId) => {
   });
 };
 
+/**
+ * Delete all messages in a college chat and remove from list
+ * @param {string} collegeId - College ID (aisheCode)
+ * @returns {Promise} API response
+ */
+export const deleteAllCollegeMessages = async (collegeId) => {
+  return await api(`/api/messages/college/${encodeURIComponent(collegeId)}/delete-all`, {
+    method: 'DELETE',
+  });
+};
+
 
 

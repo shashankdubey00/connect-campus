@@ -3,10 +3,10 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
 import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate } from '../services/socketService'
-import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll } from '../services/messageService'
+import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll, deleteAllCollegeMessages } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus, getCollegeActiveStudentsCount } from '../services/profileService'
-import { sendDirectMessage, getDirectMessages, clearDirectMessages, getDirectMessageConversations } from '../services/directMessageService'
+import { sendDirectMessage, getDirectMessages, clearDirectMessages, getDirectMessageConversations, deleteDirectMessage, deleteAllDirectMessages } from '../services/directMessageService'
 import EmojiPicker from 'emoji-picker-react'
 import './Chat.css'
 
@@ -49,6 +49,8 @@ const Chat = () => {
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [chatSelectionMode, setChatSelectionMode] = useState(false) // Selection mode for chats
   const [selectedChatIds, setSelectedChatIds] = useState(new Set()) // Set of selected chat IDs
+  const [selectedChatsFollowStatus, setSelectedChatsFollowStatus] = useState({ allFollowing: false, allNotFollowing: false, mixed: false }) // Follow status for selected chats
+  const [selectedChatsBlockStatus, setSelectedChatsBlockStatus] = useState({ allBlocked: false, allUnblocked: false, mixed: false }) // Block status for selected chats
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
   const navigationHistory = useRef([]) // Track navigation history for back button
@@ -726,6 +728,210 @@ const Chat = () => {
   // Enter chat selection mode
   const handleEnterChatSelectionMode = () => {
     setChatSelectionMode(true)
+  }
+
+  // Update follow status for selected chats
+  const updateFollowStatusForSelected = useCallback(async (selectedIds) => {
+    const selectedChats = chats.filter(chat => selectedIds.has(chat.id) && chat.type === 'college')
+    if (selectedChats.length === 0) {
+      setSelectedChatsFollowStatus({ allFollowing: false, allNotFollowing: false, mixed: false })
+      return
+    }
+    
+    try {
+      const followStatuses = await Promise.all(
+        selectedChats.map(async (chat) => {
+          const college = chat.college || { aisheCode: chat.collegeId, name: chat.name }
+          const status = await checkFollowStatus(college)
+          return status.success ? status.isFollowing : false
+        })
+      )
+      
+      const allFollowing = followStatuses.every(status => status === true)
+      const allNotFollowing = followStatuses.every(status => status === false)
+      const mixed = !allFollowing && !allNotFollowing
+      
+      setSelectedChatsFollowStatus({ allFollowing, allNotFollowing, mixed })
+    } catch (error) {
+      console.error('Error checking follow status:', error)
+    }
+  }, [chats])
+
+  // Update block status for selected chats
+  const updateBlockStatusForSelected = useCallback(async (selectedIds) => {
+    const selectedChats = chats.filter(chat => selectedIds.has(chat.id) && chat.type === 'direct')
+    if (selectedChats.length === 0) {
+      setSelectedChatsBlockStatus({ allBlocked: false, allUnblocked: false, mixed: false })
+      return
+    }
+    
+    try {
+      const blockStatuses = await Promise.all(
+        selectedChats.map(async (chat) => {
+          const userId = chat.userId
+          if (!userId) return false
+          const status = await checkBlockStatus(userId)
+          return status.success ? (status.blockedByMe || false) : false
+        })
+      )
+      
+      const allBlocked = blockStatuses.every(status => status === true)
+      const allUnblocked = blockStatuses.every(status => status === false)
+      const mixed = !allBlocked && !allUnblocked
+      
+      setSelectedChatsBlockStatus({ allBlocked, allUnblocked, mixed })
+    } catch (error) {
+      console.error('Error checking block status:', error)
+    }
+  }, [chats])
+
+  // Update follow and block status when selection mode is entered or chats change
+  useEffect(() => {
+    if (chatSelectionMode && selectedChatIds.size > 0) {
+      updateFollowStatusForSelected(selectedChatIds)
+      updateBlockStatusForSelected(selectedChatIds)
+    } else {
+      setSelectedChatsFollowStatus({ allFollowing: false, allNotFollowing: false, mixed: false })
+      setSelectedChatsBlockStatus({ allBlocked: false, allUnblocked: false, mixed: false })
+    }
+  }, [chatSelectionMode, selectedChatIds, updateFollowStatusForSelected, updateBlockStatusForSelected])
+
+  // Handle follow/unfollow selected college chats
+  const handleFollowUnfollowSelected = async () => {
+    const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id) && chat.type === 'college')
+    if (selectedChats.length === 0) return
+
+    try {
+      for (const chat of selectedChats) {
+        const college = chat.college || { aisheCode: chat.collegeId, name: chat.name }
+        const followStatus = await checkFollowStatus(college)
+        
+        if (followStatus.success) {
+          if (followStatus.isFollowing) {
+            // Unfollow
+            await unfollowCollege(college)
+          } else {
+            // Follow
+            await followCollege(college)
+          }
+        }
+      }
+      
+      // Reload chats to reflect changes
+      loadAllCollegesWithMessages()
+      handleExitChatSelectionMode()
+    } catch (error) {
+      console.error('Error following/unfollowing colleges:', error)
+      alert('Error updating follow status. Please try again.')
+    }
+  }
+
+
+  // Handle delete selected chats (both college and direct)
+  const handleDeleteSelectedChats = async () => {
+    const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id))
+    if (selectedChats.length === 0) return
+
+    const collegeChats = selectedChats.filter(chat => chat.type === 'college')
+    const directChats = selectedChats.filter(chat => chat.type === 'direct')
+
+    let confirmMessage = ''
+    if (collegeChats.length > 0 && directChats.length > 0) {
+      confirmMessage = `Are you sure you want to delete all messages in ${selectedChats.length} selected chats? This will remove them from your list.`
+    } else if (collegeChats.length > 0) {
+      confirmMessage = collegeChats.length === 1
+        ? `Are you sure you want to delete all messages in "${collegeChats[0].name}"? This will remove the chat from your list.`
+        : `Are you sure you want to delete all messages in ${collegeChats.length} selected college chats? This will remove them from your list.`
+    } else if (directChats.length > 0) {
+      confirmMessage = directChats.length === 1
+        ? `Are you sure you want to delete all messages with "${directChats[0].name}"? This will remove the chat from your list.`
+        : `Are you sure you want to delete all messages in ${directChats.length} selected chats? This will remove them from your list.`
+    }
+
+    if (!window.confirm(confirmMessage)) return
+
+    try {
+      // Delete college chats
+      for (const chat of collegeChats) {
+        const collegeId = chat.collegeId || chat.college?.aisheCode || chat.college?.name
+        if (collegeId) {
+          console.log('Deleting college messages for:', collegeId)
+          const response = await deleteAllCollegeMessages(collegeId)
+          console.log('Delete college response:', response)
+          if (!response.success) {
+            throw new Error(response.message || 'Failed to delete college messages')
+          }
+        } else {
+          console.warn('No collegeId found for chat:', chat)
+        }
+      }
+      
+      // Delete direct chats
+      for (const chat of directChats) {
+        const userId = chat.userId
+        if (userId) {
+          console.log('Deleting direct messages with user:', userId)
+          const response = await deleteAllDirectMessages(userId)
+          console.log('Delete direct response:', response)
+          if (!response.success) {
+            throw new Error(response.message || 'Failed to delete direct messages')
+          }
+        } else {
+          console.warn('No userId found for chat:', chat)
+        }
+      }
+      
+      // Reload chats to ensure list is updated
+      await loadAllCollegesWithMessages()
+      
+      // Remove selected chats from the chat list
+      setChats(prev => prev.filter(chat => !selectedChatIds.has(chat.id)))
+      
+      // If currently viewing one of the deleted chats, go back to list
+      if (selectedChat && selectedChatIds.has(selectedChat.id)) {
+        setView('list')
+        setSelectedChat(null)
+        setSelectedCollege(null)
+        setSelectedStudent(null)
+      }
+      
+      handleExitChatSelectionMode()
+    } catch (error) {
+      console.error('Error deleting chats:', error)
+      alert(`Error deleting chats: ${error.message || 'Please try again.'}`)
+    }
+  }
+
+  // Handle block/unblock selected student chats
+  const handleBlockUnblockSelected = async () => {
+    const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id) && chat.type === 'direct')
+    if (selectedChats.length === 0) return
+
+    try {
+      for (const chat of selectedChats) {
+        const userId = chat.userId
+        if (userId) {
+          // Check current block status
+          const blockStatus = await checkBlockStatus(userId)
+          if (blockStatus.success) {
+            if (blockStatus.blockedByMe) {
+              // Unblock
+              await unblockUser(userId)
+            } else {
+              // Block
+              await blockUser(userId)
+            }
+          }
+        }
+      }
+      
+      // Reload chats to reflect changes
+      loadAllCollegesWithMessages()
+      handleExitChatSelectionMode()
+    } catch (error) {
+      console.error('Error blocking/unblocking users:', error)
+      alert('Error updating block status. Please try again.')
+    }
   }
 
   const handleChatSelect = (chat) => {
@@ -1636,19 +1842,113 @@ const Chat = () => {
               <span className="panel-search-icon">🔍</span>
             </div>
             ) : (
-              <div className="chat-selection-mode-header">
-                <span>{selectedChatIds.size} selected</span>
-                <button 
-                  className="chat-selection-cancel-btn"
-                  onClick={handleExitChatSelectionMode}
-                  title="Cancel"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
+              (() => {
+                const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id))
+                const selectedCollegeChats = selectedChats.filter(chat => chat.type === 'college')
+                const selectedDirectChats = selectedChats.filter(chat => chat.type === 'direct')
+                const hasCollegeChats = selectedCollegeChats.length > 0
+                const hasDirectChats = selectedDirectChats.length > 0
+                const isHybrid = hasCollegeChats && hasDirectChats
+                const isOnlyCollege = hasCollegeChats && !hasDirectChats
+                const isOnlyDirect = hasDirectChats && !hasCollegeChats
+                
+                return (
+                  <div className="chat-selection-mode-header">
+                    <span>{selectedChatIds.size} selected</span>
+                    <div className="chat-selection-actions">
+                      {/* Show buttons based on selection type */}
+                      {isOnlyCollege && (
+                        <>
+                          <button 
+                            className="chat-selection-action-btn"
+                            onClick={handleFollowUnfollowSelected}
+                            title="Follow/Unfollow"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="8.5" cy="7" r="4"></circle>
+                              <line x1="20" y1="8" x2="20" y2="14"></line>
+                              <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                            <span>
+                              {selectedChatsFollowStatus.allFollowing 
+                                ? 'Unfollow' 
+                                : selectedChatsFollowStatus.allNotFollowing 
+                                  ? 'Follow' 
+                                  : 'Follow/Unfollow'}
+                            </span>
+                          </button>
+                          <button 
+                            className="chat-selection-action-btn chat-selection-delete-btn"
+                            onClick={handleDeleteSelectedChats}
+                            title="Delete"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Delete</span>
+                          </button>
+                        </>
+                      )}
+                      {isOnlyDirect && (
+                        <>
+                          <button 
+                            className="chat-selection-action-btn chat-selection-delete-btn"
+                            onClick={handleDeleteSelectedChats}
+                            title="Delete"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Delete</span>
+                          </button>
+                          <button 
+                            className="chat-selection-action-btn"
+                            onClick={handleBlockUnblockSelected}
+                            title="Block/Unblock"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                            <span>
+                              {selectedChatsBlockStatus.allBlocked 
+                                ? 'Unblock' 
+                                : selectedChatsBlockStatus.allUnblocked 
+                                  ? 'Block' 
+                                  : 'Block/Unblock'}
+                            </span>
+                          </button>
+                        </>
+                      )}
+                      {isHybrid && (
+                        <button 
+                          className="chat-selection-action-btn chat-selection-delete-btn"
+                          onClick={handleDeleteSelectedChats}
+                          title="Delete"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
+                    <button 
+                      className="chat-selection-cancel-btn"
+                      onClick={handleExitChatSelectionMode}
+                      title="Cancel"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })()
             )}
           </div>
           <div className="panel-list">
@@ -1839,19 +2139,113 @@ const Chat = () => {
               <span className="panel-search-icon">🔍</span>
             </div>
             ) : (
-              <div className="chat-selection-mode-header">
-                <span>{selectedChatIds.size} selected</span>
-                <button 
-                  className="chat-selection-cancel-btn"
-                  onClick={handleExitChatSelectionMode}
-                  title="Cancel"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
+              (() => {
+                const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id))
+                const selectedCollegeChats = selectedChats.filter(chat => chat.type === 'college')
+                const selectedDirectChats = selectedChats.filter(chat => chat.type === 'direct')
+                const hasCollegeChats = selectedCollegeChats.length > 0
+                const hasDirectChats = selectedDirectChats.length > 0
+                const isHybrid = hasCollegeChats && hasDirectChats
+                const isOnlyCollege = hasCollegeChats && !hasDirectChats
+                const isOnlyDirect = hasDirectChats && !hasCollegeChats
+                
+                return (
+                  <div className="chat-selection-mode-header">
+                    <span>{selectedChatIds.size} selected</span>
+                    <div className="chat-selection-actions">
+                      {/* Show buttons based on selection type */}
+                      {isOnlyCollege && (
+                        <>
+                          <button 
+                            className="chat-selection-action-btn"
+                            onClick={handleFollowUnfollowSelected}
+                            title="Follow/Unfollow"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="8.5" cy="7" r="4"></circle>
+                              <line x1="20" y1="8" x2="20" y2="14"></line>
+                              <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                            <span>
+                              {selectedChatsFollowStatus.allFollowing 
+                                ? 'Unfollow' 
+                                : selectedChatsFollowStatus.allNotFollowing 
+                                  ? 'Follow' 
+                                  : 'Follow/Unfollow'}
+                            </span>
+                          </button>
+                          <button 
+                            className="chat-selection-action-btn chat-selection-delete-btn"
+                            onClick={handleDeleteSelectedChats}
+                            title="Delete"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Delete</span>
+                          </button>
+                        </>
+                      )}
+                      {isOnlyDirect && (
+                        <>
+                          <button 
+                            className="chat-selection-action-btn chat-selection-delete-btn"
+                            onClick={handleDeleteSelectedChats}
+                            title="Delete"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6"></polyline>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Delete</span>
+                          </button>
+                          <button 
+                            className="chat-selection-action-btn"
+                            onClick={handleBlockUnblockSelected}
+                            title="Block/Unblock"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                            <span>
+                              {selectedChatsBlockStatus.allBlocked 
+                                ? 'Unblock' 
+                                : selectedChatsBlockStatus.allUnblocked 
+                                  ? 'Block' 
+                                  : 'Block/Unblock'}
+                            </span>
+                          </button>
+                        </>
+                      )}
+                      {isHybrid && (
+                        <button 
+                          className="chat-selection-action-btn chat-selection-delete-btn"
+                          onClick={handleDeleteSelectedChats}
+                          title="Delete"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
+                    <button 
+                      className="chat-selection-cancel-btn"
+                      onClick={handleExitChatSelectionMode}
+                      title="Cancel"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })()
             )}
           </div>
           <div className="panel-list">
@@ -3258,43 +3652,43 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     return () => clearInterval(interval)
   }, [collegeId, chat.type])
 
-    // Set up Socket.IO connection and listeners for real-time messages
-    useEffect(() => {
-      if (!collegeId || chat.type !== 'college') return
+  // Set up Socket.IO connection and listeners for real-time messages
+  useEffect(() => {
+    if (!collegeId || chat.type !== 'college') return
 
       // Track recent successful message sends to suppress false error warnings
       const recentSuccessfulSends = new Set();
       const MAX_TRACK_TIME = 5000; // Track for 5 seconds
 
-      // Ensure socket is connected and join room
-      const setupSocket = async () => {
-        let socketInstance = getSocket()
-        if (!socketInstance || !socketInstance.connected) {
-          try {
-            socketInstance = connectSocket()
-            if (socketInstance) {
-              // Wait for connection
-              socketInstance.once('connect', () => {
-                // Join the college room
-                joinCollegeRoom(collegeId)
-                console.log(`✅ Joined college room: ${collegeId}`)
-              })
-            }
-          } catch (error) {
-            console.error('Failed to connect socket:', error)
+    // Ensure socket is connected and join room
+    const setupSocket = async () => {
+      let socketInstance = getSocket()
+      if (!socketInstance || !socketInstance.connected) {
+        try {
+          socketInstance = connectSocket()
+          if (socketInstance) {
+            // Wait for connection
+            socketInstance.once('connect', () => {
+              // Join the college room
+              joinCollegeRoom(collegeId)
+              console.log(`✅ Joined college room: ${collegeId}`)
+            })
           }
-        } else {
-          // Already connected, join the room
-          joinCollegeRoom(collegeId)
-          console.log(`✅ Joined college room: ${collegeId}`)
+        } catch (error) {
+          console.error('Failed to connect socket:', error)
         }
+      } else {
+        // Already connected, join the room
+        joinCollegeRoom(collegeId)
+        console.log(`✅ Joined college room: ${collegeId}`)
       }
+    }
 
-      setupSocket()
+    setupSocket()
 
-      // Set up error handler - don't remove optimistic messages on socket errors
-      // The message might still be saved on the server
-      const handleSocketError = (error) => {
+    // Set up error handler - don't remove optimistic messages on socket errors
+    // The message might still be saved on the server
+    const handleSocketError = (error) => {
         const errorMessage = error?.message || '';
         
         // If we have recent successful sends, suppress the error warning
@@ -3313,9 +3707,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         } else {
           console.error('Socket error in college chat:', error);
         }
-        // Don't remove optimistic messages - they might still be saved
-        // The message will be loaded from backend on refresh
-      }
+      // Don't remove optimistic messages - they might still be saved
+      // The message will be loaded from backend on refresh
+    }
 
     const handleReceiveMessage = (message) => {
       // Only add message if it's for this college
@@ -4035,8 +4429,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         const message = messages.find(m => m.id === messageId)
         if (message) {
           setReplyingTo(message)
-          setShowQuickEmojis(false)
-          setShowActionMenu(false)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
           setSelectedMessage(null)
           // Add haptic feedback
           if (navigator.vibrate) {
@@ -4162,50 +4556,152 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     })
   }
   
-  // Delete selected items for me
+  // Delete selected items for me (permanently delete from database)
   const handleDeleteSelectedForMe = async () => {
     if (selectedItems.size === 0) return
     
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    const currentUserId = String(user?.id || user?._id || '')
+    const collegeId = chat?.collegeId || college?.aisheCode || college?.name
     
     try {
-      // Delete all selected messages for me
+      // Permanently delete all selected messages
       const deletePromises = selectedMessages.map(msg => deleteMessage(msg.id))
       await Promise.all(deletePromises)
       
       // Remove messages from local state
-      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
       handleExitSelectionMode()
+      
+      // Update chat list with the most recent remaining message
+      if (updatedMessages.length > 0 && collegeId && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          collegeId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && collegeId && onMessageSent) {
+        // No messages left, update chat list to show "No messages yet"
+        onMessageSent(
+          collegeId,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
     } catch (error) {
       console.error('Error deleting messages:', error)
       // Still remove from local state (optimistic update)
-      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
       handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && collegeId && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          collegeId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && collegeId && onMessageSent) {
+        onMessageSent(
+          collegeId,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
     }
   }
   
-  // Delete selected items for all (only own messages)
+  // Delete selected items for all (only own messages - permanently delete from database)
   const handleDeleteSelectedForAll = async () => {
     if (selectedItems.size === 0) return
     
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+    const currentUserId = String(user?.id || user?._id || '')
+    const collegeId = chat?.collegeId || college?.aisheCode || college?.name
     
     if (ownMessages.length === 0) return // Should not happen, but safety check
     
     try {
-      // Delete own messages for all
+      // Permanently delete own messages for all
       const deletePromises = ownMessages.map(msg => deleteMessageForAll(msg.id))
       await Promise.all(deletePromises)
       
       // Remove messages from local state
-      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
       handleExitSelectionMode()
+      
+      // Update chat list with the most recent remaining message
+      if (updatedMessages.length > 0 && collegeId && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          collegeId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && collegeId && onMessageSent) {
+        // No messages left, update chat list to show "No messages yet"
+        onMessageSent(
+          collegeId,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
     } catch (error) {
       console.error('Error deleting messages for all:', error)
       // Still remove from local state (optimistic update)
-      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
       handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && collegeId && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          collegeId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && collegeId && onMessageSent) {
+        onMessageSent(
+          collegeId,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
     }
   }
   
@@ -4266,11 +4762,42 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       
       if (response.success) {
         // Remove message from local state
-        setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+        const updatedMessages = messages.filter(m => m.id !== selectedMessage.id)
+        setMessages(updatedMessages)
         setShowDeleteConfirm(false)
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setDeleteForAll(false)
+        
+        // Update chat list - find the previous message to update last message
+        const currentUserId = String(user?.id || user?._id || '')
+        const collegeId = chat?.collegeId || college?.aisheCode || college?.name
+        
+        if (updatedMessages.length > 0 && collegeId && onMessageSent) {
+          // Get the most recent remaining message
+          const lastMessage = updatedMessages[updatedMessages.length - 1]
+          const isOwn = String(lastMessage.senderId) === currentUserId
+          
+          // Update chat list with the previous message
+          onMessageSent(
+            collegeId,
+            lastMessage.text,
+            lastMessage.timestamp,
+            isOwn,
+            lastMessage.deliveredTo || [],
+            lastMessage.readBy || []
+          )
+        } else if (updatedMessages.length === 0 && collegeId && onMessageSent) {
+          // No messages left, update chat list to show "No messages yet"
+          onMessageSent(
+            collegeId,
+            'No messages yet',
+            null,
+            false,
+            [],
+            []
+          )
+        }
       } else {
         alert(response.message || 'Failed to delete message')
       }
@@ -4342,37 +4869,37 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         const isHybrid = hasOwnMessages && hasOtherMessages
         
         return (
-          <div className="selection-mode-bar">
-            <div className="selection-mode-info">
-              <span>{selectedItems.size} selected</span>
-            </div>
-            <div className="selection-mode-actions">
-              <button 
-                className="selection-mode-btn"
-                onClick={handleCopySelected}
-                title="Copy"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
               
               {/* Delete buttons based on selection type */}
               {isOnlyOwn && (
                 <>
-                  <button 
-                    className="selection-mode-btn"
+            <button 
+              className="selection-mode-btn"
                     onClick={handleDeleteSelectedForMe}
                     title="Delete for me"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
                     <span>Delete for me</span>
-                  </button>
+            </button>
                   <button 
                     className="selection-mode-btn"
                     onClick={handleDeleteSelectedForAll}
@@ -4401,19 +4928,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 </button>
               )}
               
-              <button 
-                className="selection-mode-btn"
-                onClick={handleExitSelectionMode}
-                title="Cancel"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                <span>Cancel</span>
-              </button>
-            </div>
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
           </div>
+        </div>
         )
       })()}
       {/* Message Action Header (WhatsApp-style) */}
@@ -4439,29 +4966,27 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
+          <button 
+            className="action-header-btn"
+            onClick={handleDeleteForMe}
+            title="Delete"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
           {isOwnMessage && (
-            <>
-              <button 
-                className="action-header-btn"
-                onClick={handleDeleteForMe}
-                title="Delete for me"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
-              <button 
-                className="action-header-btn"
-                onClick={handleDeleteForAll}
-                title="Delete for all"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
-            </>
+            <button 
+              className="action-header-btn"
+              onClick={handleDeleteForAll}
+              title="Delete for all"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
           )}
           <button 
             className="action-header-btn"
@@ -4789,29 +5314,27 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Copy</span>
           </button>
+          <button 
+            className="mobile-action-item"
+            onClick={handleDeleteForMe}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Delete</span>
+          </button>
           {isOwnMessage && (
-            <>
-              <button 
-                className="mobile-action-item"
-                onClick={handleDeleteForMe}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-                <span>Delete for me</span>
-              </button>
-              <button 
-                className="mobile-action-item"
-                onClick={handleDeleteForAll}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-                <span>Delete for all</span>
-              </button>
-            </>
+            <button 
+              className="mobile-action-item"
+              onClick={handleDeleteForAll}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete for all</span>
+            </button>
           )}
           <button 
             className="mobile-action-item"
@@ -4887,7 +5410,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Copy</span>
           </button>
-          {isOwnMessage && (
             <button 
               className="action-menu-item" 
               onClick={handleDeleteForMe}
@@ -4896,7 +5418,18 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              <span>Delete for me</span>
+            <span>Delete</span>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="action-menu-item" 
+              onClick={handleDeleteForAll}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete for all</span>
             </button>
           )}
           <button 
@@ -5518,25 +6051,25 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             })
           }
           
-          const formattedMessage = {
-            id: message.id,
-            text: message.text,
-            sender: message.senderName,
-            senderId: message.senderId,
-            time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            date: formatDate(new Date(message.timestamp)),
+        const formattedMessage = {
+          id: message.id,
+          text: message.text,
+          sender: message.senderName,
+          senderId: message.senderId,
+          time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          date: formatDate(new Date(message.timestamp)),
             isOwn: isOwnMessage,
-            timestamp: new Date(message.timestamp),
-            replyTo: message.replyTo || null,
+          timestamp: new Date(message.timestamp),
+          replyTo: message.replyTo || null,
             replyToData: null, // Will be populated below if replyTo exists
-            readBy: message.readBy || [],
-            deliveredTo: message.deliveredTo || []
-          }
-          
+          readBy: message.readBy || [],
+          deliveredTo: message.deliveredTo || []
+        }
+        
           // Populate replyToData if this message is a reply
           if (formattedMessage.replyTo) {
             const repliedMsg = prev.find(m => m.id === formattedMessage.replyTo)
@@ -5619,13 +6152,13 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           
           newMessages[optimisticIndex] = {
             ...optimisticMsg,
-            id: message.id,
-            isOptimistic: false,
+              id: message.id,
+              isOptimistic: false,
             replyTo: message.replyTo || optimisticMsg.replyTo || null,
             replyToData: replyToData,
-            deliveredTo: message.deliveredTo || [],
-            readBy: message.readBy || []
-          }
+              deliveredTo: message.deliveredTo || [],
+              readBy: message.readBy || []
+            }
           
           console.log('✅ Replaced optimistic direct message with real message:', message.id, 'replyTo:', message.replyTo)
           
@@ -6195,58 +6728,224 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       alert('Failed to copy messages')
     })
   }
-  
-  // Delete selected items
-  const handleDeleteSelected = () => {
+
+  // Delete selected items for me (permanently delete from database)
+  const handleDeleteSelected = async () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    const currentUserId = String(user?.id || user?._id || '')
+    
+    try {
+      // Permanently delete all selected messages
+      const deletePromises = selectedMessages.map(msg => deleteDirectMessage(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list with the most recent remaining message
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        // No messages left, update chat list to show "No messages yet"
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
+    } catch (error) {
+      console.error('Error deleting messages:', error)
+      // Still remove from local state (optimistic update)
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
+      }
+    }
+  }
+
+  // Delete selected items for all (permanently delete from database - only own messages)
+  const handleDeleteSelectedForAll = async () => {
     if (selectedItems.size === 0) return
     
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const ownMessages = selectedMessages.filter(msg => msg.isOwn)
-    const otherMessages = selectedMessages.filter(msg => !msg.isOwn)
+    const currentUserId = String(user?.id || user?._id || '')
     
-    if (ownMessages.length > 0 && otherMessages.length > 0) {
-      // Mixed selection - ask what to do
-      const deleteForAll = window.confirm(
-        `You have selected ${ownMessages.length} of your messages and ${otherMessages.length} other messages.\n\n` +
-        `Click OK to delete your messages for everyone, or Cancel to delete only for you.`
-      )
-      if (deleteForAll) {
-        // Delete own messages for all
-        ownMessages.forEach(msg => {
-          handleDeleteForAll(msg.id)
-        })
-        // Delete other messages for me
-        otherMessages.forEach(msg => {
-          handleDeleteForMe(msg.id)
-        })
-      } else {
-        // Delete all for me
-        selectedMessages.forEach(msg => {
-          handleDeleteForMe(msg.id)
-        })
+    if (ownMessages.length === 0) return // Should not happen, but safety check
+    
+    try {
+      // Permanently delete own messages (in private chat, this is same as delete for me)
+      const deletePromises = ownMessages.map(msg => deleteDirectMessage(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list with the most recent remaining message
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        // No messages left, update chat list to show "No messages yet"
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
       }
-    } else if (ownMessages.length > 0) {
-      // Only own messages
-      const deleteForAll = window.confirm(
-        `Delete ${ownMessages.length} message(s) for everyone?`
-      )
-      if (deleteForAll) {
-        ownMessages.forEach(msg => {
-          handleDeleteForAll(msg.id)
-        })
-      } else {
-        ownMessages.forEach(msg => {
-          handleDeleteForMe(msg.id)
-        })
+    } catch (error) {
+      console.error('Error deleting messages for all:', error)
+      // Still remove from local state (optimistic update)
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+        
+        onMessageSent(
+          otherUserId,
+          userName,
+          userAvatar,
+          'No messages yet',
+          null,
+          false,
+          [],
+          []
+        )
       }
-    } else {
-      // Only other messages - delete for me
-      selectedMessages.forEach(msg => {
-        handleDeleteForMe(msg.id)
-      })
     }
-    
-    handleExitSelectionMode()
   }
 
   // Cancel reply
@@ -6301,33 +7000,73 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     try {
       setDeleting(true)
       // For direct messages, we only have delete for me (no delete for all in direct chats)
-      // Note: Backend endpoint for deleting direct messages may need to be implemented
-      // For now, we'll remove from local state
       try {
-        const response = await deleteMessage(selectedMessage.id)
+        const response = await deleteDirectMessage(selectedMessage.id)
         if (response.success) {
           // Remove message from local state
-          setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+          const updatedMessages = messages.filter(m => m.id !== selectedMessage.id)
+          setMessages(updatedMessages)
           setShowDeleteConfirm(false)
           setShowMessageHeader(false)
           setSelectedMessage(null)
           setDeleteForAll(false)
+          
+          // Update chat list - find the previous message to update last message
+          const currentUserId = String(user?.id || user?._id || '')
+          
+          if (updatedMessages.length > 0) {
+            // Get the most recent remaining message
+            const lastMessage = updatedMessages[updatedMessages.length - 1]
+            const isOwn = String(lastMessage.senderId) === currentUserId
+            
+            // Update chat list with the previous message
+            if (onMessageSent) {
+              const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+              const userAvatar = otherUser?.profile?.profilePicture 
+                ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                    ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                    : otherUser.profile.profilePicture)
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+              
+              onMessageSent(
+                otherUserId,
+                userName,
+                userAvatar,
+                lastMessage.text,
+                lastMessage.timestamp,
+                isOwn,
+                lastMessage.deliveredTo || [],
+                lastMessage.readBy || []
+              )
+            }
         } else {
-          // If backend delete fails, still remove from local state (optimistic update)
-          setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
-          setShowDeleteConfirm(false)
-          setShowMessageHeader(false)
-          setSelectedMessage(null)
-          setDeleteForAll(false)
+            // No messages left, update chat list to show "No messages yet"
+            if (onMessageSent) {
+              const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
+              const userAvatar = otherUser?.profile?.profilePicture 
+                ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                    ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                    : otherUser.profile.profilePicture)
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
+              
+              onMessageSent(
+                otherUserId,
+                userName,
+                userAvatar,
+                'No messages yet',
+                null,
+                false,
+                [],
+                []
+              )
+            }
+          }
+        } else {
+          alert(response.message || 'Failed to delete message')
         }
       } catch (error) {
-        // If error, still remove from local state (optimistic update)
         console.error('Error deleting direct message:', error)
-        setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
-        setShowDeleteConfirm(false)
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setDeleteForAll(false)
+        alert('Error deleting message. Please try again.')
       }
     } finally {
       setDeleting(false)
@@ -6439,8 +7178,95 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
 
   return (
     <div className="live-chat-view">
+      {/* Selection Mode Bar - Always visible when in selection mode */}
+      {selectionMode && (() => {
+        // Calculate selection type
+        const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+        const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+        const otherMessages = selectedMessages.filter(msg => !msg.isOwn)
+        const hasOwnMessages = ownMessages.length > 0
+        const hasOtherMessages = otherMessages.length > 0
+        const isOnlyOwn = hasOwnMessages && !hasOtherMessages
+        const isOnlyOthers = !hasOwnMessages && hasOtherMessages
+        const isHybrid = hasOwnMessages && hasOtherMessages
+        
+        return (
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+              
+            {/* Delete buttons based on selection type */}
+            {isOnlyOwn && (
+              <>
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelected}
+                  title="Delete for me"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for me</span>
+                </button>
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForAll}
+                  title="Delete for all"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for all</span>
+                </button>
+              </>
+            )}
+            
+            {(isOnlyOthers || isHybrid) && (
+              <button 
+                className="selection-mode-btn"
+                onClick={handleDeleteSelected}
+                title="Delete for me"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete for me</span>
+              </button>
+            )}
+            
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
+          </div>
+        </div>
+        )
+      })()}
       {/* Message Action Header (WhatsApp-style) */}
-      {showMessageHeader && selectedMessage && (
+      {showMessageHeader && selectedMessage && !selectionMode && (
         <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
           <button 
             className="action-header-btn"
@@ -6757,6 +7583,79 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
             <span>Close</span>
+          </button>
+        </div>
+      )}
+
+      {/* WhatsApp-style Action Menu Popup (Desktop) */}
+      {showActionMenu && selectedMessage && !isMobile && (
+        <div 
+          ref={actionMenuRef}
+          className="message-action-menu"
+          style={{
+            left: `${actionMenuPosition.x}px`,
+            top: `${actionMenuPosition.y}px`,
+          }}
+        >
+          <button 
+            className="action-menu-item" 
+            onClick={() => {
+              setShowEmojiPicker(true)
+              setShowActionMenu(false)
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+              <line x1="9" y1="9" x2="9.01" y2="9"></line>
+              <line x1="15" y1="9" x2="15.01" y2="9"></line>
+            </svg>
+            <span>Emoji</span>
+          </button>
+          <button 
+            className="action-menu-item" 
+            onClick={handleReplyClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+            <span>Reply</span>
+          </button>
+          <button 
+            className="action-menu-item" 
+            onClick={handleCopyMessage}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="action-menu-item" 
+              onClick={handleDeleteForMe}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete</span>
+            </button>
+          )}
+          <button 
+            className="action-menu-item" 
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Select</span>
           </button>
         </div>
       )}

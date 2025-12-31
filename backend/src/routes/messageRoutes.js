@@ -78,7 +78,83 @@ router.delete('/college/:collegeId/clear', protect, async (req, res) => {
   }
 });
 
-// Delete a single message (delete for me - only removes from user's view)
+// Delete all messages in a college chat for the user (delete sent messages and mark received as deleted)
+router.delete('/college/:collegeId/delete-all', protect, async (req, res) => {
+  try {
+    const { collegeId } = req.params;
+    const userId = req.user.userId;
+    const decodedCollegeId = decodeURIComponent(collegeId);
+
+    console.log('deleteAllCollegeMessages called:', { collegeId: decodedCollegeId, userId });
+
+    // Delete all messages sent by this user in this college
+    const deleteResult = await Message.deleteMany({
+      collegeId: decodedCollegeId,
+      senderId: userId
+    });
+
+    console.log('Deleted sent messages count:', deleteResult.deletedCount);
+
+    // Mark all received messages as deleted for this user
+    const allMessages = await Message.find({
+      collegeId: decodedCollegeId
+    }).select('_id').lean();
+
+    const messageIds = allMessages.map(msg => msg._id);
+    
+    // Get existing deletions to avoid duplicates
+    const existingDeletions = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'college'
+    }).select('messageId').lean();
+    
+    const existingIds = new Set(existingDeletions.map(d => d.messageId.toString()));
+    const newMessageIds = messageIds.filter(id => !existingIds.has(id.toString()));
+
+    // Create deletion records for all messages not already deleted
+    let markedDeletedCount = 0;
+    if (newMessageIds.length > 0) {
+      await DeletedMessage.insertMany(
+        newMessageIds.map(messageId => ({
+          userId: userId,
+          messageId: messageId,
+          messageType: 'college',
+          collegeId: decodedCollegeId,
+        }))
+      );
+      markedDeletedCount = newMessageIds.length;
+    }
+
+    console.log('Marked as deleted count:', markedDeletedCount);
+
+    // Remove ChatHistory to remove chat from list
+    const historyResult = await ChatHistory.deleteMany({
+      userId: userId,
+      collegeId: decodedCollegeId,
+      chatType: 'college',
+    });
+
+    console.log('Deleted chat history count:', historyResult.deletedCount);
+
+    res.json({
+      success: true,
+      message: 'All messages deleted and chat removed',
+      deletedSentCount: deleteResult.deletedCount,
+      markedDeletedCount: markedDeletedCount,
+      historyDeletedCount: historyResult.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting all college messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting messages',
+      error: error.message,
+    });
+  }
+});
+
+// Delete a single message (permanently delete from database - delete for me)
 router.delete('/message/:messageId', protect, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -94,30 +170,15 @@ router.delete('/message/:messageId', protect, async (req, res) => {
       });
     }
 
-    // Check if already deleted for this user
-    const existingDeletion = await DeletedMessage.findOne({
-      userId: userId,
-      messageId: messageId,
-    });
+    // Permanently delete the message from database
+    await Message.findByIdAndDelete(messageId);
 
-    if (existingDeletion) {
-      return res.json({
-        success: true,
-        message: 'Message already deleted for you',
-      });
-    }
-
-    // Store deletion record (message stays in database, just hidden from this user)
-    await DeletedMessage.create({
-      userId: userId,
-      messageId: messageId,
-      messageType: 'college',
-      collegeId: message.collegeId,
-    });
+    // Also remove all "delete for me" records for this message since it's deleted
+    await DeletedMessage.deleteMany({ messageId: messageId });
 
     res.json({
       success: true,
-      message: 'Message deleted for you',
+      message: 'Message deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting message:', error);
@@ -198,22 +259,10 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     // Fetch messages - sort by timestamp ascending (oldest first) for chronological display
     // Increased limit to ensure we get all recent messages
     const limitValue = Math.min(parseInt(limit) || 50, 200); // Increased limit to 200
-    const allMessages = await Message.find(query)
+    const messages = await Message.find(query)
       .sort({ timestamp: 1 }) // Ascending order (oldest first) for chronological display
       .limit(limitValue)
       .lean();
-
-    // Get list of message IDs that this user has deleted "for me"
-    const deletedMessageIds = await DeletedMessage.find({
-      userId: req.user.userId,
-      messageId: { $in: allMessages.map(m => m._id) },
-      messageType: 'college',
-    }).select('messageId').lean();
-
-    const deletedIdsSet = new Set(deletedMessageIds.map(d => d.messageId.toString()));
-
-    // Filter out messages deleted "for me" by this user
-    const messages = allMessages.filter(msg => !deletedIdsSet.has(msg._id.toString()));
 
           res.json({
             success: true,
