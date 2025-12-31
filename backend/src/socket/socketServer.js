@@ -29,6 +29,37 @@ export const initializeSocket = (server) => {
   // Store online users
   const onlineUsers = new Map(); // userId -> { socketId, email, lastSeen }
 
+  // Helper function to calculate and broadcast active count for a college
+  const updateCollegeActiveCount = async (collegeId) => {
+    if (!collegeId) return;
+    
+    try {
+      // Calculate 24 hours ago
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+      // Count users who:
+      // 1. Belong to this college (by aisheCode or name)
+      // 2. Have been active in the last 24 hours (lastSeen >= 24 hours ago)
+      const activeCount = await UserProfile.countDocuments({
+        $or: [
+          { 'college.aisheCode': collegeId },
+          { 'college.name': collegeId },
+        ],
+        lastSeen: { $gte: twentyFourHoursAgo },
+      });
+
+      // Broadcast to all users in the college room
+      const roomName = `college:${collegeId}`;
+      io.to(roomName).emit('collegeActiveCountUpdate', {
+        collegeId,
+        activeCount,
+      });
+    } catch (error) {
+      console.error('Error updating college active count:', error);
+    }
+  };
+
   // Connection handler
   io.on('connection', async (socket) => {
     const userId = socket.user.userId.toString();
@@ -78,6 +109,9 @@ export const initializeSocket = (server) => {
         collegeId: socket.collegeId,
         roomName: roomName,
       });
+
+      // Update active count for this college in real-time
+      await updateCollegeActiveCount(socket.collegeId);
     } else {
       // User doesn't belong to a college yet - this is normal for new users
       // Only log in debug mode to reduce console noise
@@ -88,7 +122,7 @@ export const initializeSocket = (server) => {
     }
 
     // Handle joinCollegeRoom event - allow joining any college room
-    socket.on('joinCollegeRoom', (data) => {
+    socket.on('joinCollegeRoom', async (data) => {
       const { collegeId } = data;
       
       if (!collegeId) {
@@ -107,6 +141,9 @@ export const initializeSocket = (server) => {
         collegeId: collegeId,
         roomName: room,
       });
+
+      // Update active count for this college in real-time
+      await updateCollegeActiveCount(collegeId);
     });
 
     // Handle sendMessage event - allow sending to any college room
@@ -274,6 +311,20 @@ export const initializeSocket = (server) => {
             collegeId: messageCollegeId,
             replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
             text: savedMessage.text // Include text for better matching
+          });
+
+          // Broadcast chat list update to ALL connected users (not just room members)
+          // This ensures chat list updates in real-time across all systems
+          io.emit('chatListUpdate', {
+            type: 'college',
+            collegeId: messageCollegeId,
+            messageText: savedMessage.text,
+            messageTimestamp: savedMessage.timestamp,
+            senderId: savedMessage.senderId.toString(),
+            senderName: savedMessage.senderName,
+            isOwnMessage: false, // Each client will determine if it's their own message
+            deliveredTo: messageToSend.deliveredTo || [],
+            readBy: messageToSend.readBy || []
           });
 
           console.log(`💬 Message sent in ${roomName} by ${socket.user.email}`, {
@@ -559,6 +610,32 @@ export const initializeSocket = (server) => {
         // Send confirmation to sender
         socket.emit('directMessageSent', messageToSend);
 
+        // Broadcast chat list update to BOTH sender and receiver
+        // This ensures chat list updates in real-time for both users
+        io.to(`user:${senderId}`).emit('directChatListUpdate', {
+          type: 'direct',
+          otherUserId: receiverId,
+          messageText: message.text,
+          messageTimestamp: message.timestamp,
+          senderId: senderId,
+          senderName: message.senderName,
+          isOwnMessage: true, // For sender, it's their own message
+          deliveredTo: [],
+          readBy: []
+        });
+
+        io.to(`user:${receiverId}`).emit('directChatListUpdate', {
+          type: 'direct',
+          otherUserId: senderId,
+          messageText: message.text,
+          messageTimestamp: message.timestamp,
+          senderId: senderId,
+          senderName: message.senderName,
+          isOwnMessage: false, // For receiver, it's not their own message
+          deliveredTo: [],
+          readBy: []
+        });
+
         console.log(`💬 Direct message sent from ${senderId} to ${receiverId}`);
       } catch (error) {
         console.error('Error sending direct message:', error);
@@ -665,11 +742,20 @@ export const initializeSocket = (server) => {
         console.error('Error updating last seen on disconnect:', error);
       }
       
+      // Get user's college ID before removing from online users
+      const userProfile = await UserProfile.findOne({ userId: socket.user.userId }).lean();
+      const userCollegeId = userProfile?.college?.aisheCode || userProfile?.college?.name || socket.collegeId;
+      
       // Mark user as offline
       onlineUsers.delete(userId);
       
       // Broadcast user offline status
       io.emit('userOffline', { userId, isOnline: false });
+      
+      // Update active count for user's college in real-time
+      if (userCollegeId) {
+        await updateCollegeActiveCount(userCollegeId);
+      }
       
       console.log(`❌ User disconnected: ${socket.user.email}`);
     });

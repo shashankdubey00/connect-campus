@@ -46,7 +46,7 @@ router.delete('/college/:collegeId/clear', protect, async (req, res) => {
           userId: userId,
           messageId: messageId,
           messageType: 'college',
-          collegeId: decodedCollegeId,
+      collegeId: decodedCollegeId,
         }))
       );
       markedDeletedCount = newMessageIds.length;
@@ -290,12 +290,12 @@ router.delete('/message/:messageId', protect, async (req, res) => {
     });
 
     if (!existingDeletion) {
-      await DeletedMessage.create({
-        userId: userId,
-        messageId: messageId,
-        messageType: 'college',
-        collegeId: message.collegeId,
-      });
+    await DeletedMessage.create({
+      userId: userId,
+      messageId: messageId,
+      messageType: 'college',
+      collegeId: message.collegeId,
+    });
       console.log('Marked message as deleted for user:', userId);
     }
 
@@ -395,7 +395,7 @@ router.get('/college/:collegeId', protect, async (req, res) => {
       messageId: { $in: messageIds },
       messageType: 'college'
     }).select('messageId').lean();
-    
+
     const deletedMessageIds = new Set(deletedMessages.map(d => d.messageId.toString()));
 
     // Filter out messages that are marked as deleted for this user
@@ -403,21 +403,21 @@ router.get('/college/:collegeId', protect, async (req, res) => {
       !deletedMessageIds.has(msg._id.toString())
     );
 
-    res.json({
-      success: true,
+          res.json({
+            success: true,
       count: visibleMessages.length,
       messages: visibleMessages.map(msg => ({
-        id: msg._id.toString(),
-        senderId: msg.senderId.toString(),
-        senderName: msg.senderName,
-        collegeId: msg.collegeId,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        replyTo: msg.replyTo ? msg.replyTo.toString() : null,
-        readBy: msg.readBy || [],
-        deliveredTo: msg.deliveredTo || [],
-      })),
-    });
+              id: msg._id.toString(),
+              senderId: msg.senderId.toString(),
+              senderName: msg.senderName,
+              collegeId: msg.collegeId,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              replyTo: msg.replyTo ? msg.replyTo.toString() : null,
+              readBy: msg.readBy || [],
+              deliveredTo: msg.deliveredTo || [],
+            })),
+          });
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({
@@ -473,7 +473,7 @@ router.get('/user/colleges', protect, async (req, res) => {
       collegeId: { $exists: true, $ne: null }
     }).select('collegeId').lean();
     const collegeIdsFromHistory = chatHistory.map(ch => ch.collegeId).filter(id => id); // Filter out any null/undefined
-    
+
     console.log('College IDs from follows (before filtering):', allFollowCollegeIds);
     console.log('College IDs from follows (after filtering):', collegeIdsFromFollows);
     console.log('All college IDs before filtering:', [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows, ...deletedCollegeIdsFromMessages, ...collegeIdsFromHistory])]);
@@ -559,6 +559,28 @@ router.get('/user/colleges', protect, async (req, res) => {
       }
     });
 
+    // Calculate unread counts for each college efficiently
+    // Count messages where user is not the sender and not in readBy array
+    const unreadCountsMap = new Map();
+    const userIdStr = String(userId);
+    
+    // Group messages by collegeId and count unread
+    visibleMessages.forEach(msg => {
+      // Only count messages not from the user
+      const senderIdStr = msg.senderId ? (typeof msg.senderId === 'object' ? msg.senderId.toString() : String(msg.senderId)) : String(msg.senderId);
+      if (senderIdStr !== userIdStr) {
+        const collegeId = msg.collegeId;
+        const readBy = msg.readBy || [];
+        const isRead = readBy.some(r => {
+          const readUserId = r.userId ? (typeof r.userId === 'object' ? r.userId.toString() : String(r.userId)) : String(r.userId);
+          return readUserId === userIdStr;
+        });
+        if (!isRead) {
+          unreadCountsMap.set(collegeId, (unreadCountsMap.get(collegeId) || 0) + 1);
+        }
+      }
+    });
+
     // Combine colleges with their last messages
     const collegesWithMessages = filteredColleges.map((college) => {
         const collegeId = college.aisheCode || college.name;
@@ -594,14 +616,15 @@ router.get('/user/colleges', protect, async (req, res) => {
           state: college.state,
           district: college.district,
           logo: college.logo,
+          unreadCount: unreadCountsMap.get(collegeId) || 0, // Add unread count
           lastMessage: lastMessage ? {
             text: lastMessage.text,
             timestamp: lastMessage.timestamp,
-            senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
-            senderName: lastMessage.senderName,
-            lastMessageIsOwn: isLastMessageOwn,
-            lastMessageDeliveredTo: lastMessage.deliveredTo || [],
-            lastMessageReadBy: lastMessage.readBy || [],
+          senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
+          senderName: lastMessage.senderName,
+          lastMessageIsOwn: isLastMessageOwn,
+          lastMessageDeliveredTo: lastMessage.deliveredTo || [],
+          lastMessageReadBy: lastMessage.readBy || [],
           } : { 
             text: 'No messages yet', 
             timestamp: null, 

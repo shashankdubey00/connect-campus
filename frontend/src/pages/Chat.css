@@ -867,6 +867,28 @@
   transform: scale(1.05);
 }
 
+/* Notification badge for sidebar home icon */
+.sidebar-notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: #25d366;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  border: 2px solid var(--sidebar-bg);
+}
+
 .logout-btn-sidebar {
   color: #e74c3c;
 }
@@ -1196,6 +1218,30 @@
   font-size: 12px;
   font-weight: 600;
   padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.panel-item-muted {
+  color: var(--panel-text-secondary);
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.pinned-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 12px;
+  background-color: rgba(0, 168, 132, 0.2);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
   border-radius: 10px;
   min-width: 20px;
   text-align: center;
@@ -3325,6 +3371,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+/* Notification badge for mobile nav home icon */
+.mobile-nav-notification-badge {
+  position: absolute;
+  top: 6px;
+  right: 50%;
+  transform: translateX(calc(50% + 12px));
+  background-color: #25d366;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  border: 2px solid var(--panel-bg);
 }
 
 /* ============================================

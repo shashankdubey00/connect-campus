@@ -367,3 +367,13 @@ export const onMessageUpdate = (callback) => {
   }
 };
 
+/**
+ * Listen for college active count updates
+ * @param {Function} callback - Callback function(data) where data = { collegeId, activeCount }
+ */
+export const onCollegeActiveCountUpdate = (callback) => {
+  if (socket) {
+    socket.on('collegeActiveCountUpdate', callback);
+  }
+};
+

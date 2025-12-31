@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
-import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate } from '../services/socketService'
+import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate, onCollegeActiveCountUpdate, markMessageRead } from '../services/socketService'
 import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll, deleteAllCollegeMessages } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus, getCollegeActiveStudentsCount } from '../services/profileService'
@@ -29,6 +29,7 @@ const Chat = () => {
     return saved !== null ? JSON.parse(saved) : true
   })
   const [totalUnreadCount, setTotalUnreadCount] = useState(0) // Total unread messages across all chats
+  const [chatsWithUnreadCount, setChatsWithUnreadCount] = useState(0) // Number of chats with unread messages (like WhatsApp)
   const [verificationStatus, setVerificationStatus] = useState(null) // User verification status
   const [searchQuery, setSearchQuery] = useState('') // For filtering chats
   const [collegeSearchQuery, setCollegeSearchQuery] = useState('') // For college search
@@ -49,6 +50,10 @@ const Chat = () => {
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [chatSelectionMode, setChatSelectionMode] = useState(false) // Selection mode for chats
   const [selectedChatIds, setSelectedChatIds] = useState(new Set()) // Set of selected chat IDs
+  const [pinnedChats, setPinnedChats] = useState(new Set()) // Set of pinned chat IDs
+  const [mutedChats, setMutedChats] = useState(new Set()) // Set of muted chat IDs
+  const [typingInChats, setTypingInChats] = useState(new Map()) // Map of chatId -> typing user info
+  const [onlineStatuses, setOnlineStatuses] = useState(new Map()) // Map of userId -> isOnline
   const [selectedChatsFollowStatus, setSelectedChatsFollowStatus] = useState({ allFollowing: false, allNotFollowing: false, mixed: false }) // Follow status for selected chats
   const [selectedChatsBlockStatus, setSelectedChatsBlockStatus] = useState({ allBlocked: false, allUnblocked: false, mixed: false }) // Block status for selected chats
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
@@ -447,10 +452,14 @@ const Chat = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Calculate total unread count
+  // Calculate total unread count and number of chats with unread messages
   useEffect(() => {
     const total = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)
     setTotalUnreadCount(total)
+    
+    // Count number of chats with unread messages (like WhatsApp)
+    const chatsWithUnread = chats.filter(chat => (chat.unreadCount || 0) > 0).length
+    setChatsWithUnreadCount(chatsWithUnread)
   }, [chats])
 
   // Load all colleges with messages and direct message conversations
@@ -487,7 +496,7 @@ const Chat = () => {
             lastMessageDeliveredTo: college.lastMessage?.lastMessageDeliveredTo || [],
             lastMessageReadBy: college.lastMessage?.lastMessageReadBy || [],
             timestamp: college.lastMessage?.timestamp ? formatChatTimestamp(college.lastMessage.timestamp) : '',
-            unreadCount: unreadCounts[collegeId] || 0,
+            unreadCount: college.unreadCount || unreadCounts[collegeId] || 0,
             onlineCount: 0,
             avatar: collegeLogo,
             college: {
@@ -525,7 +534,7 @@ const Chat = () => {
             lastMessageDeliveredTo: conversation.lastMessageDeliveredTo || [],
             lastMessageReadBy: conversation.lastMessageReadBy || [],
             timestamp: conversation.lastMessageTime ? formatChatTimestamp(conversation.lastMessageTime) : '',
-            unreadCount: 0, // TODO: Implement unread count for direct messages
+            unreadCount: conversation.unreadCount || 0, // Use backend unread count
             onlineCount: 0,
             avatar: userAvatar,
             lastMessageTime: conversation.lastMessageTime || null
@@ -966,6 +975,12 @@ const Chat = () => {
     } else if (chat.type === 'direct') {
       // For direct messages, open direct chat view
       if (chat.userId) {
+        // Reset unread count for direct chat
+        setChats(prev => prev.map(c => 
+          c.id === chat.id 
+            ? { ...c, unreadCount: 0 }
+            : c
+        ))
         setSelectedStudent({ id: chat.userId })
         setView('direct-chat')
       } else {
@@ -1512,12 +1527,151 @@ const Chat = () => {
     const socketInstance = getSocket()
     if (socketInstance) {
       onReceiveMessage(handleNewMessage)
+      
+      // Listen for global chat list updates (for real-time updates across all systems)
+      const handleChatListUpdate = (data) => {
+        if (data.type === 'college') {
+          const isOwnMessage = String(data.senderId) === String(user?.id || user?._id || '')
+          updateChatListOnMessage(
+            data.collegeId,
+            data.messageText,
+            data.messageTimestamp,
+            isOwnMessage,
+            data.deliveredTo || [],
+            data.readBy || []
+          )
+        }
+      }
+      
+      const handleDirectChatListUpdate = (data) => {
+        if (data.type === 'direct') {
+          // Get user info for the other user
+          const otherUserId = data.otherUserId
+          const otherUserChat = chats.find(c => c.id === `direct-${otherUserId}`)
+          const userName = otherUserChat?.name || data.senderName || 'User'
+          const userAvatar = otherUserChat?.avatar || null
+          
+          updateChatListOnDirectMessage(
+            otherUserId,
+            userName,
+            userAvatar,
+            data.messageText,
+            data.messageTimestamp,
+            data.isOwnMessage,
+            data.deliveredTo || [],
+            data.readBy || []
+          )
+        }
+      }
+      
+      socketInstance.on('chatListUpdate', handleChatListUpdate)
+      socketInstance.on('directChatListUpdate', handleDirectChatListUpdate)
+      
+      // Listen for typing indicators in chat list
+      const handleTypingInChat = (data) => {
+        if (data.type === 'college' && data.collegeId) {
+          const chatId = data.collegeId
+          if (data.isTyping) {
+            setTypingInChats(prev => {
+              const newMap = new Map(prev)
+              newMap.set(chatId, {
+                userName: data.userName || 'Someone',
+                timestamp: Date.now()
+              })
+              return newMap
+            })
+          } else {
+            setTypingInChats(prev => {
+              const newMap = new Map(prev)
+              newMap.delete(chatId)
+              return newMap
+            })
+          }
+        } else if (data.type === 'direct' && data.userId) {
+          const chatId = `direct-${data.userId}`
+          if (data.isTyping) {
+            setTypingInChats(prev => {
+              const newMap = new Map(prev)
+              newMap.set(chatId, {
+                userName: data.userName || 'Someone',
+                timestamp: Date.now()
+              })
+              return newMap
+            })
+          } else {
+            setTypingInChats(prev => {
+              const newMap = new Map(prev)
+              newMap.delete(chatId)
+              return newMap
+            })
+          }
+        }
+      }
+      
+      // Listen for user typing events and update chat list
+      const handleUserTypingForList = (data) => {
+        if (data.collegeId) {
+          handleTypingInChat({
+            type: 'college',
+            collegeId: data.collegeId,
+            userId: data.userId,
+            userName: data.userName,
+            isTyping: data.isTyping
+          })
+        }
+      }
+      
+      const handleUserTypingDirectForList = (data) => {
+        handleTypingInChat({
+          type: 'direct',
+          userId: data.userId,
+          userName: data.userName,
+          isTyping: data.isTyping
+        })
+      }
+      
+      // Listen for online/offline status updates
+      const handleUserOnlineForList = (data) => {
+        if (data.userId) {
+          setOnlineStatuses(prev => {
+            const newMap = new Map(prev)
+            newMap.set(data.userId, true)
+            return newMap
+          })
+        }
+      }
+      
+      const handleUserOfflineForList = (data) => {
+        if (data.userId) {
+          setOnlineStatuses(prev => {
+            const newMap = new Map(prev)
+            newMap.set(data.userId, false)
+            return newMap
+          })
+        }
+      }
+      
+      socketInstance.on('userTyping', handleUserTypingForList)
+      socketInstance.on('userTypingDirect', handleUserTypingDirectForList)
+      socketInstance.on('userOnline', handleUserOnlineForList)
+      socketInstance.on('userOffline', handleUserOfflineForList)
+      
+      return () => {
+        if (socketInstance) {
+          socketInstance.off('chatListUpdate', handleChatListUpdate)
+          socketInstance.off('directChatListUpdate', handleDirectChatListUpdate)
+          socketInstance.off('userTyping', handleUserTypingForList)
+          socketInstance.off('userTypingDirect', handleUserTypingDirectForList)
+          socketInstance.off('userOnline', handleUserOnlineForList)
+          socketInstance.off('userOffline', handleUserOfflineForList)
+        }
+      }
     }
     
     return () => {
       // Cleanup handled by removeAllListeners
     }
-  }, [handleNewMessage])
+  }, [handleNewMessage, user, updateChatListOnMessage, updateChatListOnDirectMessage, chats])
 
   // Filter and sort chats based on search and last message time
   const filteredChats = chats
@@ -2079,10 +2233,24 @@ const Chat = () => {
                             </>
                           )
                         })()}
-                        {truncateMessage(chat.lastMessage) || 'No messages yet'}
+                        {(() => {
+                          // Show typing indicator if someone is typing in this chat
+                          const typingInfo = typingInChats.get(chat.id)
+                          if (typingInfo) {
+                            return (
+                              <span style={{ fontStyle: 'italic', color: '#8696A0' }}>
+                                {typingInfo.userName} is typing...
+                              </span>
+                            )
+                          }
+                          return truncateMessage(chat.lastMessage) || 'No messages yet'
+                        })()}
                       </span>
-                      {chat.unreadCount > 0 && (
+                      {chat.unreadCount > 0 && !mutedChats.has(chat.id) && (
                         <span className="panel-item-unread">{chat.unreadCount > 99 ? '99+' : chat.unreadCount}</span>
+                      )}
+                      {mutedChats.has(chat.id) && (
+                        <span className="panel-item-muted" title="Muted">🔇</span>
                       )}
                     </div>
                   </div>
@@ -2821,11 +2989,17 @@ const Chat = () => {
               handleSectionChange('chats')
             }}
             title="Home / Chats"
+            style={{ position: 'relative' }}
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            {chatsWithUnreadCount > 0 && (
+              <span className="sidebar-notification-badge">
+                {chatsWithUnreadCount > 99 ? '99+' : chatsWithUnreadCount}
+              </span>
+            )}
           </button>
           <button
             className={`sidebar-bottom-item ${view === 'settings' ? 'active' : ''}`}
@@ -2909,11 +3083,17 @@ const Chat = () => {
               handleSectionChange('chats')
             }}
             title="Home"
+            style={{ position: 'relative' }}
           >
             <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            {chatsWithUnreadCount > 0 && (
+              <span className="mobile-nav-notification-badge">
+                {chatsWithUnreadCount > 99 ? '99+' : chatsWithUnreadCount}
+              </span>
+            )}
             <span className="mobile-nav-label">Home</span>
           </button>
           <button
@@ -3607,6 +3787,37 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           
           console.log(`📥 Loaded ${sortedMessages.length} messages for college: ${collegeId}`);
           
+          // Mark all unread messages as read when opening the chat
+          const socketInstance = getSocket()
+          if (socketInstance?.connected) {
+            const currentUserId = String(user?.id || user?._id || '')
+            // Mark all messages that are not from the user and not already read
+            const unreadMessages = sortedMessages.filter(msg => 
+              !msg.isOwn && !msg.readBy?.some(r => String(r.userId) === currentUserId)
+            )
+            
+            // Mark all unread messages as read
+            unreadMessages.forEach((msg, index) => {
+              // Mark as read with a small delay to avoid overwhelming the server
+              setTimeout(() => {
+                markMessageRead(msg.id, collegeId)
+              }, 50 * index) // Stagger the requests (50ms apart)
+            })
+            
+            // Immediately update unread count in chat list to 0
+            if (unreadMessages.length > 0) {
+              setChats(prev => prev.map(c => 
+                c.collegeId === collegeId 
+                  ? { ...c, unreadCount: 0 }
+                  : c
+              ))
+              setUnreadCounts(prev => ({
+                ...prev,
+                [collegeId]: 0
+              }))
+            }
+          }
+          
           // Fetch profiles for all unique senders
           const senderIds = formattedMessages.map(msg => msg.senderId).filter(Boolean)
           await fetchSenderProfiles(senderIds)
@@ -3654,9 +3865,21 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
 
     fetchActiveCount()
-    // Refresh every 5 minutes
+    // Refresh every 5 minutes (fallback in case real-time updates fail)
     const interval = setInterval(fetchActiveCount, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    
+    // Listen for real-time active count updates
+    const handleActiveCountUpdate = (data) => {
+      if (data.collegeId === collegeId) {
+        setCollegeActiveCount(data.activeCount)
+      }
+    }
+    onCollegeActiveCountUpdate(handleActiveCountUpdate)
+    
+    return () => {
+      clearInterval(interval)
+      // Remove listener is handled by socketService cleanup
+    }
   }, [collegeId, chat.type])
 
   // Set up Socket.IO connection and listeners for real-time messages
@@ -5806,10 +6029,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Keep picker open to allow multiple emoji selections
   }
 
-  // Fetch other user's last seen time for direct messages
+  // Fetch other user's last seen time for direct messages and check online status
   useEffect(() => {
     if (!otherUserId) {
       setOtherUserLastSeen(null)
+      setIsOtherUserOnline(false)
       return
     }
 
@@ -5817,7 +6041,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       try {
         const response = await getUserProfile(otherUserId)
         if (response.success && response.user?.profile?.lastSeen) {
-          setOtherUserLastSeen(new Date(response.user.profile.lastSeen))
+          const lastSeenDate = new Date(response.user.profile.lastSeen)
+          setOtherUserLastSeen(lastSeenDate)
+          
+          // Check if user is online (last seen within last 30 seconds)
+          const now = new Date()
+          const diffMs = now - lastSeenDate
+          const diffSeconds = Math.floor(diffMs / 1000)
+          
+          // Consider user online if last seen within 30 seconds
+          setIsOtherUserOnline(diffSeconds < 30)
         }
       } catch (error) {
         console.error('Error fetching last seen:', error)
@@ -5825,8 +6058,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
 
     fetchLastSeen()
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchLastSeen, 30000)
+    // Refresh every 10 seconds for real-time updates
+    const interval = setInterval(fetchLastSeen, 10000)
     return () => clearInterval(interval)
   }, [otherUserId])
 
@@ -6014,10 +6247,20 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setIsOtherUserOnline(true)
       }
     }
-    const handleUserOffline = (data) => {
+    const handleUserOffline = async (data) => {
       if (data.userId === otherUserId) {
         setIsOtherUserOnline(false)
         setOtherUserTyping(false)
+        
+        // Immediately fetch and update last seen when user goes offline
+        try {
+          const response = await getUserProfile(otherUserId)
+          if (response.success && response.user?.profile?.lastSeen) {
+            setOtherUserLastSeen(new Date(response.user.profile.lastSeen))
+          }
+        } catch (error) {
+          console.error('Error fetching last seen on offline:', error)
+        }
       }
     }
     onUserOnline(handleUserOnline)
@@ -6310,6 +6553,17 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
     onMessageUpdate(handleMessageUpdate)
 
+    // Set up interval to update last seen display in real-time
+    const updateLastSeenDisplay = () => {
+      if (otherUserLastSeen && !isOtherUserOnline) {
+        // Force re-render to update "Last seen X ago" text
+        setOtherUserLastSeen(prev => prev ? new Date(prev) : null)
+      }
+    }
+    
+    // Update last seen display every minute for real-time "X minutes ago" updates
+    const lastSeenInterval = setInterval(updateLastSeenDisplay, 60000)
+    
     return () => {
       if (socketInstance) {
         socketInstance.off('userTypingDirect', handleUserTypingDirect)
@@ -6320,8 +6574,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         socketInstance.off('directMessageSent', handleDirectMessageSent)
         socketInstance.off('message:update', handleMessageUpdate)
       }
+      clearInterval(lastSeenInterval)
     }
-  }, [otherUserId, user?.id, user?._id])
+  }, [otherUserId, user?.id, user?._id, otherUserLastSeen, isOtherUserOnline])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -7206,18 +7461,20 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         : otherUser.profile.profilePicture)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=50&background=00a8ff&color=fff`
 
-  // Format last seen time for display
+  // Format last seen time for display (real-time updates for private chats only)
   const formatLastSeen = (lastSeenDate) => {
     if (!lastSeenDate) return ''
     
     const now = new Date()
     const lastSeen = new Date(lastSeenDate)
     const diffMs = now - lastSeen
+    const diffSeconds = Math.floor(diffMs / 1000)
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Last seen just now'
+    // Show "just now" for very recent (within 1 minute)
+    if (diffSeconds < 60) return 'Last seen just now'
     if (diffMins < 60) return `Last seen ${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
     if (diffHours < 24) return `Last seen ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
     if (diffDays === 1) return 'Last seen yesterday'
@@ -7226,6 +7483,19 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // For older dates, show actual date
     return `Last seen ${lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: lastSeen.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })}`
   }
+  
+  // Real-time last seen update effect
+  useEffect(() => {
+    if (!otherUserLastSeen || isOtherUserOnline) return
+    
+    // Update last seen display every minute for real-time "X minutes ago" updates
+    const interval = setInterval(() => {
+      // Force re-render by updating state (triggers formatLastSeen recalculation)
+      setOtherUserLastSeen(prev => prev ? new Date(prev) : null)
+    }, 60000)
+    
+    return () => clearInterval(interval)
+  }, [otherUserLastSeen, isOtherUserOnline])
 
   return (
     <div className="live-chat-view">
@@ -7290,7 +7560,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             {(isOnlyOthers || isHybrid) && (
               <button 
                 className="selection-mode-btn"
-                onClick={handleDeleteSelected}
+                onClick={handleDeleteSelectedForMe}
                 title="Delete for me"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

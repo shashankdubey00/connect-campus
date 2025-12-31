@@ -351,10 +351,27 @@ export const getDirectMessageConversations = async (req, res) => {
         // Check if last message was sent by current user
         const isLastMessageOwn = lastMessage && String(lastMessage.senderId) === String(currentUserId);
 
+        // Calculate unread count: count messages where current user is receiver and not in readBy array
+        let unreadCount = 0;
+        for (const msg of visibleMessages) {
+          // Only count messages where current user is the receiver
+          if (String(msg.receiverId) === String(currentUserId)) {
+            const readBy = msg.readBy || [];
+            const isRead = readBy.some(r => {
+              const readUserId = r.userId ? (typeof r.userId === 'object' ? r.userId.toString() : String(r.userId)) : String(r.userId);
+              return readUserId === String(currentUserId);
+            });
+            if (!isRead) {
+              unreadCount++;
+            }
+          }
+        }
+
         return {
           userId: userId,
           name: userProfile?.displayName || user?.email?.split('@')[0] || 'User',
           profilePicture: userProfile?.profilePicture || null,
+          unreadCount: unreadCount, // Add unread count
           lastMessage: lastMessage?.text || 'No messages yet', // Show "No messages yet" if all messages are deleted
           lastMessageTime: lastMessage?.timestamp || null,
           lastMessageIsOwn: isLastMessageOwn || false,
