@@ -6,6 +6,7 @@ import DirectMessage from '../models/DirectMessage.js';
 import UserProfile from '../models/UserProfile.js';
 import Block from '../models/Block.js';
 import ChatHistory from '../models/ChatHistory.js';
+import DeletedChat from '../models/DeletedChat.js';
 
 let io;
 
@@ -487,6 +488,36 @@ export const initializeSocket = (server) => {
         });
 
         await message.save();
+
+        // Remove DeletedChat record if it exists (so chat reappears in list)
+        // This needs to be done for both sender and receiver
+        try {
+          // Remove for sender
+          await DeletedChat.deleteMany({
+            userId: socket.user.userId,
+            otherUserId: receiverId,
+            chatType: 'direct',
+          });
+          
+          // Remove for receiver (so they see the chat too)
+          const receiverObjectId = mongoose.Types.ObjectId.isValid(receiverId) 
+            ? new mongoose.Types.ObjectId(receiverId) 
+            : receiverId;
+          const senderObjectId = mongoose.Types.ObjectId.isValid(senderId) 
+            ? new mongoose.Types.ObjectId(senderId) 
+            : senderId;
+          
+          await DeletedChat.deleteMany({
+            userId: receiverObjectId,
+            otherUserId: senderObjectId,
+            chatType: 'direct',
+          });
+          
+          console.log('Removed DeletedChat records for new message between', senderId, 'and', receiverId);
+        } catch (error) {
+          console.error('Error removing DeletedChat record:', error);
+          // Don't fail the message send if this fails
+        }
 
         // Track chat history to ensure chat persists even if all messages are cleared
         try {

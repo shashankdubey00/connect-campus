@@ -67,6 +67,17 @@ export const deleteDirectMessage = async (messageId) => {
 };
 
 /**
+ * Delete a direct message for everyone (delete for all)
+ * @param {String} messageId - Message ID
+ * @returns {Promise} API response
+ */
+export const deleteDirectMessageForAll = async (messageId) => {
+  return await api(`/api/direct-messages/message/${encodeURIComponent(messageId)}/for-all`, {
+    method: 'DELETE',
+  });
+};
+
+/**
  * Delete all messages with a user and remove from chat list
  * @param {String} otherUserId - Other user ID
  * @returns {Promise} API response

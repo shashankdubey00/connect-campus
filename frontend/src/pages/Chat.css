@@ -2270,6 +2270,7 @@
   margin: 0 0 4px 0;
   word-wrap: break-word;
   line-height: 1.4;
+  white-space: pre-wrap; /* Preserve line breaks and wrap text */
   /* Ensure emojis render correctly */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
   /* Center emoji-only messages vertically */
@@ -2372,6 +2373,12 @@
   color: var(--input-text);
   font-size: 15px;
   outline: none;
+  resize: none;
+  overflow-y: auto;
+  min-height: 20px;
+  max-height: 120px;
+  line-height: 20px;
+  font-family: inherit;
 }
 
 .chat-input::placeholder {

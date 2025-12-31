@@ -3,6 +3,7 @@ import Message from '../models/Message.js';
 import DeletedMessage from '../models/DeletedMessage.js';
 import Follow from '../models/Follow.js';
 import ChatHistory from '../models/ChatHistory.js';
+import DeletedChat from '../models/DeletedChat.js';
 import { protect } from '../middleware/authMiddleware.js';
 import College from '../../models/College.js';
 
@@ -16,11 +17,42 @@ router.delete('/college/:collegeId/clear', protect, async (req, res) => {
     const userId = req.user.userId;
     const decodedCollegeId = decodeURIComponent(collegeId);
 
-    // Delete all messages sent by this user in this college
-    const result = await Message.deleteMany({
-      collegeId: decodedCollegeId,
-      senderId: userId
-    });
+    // IMPORTANT: Don't permanently delete messages - mark them as deleted for this user only
+    // This way other users can still see all messages (both their own and yours)
+    
+    // Get all messages in this college
+    const allMessages = await Message.find({
+      collegeId: decodedCollegeId
+    }).select('_id').lean();
+
+    const messageIds = allMessages.map(msg => msg._id);
+    
+    // Get existing deletions to avoid duplicates
+    const existingDeletions = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'college'
+    }).select('messageId').lean();
+    
+    const existingIds = new Set(existingDeletions.map(d => d.messageId.toString()));
+    const newMessageIds = messageIds.filter(id => !existingIds.has(id.toString()));
+
+    // Mark ALL messages (both sent and received) as deleted for this user only
+    // This way other users can still see all messages
+    let markedDeletedCount = 0;
+    if (newMessageIds.length > 0) {
+      await DeletedMessage.insertMany(
+        newMessageIds.map(messageId => ({
+          userId: userId,
+          messageId: messageId,
+          messageType: 'college',
+          collegeId: decodedCollegeId,
+        }))
+      );
+      markedDeletedCount = newMessageIds.length;
+    }
+
+    console.log('Marked all messages as deleted for user count:', markedDeletedCount);
 
     // Always track that user has interacted with this college chat (even if cleared)
     // This ensures the chat persists in the list after refresh
@@ -65,8 +97,8 @@ router.delete('/college/:collegeId/clear', protect, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Messages cleared successfully',
-      deletedCount: result.deletedCount
+      message: 'Messages cleared successfully for you only',
+      markedDeletedCount: markedDeletedCount
     });
   } catch (error) {
     console.error('Error clearing messages:', error);
@@ -137,6 +169,81 @@ router.delete('/college/:collegeId/delete-all', protect, async (req, res) => {
 
     console.log('Deleted chat history count:', historyResult.deletedCount);
 
+    // Get college details to store both aisheCode and name in DeletedChat
+    const college = await College.findOne({
+      $or: [
+        { aisheCode: decodedCollegeId },
+        { name: decodedCollegeId }
+      ]
+    }).lean();
+
+    // Mark this chat as deleted so it doesn't reappear even if user follows the college
+    // Store both aisheCode and name to ensure proper filtering
+    try {
+      const collegeAisheCode = college?.aisheCode || decodedCollegeId;
+      const collegeName = college?.name || decodedCollegeId;
+      
+      // Store DeletedChat records for both aisheCode and name to cover all cases
+      const deletedChatPromises = [];
+      
+      if (collegeAisheCode) {
+        deletedChatPromises.push(
+          DeletedChat.findOneAndUpdate(
+            {
+              userId: userId,
+              collegeId: collegeAisheCode,
+              chatType: 'college',
+            },
+            {
+              userId: userId,
+              collegeId: collegeAisheCode,
+              chatType: 'college',
+              deletedAt: new Date(),
+            },
+            { upsert: true, new: true }
+          )
+        );
+      }
+      
+      if (collegeName && collegeName !== collegeAisheCode) {
+        deletedChatPromises.push(
+          DeletedChat.findOneAndUpdate(
+            {
+              userId: userId,
+              collegeId: collegeName,
+              chatType: 'college',
+            },
+            {
+              userId: userId,
+              collegeId: collegeName,
+              chatType: 'college',
+              deletedAt: new Date(),
+            },
+            { upsert: true, new: true }
+          )
+        );
+      }
+      
+      await Promise.all(deletedChatPromises);
+      
+      console.log('Marked chat as deleted in DeletedChat:', {
+        userId: userId.toString(),
+        collegeId: decodedCollegeId,
+        aisheCode: collegeAisheCode,
+        name: collegeName,
+        result: 'created/updated'
+      });
+    } catch (deletedChatError) {
+      console.error('Error marking chat as deleted:', deletedChatError);
+      console.error('Error details:', {
+        userId: userId.toString(),
+        collegeId: decodedCollegeId,
+        error: deletedChatError.message,
+        stack: deletedChatError.stack
+      });
+      // Don't fail the entire operation if this fails
+    }
+
     res.json({
       success: true,
       message: 'All messages deleted and chat removed',
@@ -146,6 +253,7 @@ router.delete('/college/:collegeId/delete-all', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Error deleting all college messages:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error deleting messages',
@@ -154,7 +262,7 @@ router.delete('/college/:collegeId/delete-all', protect, async (req, res) => {
   }
 });
 
-// Delete a single message (permanently delete from database - delete for me)
+// Delete a single message (mark as deleted for this user only - delete for me)
 router.delete('/message/:messageId', protect, async (req, res) => {
   try {
     const { messageId } = req.params;
@@ -170,15 +278,30 @@ router.delete('/message/:messageId', protect, async (req, res) => {
       });
     }
 
-    // Permanently delete the message from database
-    await Message.findByIdAndDelete(messageId);
+    // Check if user is the sender or receiver (for group chats, anyone can delete for themselves)
+    const isSender = String(message.senderId) === String(userId);
+    
+    // For group chats, any user can mark any message as deleted for themselves
+    // Mark the message as deleted for this user only (don't permanently delete)
+    const existingDeletion = await DeletedMessage.findOne({
+      userId: userId,
+      messageId: messageId,
+      messageType: 'college'
+    });
 
-    // Also remove all "delete for me" records for this message since it's deleted
-    await DeletedMessage.deleteMany({ messageId: messageId });
+    if (!existingDeletion) {
+      await DeletedMessage.create({
+        userId: userId,
+        messageId: messageId,
+        messageType: 'college',
+        collegeId: message.collegeId,
+      });
+      console.log('Marked message as deleted for user:', userId);
+    }
 
     res.json({
       success: true,
-      message: 'Message deleted successfully',
+      message: 'Message deleted for you only',
     });
   } catch (error) {
     console.error('Error deleting message:', error);
@@ -259,26 +382,42 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     // Fetch messages - sort by timestamp ascending (oldest first) for chronological display
     // Increased limit to ensure we get all recent messages
     const limitValue = Math.min(parseInt(limit) || 50, 200); // Increased limit to 200
-    const messages = await Message.find(query)
+    const allMessages = await Message.find(query)
       .sort({ timestamp: 1 }) // Ascending order (oldest first) for chronological display
       .limit(limitValue)
       .lean();
 
-          res.json({
-            success: true,
-            count: messages.length,
-            messages: messages.map(msg => ({
-              id: msg._id.toString(),
-              senderId: msg.senderId.toString(),
-              senderName: msg.senderName,
-              collegeId: msg.collegeId,
-              text: msg.text,
-              timestamp: msg.timestamp,
-              replyTo: msg.replyTo ? msg.replyTo.toString() : null,
-              readBy: msg.readBy || [],
-              deliveredTo: msg.deliveredTo || [],
-            })),
-          });
+    // Get list of message IDs that are marked as deleted for this user
+    const userId = req.user.userId;
+    const messageIds = allMessages.map(msg => msg._id);
+    const deletedMessages = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'college'
+    }).select('messageId').lean();
+    
+    const deletedMessageIds = new Set(deletedMessages.map(d => d.messageId.toString()));
+
+    // Filter out messages that are marked as deleted for this user
+    const visibleMessages = allMessages.filter(msg => 
+      !deletedMessageIds.has(msg._id.toString())
+    );
+
+    res.json({
+      success: true,
+      count: visibleMessages.length,
+      messages: visibleMessages.map(msg => ({
+        id: msg._id.toString(),
+        senderId: msg.senderId.toString(),
+        senderName: msg.senderName,
+        collegeId: msg.collegeId,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        replyTo: msg.replyTo ? msg.replyTo.toString() : null,
+        readBy: msg.readBy || [],
+        deliveredTo: msg.deliveredTo || [],
+      })),
+    });
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({
@@ -303,10 +442,25 @@ router.get('/user/colleges', protect, async (req, res) => {
 
     // Find all colleges the user follows
     const follows = await Follow.find({ userId }).lean();
-    const collegeIdsFromFollows = follows.map(f => f.collegeId);
+    // Get both collegeId and collegeAisheCode from follows (some might use one or the other)
+    // But we need to filter out any that are in deleted chats
+    const allFollowCollegeIds = follows.map(f => [f.collegeId, f.collegeAisheCode]).flat().filter(id => id);
+    
+    // Find colleges that have been explicitly deleted by the user (do this early)
+    const deletedChats = await DeletedChat.find({
+      userId: userId,
+      chatType: 'college',
+      collegeId: { $exists: true, $ne: null }
+    }).select('collegeId').lean();
+    const deletedCollegeIds = new Set(deletedChats.map(dc => dc.collegeId).filter(id => id));
+    
+    console.log('Deleted college chats:', Array.from(deletedCollegeIds));
+    
+    // Filter out deleted chats from follows - even if user follows, if they deleted the chat, exclude it
+    const collegeIdsFromFollows = allFollowCollegeIds.filter(id => !deletedCollegeIds.has(id));
 
     // Find colleges where user has deleted messages (indicating previous interaction)
-    const deletedMessages = await DeletedMessage.distinct('collegeId', {
+    const deletedCollegeIdsFromMessages = await DeletedMessage.distinct('collegeId', {
       userId: userId,
       messageType: 'college',
       collegeId: { $exists: true, $ne: null }
@@ -319,9 +473,16 @@ router.get('/user/colleges', protect, async (req, res) => {
       collegeId: { $exists: true, $ne: null }
     }).select('collegeId').lean();
     const collegeIdsFromHistory = chatHistory.map(ch => ch.collegeId).filter(id => id); // Filter out any null/undefined
+    
+    console.log('College IDs from follows (before filtering):', allFollowCollegeIds);
+    console.log('College IDs from follows (after filtering):', collegeIdsFromFollows);
+    console.log('All college IDs before filtering:', [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows, ...deletedCollegeIdsFromMessages, ...collegeIdsFromHistory])]);
 
-    // Combine all lists and get unique college IDs
-    const allCollegeIds = [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows, ...deletedMessages, ...collegeIdsFromHistory])];
+    // Combine all lists and get unique college IDs, but exclude deleted chats
+    const allCollegeIds = [...new Set([...collegeIdsFromMessages, ...collegeIdsFromFollows, ...deletedCollegeIdsFromMessages, ...collegeIdsFromHistory])]
+      .filter(id => !deletedCollegeIds.has(id)); // Exclude explicitly deleted chats
+    
+    console.log('All college IDs after filtering:', allCollegeIds);
 
     // If no colleges found (user hasn't sent messages or followed any), return empty array
     if (allCollegeIds.length === 0) {
@@ -339,29 +500,67 @@ router.get('/user/colleges', protect, async (req, res) => {
       ]
     }).lean();
 
-    // Optimize: Get all last messages in a single aggregation query instead of N queries
-    const collegeIds = colleges.map(c => c.aisheCode || c.name);
-    
-    // Use aggregation to get the last message for each college in one query
-    const lastMessagesByCollege = await Message.aggregate([
-      { $match: { collegeId: { $in: collegeIds } } },
-      { $sort: { timestamp: -1 } },
-      {
-        $group: {
-          _id: '$collegeId',
-          lastMessage: { $first: '$$ROOT' }
-        }
+    // Filter out colleges that match any deleted chat (check both aisheCode and name)
+    // This ensures that even if user follows a college, if they deleted the chat, it won't appear
+    const filteredColleges = colleges.filter(college => {
+      const collegeAisheCode = college.aisheCode;
+      const collegeName = college.name;
+      
+      // Check if this college's aisheCode or name is in the deleted chats list
+      const isDeleted = deletedCollegeIds.has(collegeAisheCode) || deletedCollegeIds.has(collegeName);
+      
+      if (isDeleted) {
+        console.log('Filtering out deleted college:', {
+          id: college._id,
+          aisheCode: collegeAisheCode,
+          name: collegeName,
+          deletedIds: Array.from(deletedCollegeIds)
+        });
       }
-    ]);
+      
+      // Exclude if either aisheCode or name matches a deleted chat
+      return !isDeleted;
+    });
+    
+    console.log('Colleges before filtering:', colleges.length);
+    console.log('Colleges after filtering:', filteredColleges.length);
 
-    // Create a map for O(1) lookup
+    // Optimize: Get all last messages in a single query, then filter out deleted ones
+    const collegeIds = filteredColleges.map(c => c.aisheCode || c.name);
+    
+    // Get all messages for these colleges first
+    const allMessages = await Message.find({
+      collegeId: { $in: collegeIds }
+    })
+      .sort({ timestamp: -1 })
+      .lean();
+
+    // Get list of message IDs that are marked as deleted for this user
+    const messageIds = allMessages.map(msg => msg._id);
+    const deletedMessages = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'college'
+    }).select('messageId').lean();
+    
+    const deletedMessageIds = new Set(deletedMessages.map(d => d.messageId.toString()));
+
+    // Filter out deleted messages
+    const visibleMessages = allMessages.filter(msg => 
+      !deletedMessageIds.has(msg._id.toString())
+    );
+
+    // Group by collegeId and get the most recent visible message for each
     const lastMessageMap = new Map();
-    lastMessagesByCollege.forEach(item => {
-      lastMessageMap.set(item._id, item.lastMessage);
+    visibleMessages.forEach(msg => {
+      const collegeId = msg.collegeId;
+      if (!lastMessageMap.has(collegeId)) {
+        lastMessageMap.set(collegeId, msg);
+      }
     });
 
     // Combine colleges with their last messages
-    const collegesWithMessages = colleges.map((college) => {
+    const collegesWithMessages = filteredColleges.map((college) => {
         const collegeId = college.aisheCode || college.name;
       const lastMessage = lastMessageMap.get(collegeId);
 
@@ -398,12 +597,20 @@ router.get('/user/colleges', protect, async (req, res) => {
           lastMessage: lastMessage ? {
             text: lastMessage.text,
             timestamp: lastMessage.timestamp,
-          senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
-          senderName: lastMessage.senderName,
-          lastMessageIsOwn: isLastMessageOwn,
-          lastMessageDeliveredTo: lastMessage.deliveredTo || [],
-          lastMessageReadBy: lastMessage.readBy || [],
-        } : null // null means no messages, but chat should still appear
+            senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
+            senderName: lastMessage.senderName,
+            lastMessageIsOwn: isLastMessageOwn,
+            lastMessageDeliveredTo: lastMessage.deliveredTo || [],
+            lastMessageReadBy: lastMessage.readBy || [],
+          } : { 
+            text: 'No messages yet', 
+            timestamp: null, 
+            senderId: null, 
+            senderName: null, 
+            lastMessageIsOwn: false, 
+            lastMessageDeliveredTo: [], 
+            lastMessageReadBy: [] 
+          } // Show "No messages yet" if all messages are deleted
         };
     });
 
