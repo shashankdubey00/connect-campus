@@ -151,8 +151,12 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
       const data = await response.json()
       
       if (data.success) {
+        console.log('Search results:', data.colleges.length, 'colleges found')
+        console.log('Colleges:', data.colleges)
         setSuggestions(data.colleges)
         setShowSuggestions(data.colleges.length > 0)
+      } else {
+        console.error('Search failed:', data.message)
       }
     } catch (error) {
       console.error('Error searching colleges:', error)

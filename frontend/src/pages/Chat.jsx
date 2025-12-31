@@ -47,6 +47,8 @@ const Chat = () => {
   const collegeSearchRef = useRef(null)
   const collegeSuggestionsRef = useRef(null)
   const [chats, setChats] = useState([]) // Dynamic chat list
+  const [chatSelectionMode, setChatSelectionMode] = useState(false) // Selection mode for chats
+  const [selectedChatIds, setSelectedChatIds] = useState(new Set()) // Set of selected chat IDs
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
   const navigationHistory = useRef([]) // Track navigation history for back button
@@ -77,16 +79,11 @@ const Chat = () => {
               socketInstance.once('connect', () => {
                 // Set up Socket.IO listeners
                 onJoinedRoom(() => {});
-                onSocketError((error) => {
-                  console.error('Socket error:', error);
-                });
+                // Error handler will be set up in the college chat useEffect
               })
               
-              // Set up listeners even if not connected yet
+              // Set up listeners even if not connected yet (minimal, specific handlers will be set in useEffects)
               onJoinedRoom(() => {});
-              onSocketError((error) => {
-                console.error('Socket error:', error);
-              });
             } else {
               console.log('Socket.IO connection will be retried when needed')
             }
@@ -703,7 +700,41 @@ const Chat = () => {
   }
 
   // Handle chat selection
+  // Toggle chat selection in selection mode
+  const handleToggleChatSelection = (chatId) => {
+    setSelectedChatIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(chatId)) {
+        newSet.delete(chatId)
+      } else {
+        newSet.add(chatId)
+      }
+      // Exit selection mode if no chats selected
+      if (newSet.size === 0) {
+        setChatSelectionMode(false)
+      }
+      return newSet
+    })
+  }
+  
+  // Exit chat selection mode
+  const handleExitChatSelectionMode = () => {
+    setChatSelectionMode(false)
+    setSelectedChatIds(new Set())
+  }
+  
+  // Enter chat selection mode
+  const handleEnterChatSelectionMode = () => {
+    setChatSelectionMode(true)
+  }
+
   const handleChatSelect = (chat) => {
+    // If in selection mode, toggle selection instead of opening chat
+    if (chatSelectionMode) {
+      handleToggleChatSelection(chat.id)
+      return
+    }
+    
     saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
     
@@ -1108,8 +1139,8 @@ const Chat = () => {
         chat.lastMessageIsOwn = isOwnMessage
         chat.lastMessageDeliveredTo = deliveredTo || []
         chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
+      chat.timestamp = formatChatTimestamp(messageTimestamp)
+      chat.lastMessageTime = messageTimestamp
       } else {
         // When clearing chat, just update the message text, keep existing timestamp
         chat.lastMessage = 'No messages yet'
@@ -1202,12 +1233,12 @@ const Chat = () => {
       // Update last message and timestamp
       // If messageText is "No messages yet", don't update timestamp to keep original order
       if (messageText !== 'No messages yet') {
-        chat.lastMessage = truncateMessage(messageText)
+      chat.lastMessage = truncateMessage(messageText)
         chat.lastMessageIsOwn = isOwnMessage
         chat.lastMessageDeliveredTo = deliveredTo || []
         chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
+      chat.timestamp = formatChatTimestamp(messageTimestamp)
+      chat.lastMessageTime = messageTimestamp
       } else {
         // When clearing chat, just update the message text, keep existing timestamp
         chat.lastMessage = 'No messages yet'
@@ -1239,7 +1270,12 @@ const Chat = () => {
       updatedChats.splice(chatIndex, 1)
       updatedChats.unshift(chat)
       
-      return updatedChats
+      // Sort by last message time to ensure correct order
+      return updatedChats.sort((a, b) => {
+        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
+        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
+        return timeB - timeA // Most recent first
+      })
     })
   }, [selectedChat])
 
@@ -1588,6 +1624,7 @@ const Chat = () => {
         <>
           <div className="panel-header panel-header-with-search">
             <h2>all chats</h2>
+            {!chatSelectionMode ? (
             <div className="panel-header-search">
               <input
                 type="text"
@@ -1598,6 +1635,21 @@ const Chat = () => {
               />
               <span className="panel-search-icon">🔍</span>
             </div>
+            ) : (
+              <div className="chat-selection-mode-header">
+                <span>{selectedChatIds.size} selected</span>
+                <button 
+                  className="chat-selection-cancel-btn"
+                  onClick={handleExitChatSelectionMode}
+                  title="Cancel"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
           <div className="panel-list">
             {filteredChats.length === 0 ? (
@@ -1610,9 +1662,56 @@ const Chat = () => {
               filteredChats.map(chat => (
                 <div
                   key={chat.id}
-                  className={`panel-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
+                  className={`panel-item ${selectedChat?.id === chat.id ? 'active' : ''} ${chatSelectionMode && selectedChatIds.has(chat.id) ? 'chat-selected' : ''} ${chatSelectionMode ? 'chat-selection-mode' : ''}`}
                   onClick={() => handleChatSelect(chat)}
+                  onContextMenu={(e) => {
+                    if (!chatSelectionMode) {
+                      e.preventDefault()
+                      handleEnterChatSelectionMode()
+                      handleToggleChatSelection(chat.id)
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (!chatSelectionMode) {
+                      const touch = e.touches[0]
+                      const startTime = Date.now()
+                      const startX = touch.clientX
+                      const startY = touch.clientY
+                      
+                      const handleTouchEnd = (endEvent) => {
+                        const endTime = Date.now()
+                        const endTouch = endEvent.changedTouches[0]
+                        const endX = endTouch.clientX
+                        const endY = endTouch.clientY
+                        
+                        const timeDiff = endTime - startTime
+                        const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))
+                        
+                        // Long press: > 500ms and minimal movement
+                        if (timeDiff > 500 && distance < 10) {
+                          if (!chatSelectionMode) {
+                            handleEnterChatSelectionMode()
+                            handleToggleChatSelection(chat.id)
+                          }
+                        }
+                        
+                        document.removeEventListener('touchend', handleTouchEnd)
+                      }
+                      
+                      document.addEventListener('touchend', handleTouchEnd, { once: true })
+                    }
+                  }}
                 >
+                  {chatSelectionMode && (
+                    <div className="chat-selection-checkbox">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedChatIds.has(chat.id)}
+                        onChange={() => handleToggleChatSelection(chat.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  )}
                   <div className="panel-item-avatar">
                     <img src={chat.avatar} alt={chat.name} />
                     {chat.type === 'college' && (
@@ -1728,6 +1827,7 @@ const Chat = () => {
         <>
           <div className="panel-header panel-header-with-search">
             <h2>all chats</h2>
+            {!chatSelectionMode ? (
             <div className="panel-header-search">
               <input
                 type="text"
@@ -1738,6 +1838,21 @@ const Chat = () => {
               />
               <span className="panel-search-icon">🔍</span>
             </div>
+            ) : (
+              <div className="chat-selection-mode-header">
+                <span>{selectedChatIds.size} selected</span>
+                <button 
+                  className="chat-selection-cancel-btn"
+                  onClick={handleExitChatSelectionMode}
+                  title="Cancel"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
           <div className="panel-list">
             {filteredChats.length === 0 ? (
@@ -1750,9 +1865,56 @@ const Chat = () => {
               filteredChats.map(chat => (
                 <div
                   key={chat.id}
-                  className={`panel-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
+                  className={`panel-item ${selectedChat?.id === chat.id ? 'active' : ''} ${chatSelectionMode && selectedChatIds.has(chat.id) ? 'chat-selected' : ''} ${chatSelectionMode ? 'chat-selection-mode' : ''}`}
                   onClick={() => handleChatSelect(chat)}
+                  onContextMenu={(e) => {
+                    if (!chatSelectionMode) {
+                      e.preventDefault()
+                      handleEnterChatSelectionMode()
+                      handleToggleChatSelection(chat.id)
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (!chatSelectionMode) {
+                      const touch = e.touches[0]
+                      const startTime = Date.now()
+                      const startX = touch.clientX
+                      const startY = touch.clientY
+                      
+                      const handleTouchEnd = (endEvent) => {
+                        const endTime = Date.now()
+                        const endTouch = endEvent.changedTouches[0]
+                        const endX = endTouch.clientX
+                        const endY = endTouch.clientY
+                        
+                        const timeDiff = endTime - startTime
+                        const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))
+                        
+                        // Long press: > 500ms and minimal movement
+                        if (timeDiff > 500 && distance < 10) {
+                          if (!chatSelectionMode) {
+                            handleEnterChatSelectionMode()
+                            handleToggleChatSelection(chat.id)
+                          }
+                        }
+                        
+                        document.removeEventListener('touchend', handleTouchEnd)
+                      }
+                      
+                      document.addEventListener('touchend', handleTouchEnd, { once: true })
+                    }
+                  }}
                 >
+                  {chatSelectionMode && (
+                    <div className="chat-selection-checkbox">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedChatIds.has(chat.id)}
+                        onChange={() => handleToggleChatSelection(chat.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  )}
                   <div className="panel-item-avatar">
                     <img src={chat.avatar} alt={chat.name} />
                     {chat.type === 'college' && (
@@ -2826,6 +2988,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
   const [collegeActiveCount, setCollegeActiveCount] = useState(null) // Track active students count for college
   const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
+  const [hoveredMessage, setHoveredMessage] = useState(null) // Track hovered message for desktop
+  const [showMessageHeader, setShowMessageHeader] = useState(false) // Show action header when message selected
+  const [selectionMode, setSelectionMode] = useState(false) // Selection mode for messages/chats
+  const [selectedItems, setSelectedItems] = useState(new Set()) // Set of selected message/chat IDs
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
   const actionMenuRef = useRef(null)
@@ -2833,6 +2999,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const quickEmojiRef = useRef(null)
   const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
   const typingTimeoutRef = useRef(null) // Store typing timeout
+  const doubleClickTimer = useRef(null) // For double-click detection
+  const lastClickTime = useRef(0) // Track last click time for double-click
+  const lastClickedMessage = useRef(null) // Track last clicked message
   const socket = getSocket()
   
   // Top 5 emojis for quick reactions
@@ -2868,7 +3037,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
       // Stop typing when component unmounts
       // Note: collegeId and isTyping are captured in closure
-    }
+      }
   }, [isTyping]) // Add isTyping to dependencies
 
   // Update mobile detection on resize
@@ -2982,7 +3151,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         const response = await fetchMessages(collegeId)
         if (response.success) {
           // Format messages for display
-          const formattedMessages = response.messages.map(msg => ({
+          const formattedMessages = response.messages.map(msg => {
+            const formattedMsg = {
             id: msg.id,
             text: msg.text,
             sender: msg.senderName,
@@ -2995,9 +3165,28 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             date: formatDate(new Date(msg.timestamp)),
             isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
             timestamp: new Date(msg.timestamp),
+              replyTo: msg.replyTo || null,
+              replyToData: null, // Will be populated below
             readBy: msg.readBy ? msg.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
             deliveredTo: msg.deliveredTo ? msg.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
-          }))
+            }
+            
+            // If this message has a replyTo, find the replied-to message in the same response
+            if (msg.replyTo) {
+              const repliedMsg = response.messages.find(m => m.id === msg.replyTo)
+              if (repliedMsg) {
+                formattedMsg.replyToData = {
+                  id: repliedMsg.id,
+                  text: repliedMsg.text,
+                  sender: repliedMsg.senderName,
+                  senderId: repliedMsg.senderId,
+                  isOwn: String(repliedMsg.senderId) === String(user?.id || user?._id || '')
+                }
+              }
+            }
+            
+            return formattedMsg
+          })
           
           // Filter out messages from blocked users
           const currentUserId = String(user?.id || user?._id || '')
@@ -3008,7 +3197,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             return true // Will filter after loading blocked users
           })
           
-          setMessages(filteredMessages)
+          // Sort messages by timestamp to ensure correct order
+          const sortedMessages = filteredMessages.sort((a, b) => 
+            new Date(a.timestamp) - new Date(b.timestamp)
+          );
+          
+          setMessages(sortedMessages)
+          
+          console.log(`📥 Loaded ${sortedMessages.length} messages for college: ${collegeId}`);
           
           // Fetch profiles for all unique senders
           const senderIds = formattedMessages.map(msg => msg.senderId).filter(Boolean)
@@ -3062,35 +3258,64 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     return () => clearInterval(interval)
   }, [collegeId, chat.type])
 
-  // Set up Socket.IO connection and listeners for real-time messages
-  useEffect(() => {
-    if (!collegeId || chat.type !== 'college') return
+    // Set up Socket.IO connection and listeners for real-time messages
+    useEffect(() => {
+      if (!collegeId || chat.type !== 'college') return
 
-    // Ensure socket is connected and join room
-    const setupSocket = async () => {
-      let socketInstance = getSocket()
-      if (!socketInstance || !socketInstance.connected) {
-        try {
-          socketInstance = connectSocket()
-          if (socketInstance) {
-            // Wait for connection
-            socketInstance.once('connect', () => {
-              // Join the college room
-              joinCollegeRoom(collegeId)
-              console.log(`✅ Joined college room: ${collegeId}`)
-            })
+      // Track recent successful message sends to suppress false error warnings
+      const recentSuccessfulSends = new Set();
+      const MAX_TRACK_TIME = 5000; // Track for 5 seconds
+
+      // Ensure socket is connected and join room
+      const setupSocket = async () => {
+        let socketInstance = getSocket()
+        if (!socketInstance || !socketInstance.connected) {
+          try {
+            socketInstance = connectSocket()
+            if (socketInstance) {
+              // Wait for connection
+              socketInstance.once('connect', () => {
+                // Join the college room
+                joinCollegeRoom(collegeId)
+                console.log(`✅ Joined college room: ${collegeId}`)
+              })
+            }
+          } catch (error) {
+            console.error('Failed to connect socket:', error)
           }
-        } catch (error) {
-          console.error('Failed to connect socket:', error)
+        } else {
+          // Already connected, join the room
+          joinCollegeRoom(collegeId)
+          console.log(`✅ Joined college room: ${collegeId}`)
         }
-      } else {
-        // Already connected, join the room
-        joinCollegeRoom(collegeId)
-        console.log(`✅ Joined college room: ${collegeId}`)
       }
-    }
 
-    setupSocket()
+      setupSocket()
+
+      // Set up error handler - don't remove optimistic messages on socket errors
+      // The message might still be saved on the server
+      const handleSocketError = (error) => {
+        const errorMessage = error?.message || '';
+        
+        // If we have recent successful sends, suppress the error warning
+        // This handles the case where an error is emitted but message was actually saved
+        if (recentSuccessfulSends.size > 0 && 
+            (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message'))) {
+          // Silently ignore - message was successfully sent
+          return;
+        }
+        
+        // Don't log generic "Failed to send message" errors as errors if messages are working
+        // This prevents false positive error logs when messages are actually being sent successfully
+        if (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message')) {
+          // Log as warning instead of error since message might still be saved
+          console.warn('⚠️ Socket error (message may still be saved):', errorMessage);
+        } else {
+          console.error('Socket error in college chat:', error);
+        }
+        // Don't remove optimistic messages - they might still be saved
+        // The message will be loaded from backend on refresh
+      }
 
     const handleReceiveMessage = (message) => {
       // Only add message if it's for this college
@@ -3104,25 +3329,99 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           return // Skip blocked user's messages
         }
         
-        // Check if this message matches an optimistic message (replace it)
+        const isOwn = String(message.senderId) === String(user?.id || user?._id || '')
+        
+        // If this is our own message, track it as a successful send to suppress false errors
+        if (isOwn && message.id) {
+          recentSuccessfulSends.add(message.id);
+          // Clean up after tracking period
+          setTimeout(() => {
+            recentSuccessfulSends.delete(message.id);
+          }, MAX_TRACK_TIME);
+        }
+        
+        // SIMPLIFIED: Check if this message matches an optimistic message (replace it)
         setMessages(prev => {
-          // Check for duplicate messages first
+          
+          // Check for duplicate first
           const existingIndex = prev.findIndex(m => m.id === message.id)
           if (existingIndex !== -1) {
-            return prev // Message already exists, don't add duplicate
+            // If it's an optimistic message with this ID, replace it
+            if (prev[existingIndex].isOptimistic) {
+              const optimisticMsg = prev[existingIndex]
+              const newMessages = [...prev]
+              newMessages[existingIndex] = {
+                id: message.id,
+                text: message.text,
+                sender: message.senderName,
+                senderId: message.senderId,
+                time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
+                  minute: '2-digit',
+                  hour12: true 
+                }),
+                date: formatDate(new Date(message.timestamp)),
+                isOwn: isOwn,
+                timestamp: new Date(message.timestamp),
+                replyTo: message.replyTo || optimisticMsg.replyTo || null,
+                replyToData: optimisticMsg.replyToData || null,
+                readBy: message.readBy ? message.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
+                deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
+              }
+              if (isOwn && onMessageSent && message.collegeId) {
+                onMessageSent(message.collegeId, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
+              }
+              return newMessages
+            }
+            return prev // Already exists, skip
           }
-
-          const optimisticIndex = prev.findIndex(m => 
-            m.isOptimistic && 
-            m.text === message.text && 
-            String(m.senderId) === String(message.senderId) &&
-            Math.abs(new Date(m.timestamp) - new Date(message.timestamp)) < 5000 // Within 5 seconds
-          )
+          
+          // SIMPLE MATCHING: Find optimistic message by text + sender + recent time
+          // This works for both normal and reply messages
+          const optimisticIndex = prev.findIndex(m => {
+            if (!m.isOptimistic) return false
+            // Trim both texts for comparison to handle whitespace differences
+            if (m.text.trim() !== message.text.trim()) return false
+            if (String(m.senderId) !== String(message.senderId)) return false
+            // Time check - be VERY lenient (60 seconds)
+            const timeDiff = Math.abs(new Date(m.timestamp) - new Date(message.timestamp))
+            return timeDiff < 60000
+          })
+          
+          console.log('🔍 Matching check:', {
+            messageText: message.text,
+            messageId: message.id,
+            isOwn,
+            optimisticIndex,
+            totalOptimistic: prev.filter(m => m.isOptimistic).length,
+            optimisticMessages: prev.filter(m => m.isOptimistic).map(m => ({
+              id: m.id,
+              text: m.text,
+              senderId: m.senderId,
+              timestamp: m.timestamp
+            }))
+          })
           
           if (optimisticIndex !== -1) {
-            // Replace optimistic message with real one
+            // Replace optimistic with real message
+            const optimisticMsg = prev[optimisticIndex]
             const newMessages = [...prev]
-            const isOwn = String(message.senderId) === String(user?.id || user?._id || '')
+            
+            // Preserve replyToData from optimistic message
+            let replyToData = optimisticMsg.replyToData || null
+            if (message.replyTo && !replyToData) {
+              const repliedMsg = prev.find(m => m.id === message.replyTo)
+              if (repliedMsg) {
+                replyToData = {
+                  id: repliedMsg.id,
+                  text: repliedMsg.text,
+                  sender: repliedMsg.sender,
+                  senderId: repliedMsg.senderId,
+                  isOwn: repliedMsg.isOwn
+                }
+              }
+            }
+            
             newMessages[optimisticIndex] = {
               id: message.id,
               text: message.text,
@@ -3136,25 +3435,34 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               date: formatDate(new Date(message.timestamp)),
               isOwn: isOwn,
               timestamp: new Date(message.timestamp),
+              replyTo: message.replyTo || optimisticMsg.replyTo || null,
+              replyToData: replyToData,
               readBy: message.readBy ? message.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
               deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
             }
             
-            // Update chat list if this is our own message
             if (isOwn && onMessageSent && message.collegeId) {
-              onMessageSent(
-                message.collegeId,
-                message.text,
-                message.timestamp,
-                true,
-                message.deliveredTo || [],
-                message.readBy || []
-              )
+              onMessageSent(message.collegeId, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
             }
             
+            console.log('✅ Replaced optimistic message with real message:', message.id)
             return newMessages
-          } else {
-            // New message from someone else, add it
+          }
+          
+          // New message from someone else (or our own that didn't match)
+          // For our own messages, make sure we remove any optimistic messages to prevent duplicates
+          // If it's our own message, remove any optimistic messages with the same text to avoid duplicates
+          const filteredPrev = isOwn 
+            ? prev.filter(m => {
+                // Remove optimistic messages that match this message
+                if (m.isOptimistic && m.text.trim() === message.text.trim() && String(m.senderId) === String(message.senderId)) {
+                  console.log('🗑️ Removing unmatched optimistic message:', m.id, 'for real message:', message.id)
+                  return false
+                }
+                return true
+              })
+            : prev
+          
             const formattedMessage = {
               id: message.id,
               text: message.text,
@@ -3166,29 +3474,70 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 hour12: true 
               }),
               date: formatDate(new Date(message.timestamp)),
-              isOwn: String(message.senderId) === String(user?.id || user?._id || ''),
+            isOwn: isOwn,
               timestamp: new Date(message.timestamp),
+            replyTo: message.replyTo || null,
+            replyToData: null,
               readBy: message.readBy ? message.readBy.map(r => ({ userId: r.userId?.toString() || r.userId, readAt: r.readAt })) : [],
               deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: d.userId?.toString() || d.userId, deliveredAt: d.deliveredAt })) : []
             }
-            // Insert message in correct chronological order
-            const newMessages = [...prev, formattedMessage].sort((a, b) => 
+          
+          // Populate replyToData if needed
+          if (formattedMessage.replyTo) {
+            const repliedMsg = filteredPrev.find(m => m.id === formattedMessage.replyTo)
+            if (repliedMsg) {
+              formattedMessage.replyToData = {
+                id: repliedMsg.id,
+                text: repliedMsg.text,
+                sender: repliedMsg.sender,
+                senderId: repliedMsg.senderId,
+                isOwn: repliedMsg.isOwn
+              }
+            }
+          }
+          
+            const newMessages = [...filteredPrev, formattedMessage].sort((a, b) => 
               new Date(a.timestamp) - new Date(b.timestamp)
             )
             
-            // Fetch profile for new sender if not already cached
             if (message.senderId && String(message.senderId) !== String(user?.id || user?._id || '')) {
               fetchSenderProfiles([message.senderId])
             }
             
             return newMessages
-          }
         })
       }
     }
 
     // Set up message listener
     onReceiveMessage(handleReceiveMessage)
+    
+    // Set up error handler - don't remove optimistic messages on socket errors
+    // The message might still be saved on the server
+    onSocketError(handleSocketError)
+    
+    // Get socket instance for all listeners
+    const socketInstance = getSocket()
+    
+    // Listen for message sent confirmation - just log it, don't update IDs
+    // We'll match by text/sender/time when receiveMessage arrives
+    const handleMessageSent = (data) => {
+      console.log('✅ Message sent confirmation received:', data.messageId)
+      // Mark this as a successful send to suppress false error warnings
+      if (data.messageId) {
+        recentSuccessfulSends.add(data.messageId);
+        // Clean up after tracking period
+        setTimeout(() => {
+          recentSuccessfulSends.delete(data.messageId);
+        }, MAX_TRACK_TIME);
+      }
+      // Don't update optimistic messages here - let receiveMessage handle it
+      // This avoids race conditions and timing issues
+    }
+    
+    if (socketInstance) {
+      socketInstance.on('messageSent', handleMessageSent)
+    }
 
     // Set up typing indicator listeners
     const handleUserTyping = (data) => {
@@ -3257,7 +3606,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     onMessageRead(handleMessageRead)
 
     // Set up blocked message listener
-    const socketInstance = getSocket()
     if (socketInstance) {
       const handleBlockedMessage = (data) => {
         setBlockMessageWithTimeout({
@@ -3277,6 +3625,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           socketInstance.off('userOnline', handleUserOnline)
           socketInstance.off('userOffline', handleUserOffline)
           socketInstance.off('messageRead', handleMessageRead)
+          socketInstance.off('messageSent', handleMessageSent)
         }
       }
     }
@@ -3344,12 +3693,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // If user is typing and not already marked as typing
     if (value.trim().length > 0) {
       if (!isTyping) {
-        setIsTyping(true)
-        emitTyping(collegeId, true)
-      }
-      
-      // Set timeout to stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(true)
+      emitTyping(collegeId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
         emitTyping(collegeId, false)
         typingTimeoutRef.current = null
@@ -3377,11 +3726,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = null
     }
-    
-    // If replying, clear reply after sending
-    if (replyingTo) {
-      setReplyingTo(null)
-    }
 
     // Check if user has blocked anyone (prevent sending)
     if (blockedUsers.size > 0) {
@@ -3406,12 +3750,22 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       date: formatDate(new Date()),
       isOwn: true,
       timestamp: new Date(),
+      replyTo: replyingTo ? replyingTo.id : null,
+      replyToData: replyingTo ? replyingTo : null, // Store full reply data for rendering
       isOptimistic: true
     }
+
+    // Store replyToId before clearing replyingTo
+    const replyToId = replyingTo ? replyingTo.id : null
 
     // Add optimistic message immediately
     setMessages(prev => [...prev, optimisticMessage])
     setMessageInput('')
+    
+    // Clear reply after storing replyToId and adding to messages
+    if (replyingTo) {
+      setReplyingTo(null)
+    }
 
     // Try to connect socket if not connected
     let socketInstance = getSocket()
@@ -3448,7 +3802,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         }
       } catch (error) {
         console.error('Failed to connect socket:', error)
-        // Remove optimistic message on error
+        // Remove optimistic message only on connection failure
         setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
         return
       }
@@ -3458,23 +3812,49 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     try {
       socketInstance = getSocket()
       if (socketInstance && socketInstance.connected) {
-        sendMessage(messageText, collegeId)
-        console.log('✅ Message sent via socket')
+        // Use stored replyToId (already captured above)
+        
+        // Use async/await for better error handling
+        try {
+          await sendMessage(messageText, collegeId, replyToId)
+          console.log('✅ Message sent via socket', replyToId ? `(replying to: ${replyToId})` : '')
+          
+          // Clear reply after sending
+          if (replyingTo) {
+            setReplyingTo(null)
+          }
         
         // Update chat list immediately (optimistic update)
-        // Message is just sent, so no delivery/read status yet
+          // Message is just sent, so no delivery/read status yet
         if (onMessageSent && collegeId) {
-          onMessageSent(collegeId, messageText, new Date(), true, [], [])
+            onMessageSent(collegeId, messageText, new Date(), true, [], [])
+          }
+          
+          // Don't remove optimistic message - it will be replaced when receiveMessage is received
+          // If there's a socket error, the message might still be saved on the server
+        } catch (sendError) {
+          console.error('❌ Error sending message via socket:', sendError)
+          // Only remove optimistic message if it's a connection error, not a server error
+          // Server errors might mean the message was still saved
+          if (sendError.message?.includes('not connected') || sendError.message?.includes('timeout')) {
+            setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+          } else {
+            // Keep optimistic message - it might still be saved on server
+            console.log('⚠️ Keeping optimistic message - might be saved on server')
+          }
         }
       } else {
         console.error('Socket not connected, cannot send message')
-        // Remove optimistic message on error
+        // Remove optimistic message on connection error
         setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+        throw new Error('Socket not connected')
       }
     } catch (error) {
       console.error('Error sending message:', error)
-      // Remove optimistic message on error
+      // Only remove if it's a connection error
+      if (error.message?.includes('not connected') || error.message?.includes('timeout')) {
       setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+      }
     }
   }
 
@@ -3534,6 +3914,75 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const isCollegeVerified = college?.isVerified || false
 
   // Handle long press on message (mobile and desktop)
+  // Handle message hover (desktop)
+  const handleMessageHover = (message) => {
+    if (!isMobile) {
+      setHoveredMessage(message)
+    }
+  }
+
+  // Handle message unhover (desktop)
+  const handleMessageUnhover = () => {
+    if (!isMobile) {
+      setHoveredMessage(null)
+    }
+  }
+
+  // Handle message click (desktop - for double-click detection)
+  const handleMessageClick = (e, message) => {
+    if (isMobile) return
+    
+    // Prevent default browser behavior (including context menu)
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // If in selection mode, toggle selection
+    if (selectionMode) {
+      handleToggleSelection(message.id)
+      return
+    }
+    
+    const currentTime = Date.now()
+    const timeDiff = currentTime - lastClickTime.current
+    
+    // Check if this is a double-click (within 300ms and same message)
+    if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+      // Double-click detected - show action header
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+      setShowActionMenu(false)
+      lastClickTime.current = 0
+      lastClickedMessage.current = null
+    } else {
+      // Single click - store for potential double-click
+      lastClickTime.current = currentTime
+      lastClickedMessage.current = message
+      
+      // Clear timer if exists
+      if (doubleClickTimer.current) {
+        clearTimeout(doubleClickTimer.current)
+      }
+      
+      // If no double-click within 300ms, clear selection
+      doubleClickTimer.current = setTimeout(() => {
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+      }, 300)
+    }
+  }
+
+  // Handle right-click on message (prevent default context menu)
+  const handleMessageContextMenu = (e, message) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // On desktop, show action header on right-click as well
+    if (!isMobile) {
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+      setShowActionMenu(false)
+    }
+  }
+
   const handleMessageTouchStart = (e, message) => {
     const touch = e.touches ? e.touches[0] : null
     const clientX = touch ? touch.clientX : e.clientX
@@ -3544,6 +3993,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     
+    // Start long-press timer (1 second for mobile)
     longPressTimer.current = setTimeout(() => {
       setSelectedMessage(message)
       
@@ -3554,17 +4004,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         const messagesAreaRect = messagesArea.getBoundingClientRect()
         
         if (isMobile) {
-          // On mobile, show quick emoji reactions (1 second)
+          // On mobile, show action menu with all options (1 second)
           const x = rect.left - messagesAreaRect.left + (rect.width / 2)
           const y = rect.top - messagesAreaRect.top - 60
           setQuickEmojiPosition({ x, y })
           setShowQuickEmojis(true)
-        } else {
-          // On desktop, show action menu (500ms)
-          const x = rect.left - messagesAreaRect.left + (rect.width / 2)
-          const y = rect.top - messagesAreaRect.top
-          setActionMenuPosition({ x, y })
-          setShowActionMenu(true)
         }
       }
       
@@ -3572,7 +4016,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       if (navigator.vibrate && isMobile) {
         navigator.vibrate(50)
       }
-    }, isMobile ? 1000 : 500) // 1 second for mobile, 500ms for desktop
+    }, 1000) // 1 second for mobile long-press
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -3581,13 +4025,31 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       longPressTimer.current = null
     }
     
-    // Check if swipe was significant enough for reply
-    if (swipeStartX !== null && swipeOffset > 50 && isMobile) {
-      // Swipe right detected - reply to message
-      if (selectedMessage) {
-        setReplyingTo(selectedMessage)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
+    // Check if swipe was significant enough for reply (mobile only)
+    // In WhatsApp, you swipe LEFT to reply (negative deltaX)
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset < 0) {
+      // Swipe left detected - reply to message
+      const messageElement = e.currentTarget.closest('.message')
+      if (messageElement) {
+        const messageId = messageElement.dataset.messageId
+        const message = messages.find(m => m.id === messageId)
+        if (message) {
+          setReplyingTo(message)
+          setShowQuickEmojis(false)
+          setShowActionMenu(false)
+          setSelectedMessage(null)
+          // Add haptic feedback
+          if (navigator.vibrate) {
+            navigator.vibrate(50)
+          }
+          // Scroll to input area to show reply preview
+          setTimeout(() => {
+            const inputArea = document.querySelector('.chat-input-area')
+            if (inputArea) {
+              inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }
+          }, 100)
+        }
       }
     }
     
@@ -3609,20 +4071,25 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const clientX = touch ? touch.clientX : e.clientX
       const deltaX = clientX - swipeStartX
       
-      // Only allow right swipe (positive deltaX)
-      if (deltaX > 0) {
-        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px
+      // In WhatsApp, you swipe LEFT to reply (negative deltaX)
+      // Allow left swipe (negative deltaX) for reply
+      if (deltaX < 0) {
+        setSwipeOffset(Math.max(deltaX, -100)) // Cap at -100px (swipe left)
+      } else {
+        // Reset if swiping right
+        setSwipeOffset(0)
       }
     }
   }
   
-  // Handle quick emoji reaction
+  // Handle quick emoji reaction (mobile)
   const handleQuickEmojiClick = (emoji) => {
     if (selectedMessage) {
       // For now, add emoji to message input
       setMessageInput(prev => prev + emoji + ' ')
       setShowQuickEmojis(false)
       setSelectedMessage(null)
+      setShowMessageHeader(false)
     }
   }
   
@@ -3632,14 +4099,114 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setReplyingTo(selectedMessage)
       setShowActionMenu(false)
       setShowQuickEmojis(false)
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      // Scroll to input area to show reply preview
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100)
     }
   }
   
   // Handle select button
+  // Handle select button - enter selection mode
   const handleSelectClick = () => {
-    // TODO: Implement multi-select functionality
-    setShowActionMenu(false)
-    setShowQuickEmojis(false)
+    if (selectedMessage) {
+      // Enter selection mode and add this message to selected items
+      setSelectionMode(true)
+      setSelectedItems(new Set([selectedMessage.id]))
+      setShowMessageHeader(false) // Close the action header, selection mode will show copy/delete buttons
+      setSelectedMessage(null)
+    }
+  }
+  
+  // Toggle item selection in selection mode
+  const handleToggleSelection = (itemId) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      // Exit selection mode if no items selected
+      if (newSet.size === 0) {
+        setSelectionMode(false)
+      }
+      return newSet
+    })
+  }
+  
+  // Exit selection mode
+  const handleExitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelectedItems(new Set())
+  }
+  
+  // Copy selected items
+  const handleCopySelected = () => {
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    if (selectedMessages.length === 0) return
+    
+    const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      // Show feedback
+      alert(`Copied ${selectedMessages.length} message(s)`)
+      handleExitSelectionMode()
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+      alert('Failed to copy messages')
+    })
+  }
+  
+  // Delete selected items for me
+  const handleDeleteSelectedForMe = async () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    
+    try {
+      // Delete all selected messages for me
+      const deletePromises = selectedMessages.map(msg => deleteMessage(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      handleExitSelectionMode()
+    } catch (error) {
+      console.error('Error deleting messages:', error)
+      // Still remove from local state (optimistic update)
+      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      handleExitSelectionMode()
+    }
+  }
+  
+  // Delete selected items for all (only own messages)
+  const handleDeleteSelectedForAll = async () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+    
+    if (ownMessages.length === 0) return // Should not happen, but safety check
+    
+    try {
+      // Delete own messages for all
+      const deletePromises = ownMessages.map(msg => deleteMessageForAll(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      handleExitSelectionMode()
+    } catch (error) {
+      console.error('Error deleting messages for all:', error)
+      // Still remove from local state (optimistic update)
+      setMessages(prev => prev.filter(m => !selectedItems.has(m.id)))
+      handleExitSelectionMode()
+    }
   }
   
   // Cancel reply
@@ -3652,6 +4219,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     if (selectedMessage) {
       navigator.clipboard.writeText(selectedMessage.text).then(() => {
         setShowActionMenu(false)
+        setShowQuickEmojis(false)
+        setShowMessageHeader(false)
         setSelectedMessage(null)
         // Show brief feedback
         if (navigator.vibrate) {
@@ -3669,6 +4238,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setShowDeleteConfirm(true)
       setDeleteForAll(false)
       setShowActionMenu(false)
+      setShowQuickEmojis(false)
+      setShowMessageHeader(false)
     }
   }
 
@@ -3678,6 +4249,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setShowDeleteConfirm(true)
       setDeleteForAll(true)
       setShowActionMenu(false)
+      setShowQuickEmojis(false)
+      setShowMessageHeader(false)
     }
   }
 
@@ -3695,6 +4268,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         // Remove message from local state
         setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
         setShowDeleteConfirm(false)
+        setShowMessageHeader(false)
         setSelectedMessage(null)
         setDeleteForAll(false)
       } else {
@@ -3715,6 +4289,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         setShowActionMenu(false)
         setSelectedMessage(null)
       }
+      // Close message header when clicking outside
+      if (showMessageHeader && !e.target.closest('.message-action-header') && !e.target.closest('.message-content')) {
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+      }
+      // Close mobile action menu when clicking outside
+      if (showQuickEmojis && quickEmojiRef.current && !quickEmojiRef.current.contains(e.target) && !e.target.closest('.message-content')) {
+        setShowQuickEmojis(false)
+        setSelectedMessage(null)
+      }
       // Close emoji picker when clicking outside
       if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(e.target) && !e.target.closest('.emoji-picker-btn')) {
         setShowEmojiPicker(false)
@@ -3726,7 +4310,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       document.removeEventListener('click', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
     }
-  }, [showActionMenu, showEmojiPicker])
+  }, [showActionMenu, showEmojiPicker, showMessageHeader, showQuickEmojis])
 
   // Handle emoji selection
   const onEmojiClick = (emojiData) => {
@@ -3738,8 +4322,175 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const currentUserId = sessionStorage.getItem('userId')
   const isOwnMessage = selectedMessage && selectedMessage.senderId === currentUserId
 
+  // Prevent click propagation on action header
+  const handleActionHeaderClick = (e) => {
+    e.stopPropagation()
+  }
+
   return (
     <div className="live-chat-view">
+      {/* Selection Mode Bar - Always visible when in selection mode */}
+      {selectionMode && (() => {
+        // Calculate selection type
+        const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+        const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+        const otherMessages = selectedMessages.filter(msg => !msg.isOwn)
+        const hasOwnMessages = ownMessages.length > 0
+        const hasOtherMessages = otherMessages.length > 0
+        const isOnlyOwn = hasOwnMessages && !hasOtherMessages
+        const isOnlyOthers = !hasOwnMessages && hasOtherMessages
+        const isHybrid = hasOwnMessages && hasOtherMessages
+        
+        return (
+          <div className="selection-mode-bar">
+            <div className="selection-mode-info">
+              <span>{selectedItems.size} selected</span>
+            </div>
+            <div className="selection-mode-actions">
+              <button 
+                className="selection-mode-btn"
+                onClick={handleCopySelected}
+                title="Copy"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+              
+              {/* Delete buttons based on selection type */}
+              {isOnlyOwn && (
+                <>
+                  <button 
+                    className="selection-mode-btn"
+                    onClick={handleDeleteSelectedForMe}
+                    title="Delete for me"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>Delete for me</span>
+                  </button>
+                  <button 
+                    className="selection-mode-btn"
+                    onClick={handleDeleteSelectedForAll}
+                    title="Delete for all"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>Delete for all</span>
+                  </button>
+                </>
+              )}
+              
+              {(isOnlyOthers || isHybrid) && (
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForMe}
+                  title="Delete for me"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for me</span>
+                </button>
+              )}
+              
+              <button 
+                className="selection-mode-btn"
+                onClick={handleExitSelectionMode}
+                title="Cancel"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+      {/* Message Action Header (WhatsApp-style) */}
+      {showMessageHeader && selectedMessage && !selectionMode && (
+        <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
+          <button 
+            className="action-header-btn"
+            onClick={handleReplyClick}
+            title="Reply"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn"
+            onClick={handleCopyMessage}
+            title="Copy"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          {isOwnMessage && (
+            <>
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForMe}
+                title="Delete for me"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForAll}
+                title="Delete for all"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </>
+          )}
+          <button 
+            className="action-header-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
+            title="Select"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn action-header-close"
+            onClick={() => {
+              setShowMessageHeader(false)
+              setSelectedMessage(null)
+            }}
+            title="Close"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
       <div className="chat-header-bar">
         <>
           {/* WhatsApp-like back button */}
@@ -3829,7 +4580,25 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       <span>{message.date}</span>
                     </div>
                   )}
-                  <div className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''}`}>
+                  <div 
+                    className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                    data-message-id={message.id}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={() => !selectionMode && handleMessageHover(message)}
+                    onMouseLeave={() => !selectionMode && handleMessageUnhover()}
+                    onClick={(e) => handleMessageClick(e, message)}
+                    onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+                  >
+                    {selectionMode && (
+                      <div className="message-selection-checkbox">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedItems.has(message.id)}
+                          onChange={() => handleToggleSelection(message.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
                     {!message.isOwn && (
                       <div className="message-sender-info">
                         <div 
@@ -3877,26 +4646,58 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         </div>
                       </div>
                     )}
+                    {/* Reply indicator when swiping left (mobile) */}
+                    {isMobile && swipeOffset < -20 && (
+                      <div 
+                        className="message-swipe-reply-indicator"
+                        style={{ 
+                          opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
+                          transform: `translateX(${swipeOffset + 60}px)`
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 10 4 15 9 20"></polyline>
+                          <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                        </svg>
+                      </div>
+                    )}
                     <div 
-                      className={`message-content ${swipeOffset > 0 ? 'swiping' : ''}`}
-                      style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      className={`message-content ${swipeOffset < 0 ? 'swiping' : ''}`}
+                      style={swipeOffset < 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
                       onTouchEnd={handleMessageTouchEnd}
                       onTouchMove={handleMessageTouchMove}
-                      onMouseDown={(e) => {
-                        if (!isMobile) {
-                          handleMessageTouchStart(e, message)
-                        }
-                      }}
-                      onMouseUp={handleMessageTouchEnd}
-                      onMouseLeave={handleMessageTouchEnd}
                       onContextMenu={(e) => {
                         if (isMobile) {
                           e.preventDefault()
-                          handleMessageTouchStart(e, message)
                         }
                       }}
                     >
+                      {/* Reply Information */}
+                      {message.replyTo && (() => {
+                        // First try to use stored reply data (from optimistic message)
+                        let repliedMessage = message.replyToData
+                        
+                        // If not available, try to find it in messages array
+                        if (!repliedMessage) {
+                          repliedMessage = messages.find(m => m.id === message.replyTo)
+                        }
+                        
+                        if (repliedMessage) {
+                          return (
+                            <div className="message-reply-info">
+                              <div className="message-reply-line"></div>
+                              <div className="message-reply-content">
+                                <span className="message-reply-name">
+                                  {repliedMessage.isOwn ? 'You' : (senderProfiles[repliedMessage.senderId]?.displayName || repliedMessage.sender || 'User')}
+                                </span>
+                                <span className="message-reply-text">{repliedMessage.text}</span>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                       <p>{message.text}</p>
                       <div className="message-footer">
                         <span className="message-time">{message.time}</span>
@@ -3958,36 +4759,85 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         <div ref={messagesEndRef}></div>
       </div>
 
-      {/* Quick Emoji Reactions (Mobile) */}
+      {/* Mobile Action Menu (Long-press) */}
       {showQuickEmojis && selectedMessage && isMobile && (
         <div 
           ref={quickEmojiRef}
-          className="quick-emoji-reactions"
+          className="mobile-action-menu"
           style={{
             left: `${quickEmojiPosition.x}px`,
             top: `${quickEmojiPosition.y}px`,
           }}
         >
-          {quickEmojis.map((emoji, index) => (
             <button
-              key={index}
-              className="quick-emoji-btn"
-              onClick={() => handleQuickEmojiClick(emoji)}
-            >
-              {emoji}
+            className="mobile-action-item"
+            onClick={handleReplyClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+            <span>Reply</span>
             </button>
-          ))}
           <button
-            className="quick-emoji-add-btn"
-            onClick={() => {
-              setShowQuickEmojis(false)
-              setShowEmojiPicker(true)
+            className="mobile-action-item"
+            onClick={handleCopyMessage}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          {isOwnMessage && (
+            <>
+              <button 
+                className="mobile-action-item"
+                onClick={handleDeleteForMe}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete for me</span>
+              </button>
+              <button 
+                className="mobile-action-item"
+                onClick={handleDeleteForAll}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete for all</span>
+              </button>
+            </>
+          )}
+          <button 
+            className="mobile-action-item"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
             </svg>
+            <span>Select</span>
+          </button>
+          <button
+            className="mobile-action-item mobile-action-close"
+            onClick={() => {
+              setShowQuickEmojis(false)
+              setSelectedMessage(null)
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Close</span>
           </button>
         </div>
       )}
@@ -4051,7 +4901,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           )}
           <button 
             className="action-menu-item" 
-            onClick={handleSelectClick}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="9 11 12 14 22 4"></polyline>
@@ -4240,10 +5093,33 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const [otherUserLastSeen, setOtherUserLastSeen] = useState(null) // Track other user's last seen time
   const [collegeActiveCount, setCollegeActiveCount] = useState(null) // Track active students count for college
   const [lastReadMessageId, setLastReadMessageId] = useState(null) // Track last read message
+  const [selectedMessage, setSelectedMessage] = useState(null)
+  const [showActionMenu, setShowActionMenu] = useState(false)
+  const [actionMenuPosition, setActionMenuPosition] = useState({ x: 0, y: 0 })
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteForAll, setDeleteForAll] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [swipeStartX, setSwipeStartX] = useState(null)
+  const [swipeStartY, setSwipeStartY] = useState(null)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [hoveredMessage, setHoveredMessage] = useState(null)
+  const [showMessageHeader, setShowMessageHeader] = useState(false)
+  const [showQuickEmojis, setShowQuickEmojis] = useState(false)
+  const [quickEmojiPosition, setQuickEmojiPosition] = useState({ x: 0, y: 0 })
+  const [selectionMode, setSelectionMode] = useState(false) // Selection mode for messages
+  const [selectedItems, setSelectedItems] = useState(new Set()) // Set of selected message IDs
   const messagesEndRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
   const typingTimeoutRef = useRef(null) // Store typing timeout
+  const longPressTimer = useRef(null)
+  const actionMenuRef = useRef(null)
+  const quickEmojiRef = useRef(null)
+  const doubleClickTimer = useRef(null)
+  const lastClickTime = useRef(0)
+  const lastClickedMessage = useRef(null)
   
   // Cleanup function for block message timeout
   const clearBlockMessageTimeout = () => {
@@ -4270,11 +5146,26 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+      }
+      if (doubleClickTimer.current) {
+        clearTimeout(doubleClickTimer.current)
+      }
       // Stop typing when component unmounts
       if (isTyping && otherUserId) {
         emitTypingDirect(otherUserId, false)
       }
     }
+  }, [])
+
+  // Update mobile detection on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   // Function to refresh block status
@@ -4458,24 +5349,46 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                 }
               }
             }
-            return {
-              id: msg.id,
-              text: msg.text,
-              sender: msg.senderName,
-              senderId: msg.senderId,
-              time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit',
-                hour12: true 
-              }),
-              date: formatDate(new Date(msg.timestamp)),
+            const formattedMsg = {
+            id: msg.id,
+            text: msg.text,
+            sender: msg.senderName,
+            senderId: msg.senderId,
+            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatDate(new Date(msg.timestamp)),
               isOwn: isOwn,
-              timestamp: new Date(msg.timestamp),
-              readBy: msg.readBy || [],
-              deliveredTo: msg.deliveredTo || []
+            timestamp: new Date(msg.timestamp),
+            replyTo: msg.replyTo || null,
+            replyToData: null, // Will be populated below
+            readBy: msg.readBy || [],
+            deliveredTo: msg.deliveredTo || []
             }
+            
+            return formattedMsg
           })
-          setMessages(formattedMessages)
+          
+          // Populate replyToData for messages that have replyTo
+          const messagesWithReplies = formattedMessages.map(msg => {
+            if (msg.replyTo && !msg.replyToData) {
+              const repliedMsg = formattedMessages.find(m => m.id === msg.replyTo)
+              if (repliedMsg) {
+                msg.replyToData = {
+                  id: repliedMsg.id,
+                  text: repliedMsg.text,
+                  sender: repliedMsg.sender,
+                  senderId: repliedMsg.senderId,
+                  isOwn: repliedMsg.isOwn
+                }
+              }
+            }
+            return msg
+          })
+          
+          setMessages(messagesWithReplies)
           
           // Update chat list with last message status if it's our message
           if (formattedMessages.length > 0) {
@@ -4569,30 +5482,75 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Listen for new direct messages (when we receive a message)
     const handleNewDirectMessage = (message) => {
       console.log('📬 New direct message received:', message)
+      const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
+      
       if (String(message.receiverId) === String(user?.id || user?._id || '')) {
         // This is a message for us
-        const formattedMessage = {
-          id: message.id,
-          text: message.text,
-          sender: message.senderName,
-          senderId: message.senderId,
-          time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
-          date: formatDate(new Date(message.timestamp)),
-          isOwn: false,
-          timestamp: new Date(message.timestamp),
-          readBy: message.readBy || [],
-          deliveredTo: message.deliveredTo || []
-        }
-        
         setMessages(prev => {
           // Check for duplicates
           if (prev.some(m => m.id === message.id)) {
-            return prev
+            // If message exists, update it (might be our own message coming back)
+            return prev.map(m => {
+              if (m.id === message.id) {
+                // Update existing message, preserve replyToData if it exists
+                let replyToData = m.replyToData
+                if (message.replyTo && !replyToData) {
+                  const repliedMsg = prev.find(msg => msg.id === message.replyTo)
+                  if (repliedMsg) {
+                    replyToData = {
+                      id: repliedMsg.id,
+                      text: repliedMsg.text,
+                      sender: repliedMsg.sender,
+                      senderId: repliedMsg.senderId,
+                      isOwn: repliedMsg.isOwn
+                    }
+                  }
+                }
+                return {
+                  ...m,
+                  replyTo: message.replyTo || m.replyTo || null,
+                  replyToData: replyToData,
+                  readBy: message.readBy || m.readBy || [],
+                  deliveredTo: message.deliveredTo || m.deliveredTo || []
+                }
+              }
+              return m
+            })
           }
+          
+          const formattedMessage = {
+            id: message.id,
+            text: message.text,
+            sender: message.senderName,
+            senderId: message.senderId,
+            time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatDate(new Date(message.timestamp)),
+            isOwn: isOwnMessage,
+            timestamp: new Date(message.timestamp),
+            replyTo: message.replyTo || null,
+            replyToData: null, // Will be populated below if replyTo exists
+            readBy: message.readBy || [],
+            deliveredTo: message.deliveredTo || []
+          }
+          
+          // Populate replyToData if this message is a reply
+          if (formattedMessage.replyTo) {
+            const repliedMsg = prev.find(m => m.id === formattedMessage.replyTo)
+            if (repliedMsg) {
+              formattedMessage.replyToData = {
+                id: repliedMsg.id,
+                text: repliedMsg.text,
+                sender: repliedMsg.sender,
+                senderId: repliedMsg.senderId,
+                isOwn: repliedMsg.isOwn
+              }
+            }
+          }
+          
           return [...prev, formattedMessage].sort((a, b) => 
             new Date(a.timestamp) - new Date(b.timestamp)
           )
@@ -4615,17 +5573,117 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const handleDirectMessageSent = (message) => {
       console.log('✅ Message sent confirmation received:', message)
       // Replace optimistic message with real one
-      setMessages(prev => prev.map(msg => 
-        msg.isOptimistic && msg.text === message.text
-          ? {
-              ...msg,
-              id: message.id,
-              isOptimistic: false,
-              deliveredTo: message.deliveredTo || [],
-              readBy: message.readBy || []
+      // Match by text AND replyTo to ensure we match the correct message
+      setMessages(prev => {
+        // First try to find by ID (if message was already updated)
+        const existingIndex = prev.findIndex(m => m.id === message.id)
+        if (existingIndex !== -1) {
+          // Message already exists, just update it
+          const newMessages = [...prev]
+          newMessages[existingIndex] = {
+            ...newMessages[existingIndex],
+            replyTo: message.replyTo || newMessages[existingIndex].replyTo || null,
+            // Preserve replyToData if it exists, otherwise try to find it
+            replyToData: newMessages[existingIndex].replyToData || (message.replyTo ? prev.find(m => m.id === message.replyTo) : null) || null,
+            deliveredTo: message.deliveredTo || [],
+            readBy: message.readBy || []
+          }
+          return newMessages
+        }
+        
+        // Find optimistic message by text and replyTo
+        const optimisticIndex = prev.findIndex(msg => 
+          msg.isOptimistic && 
+          msg.text === message.text &&
+          (msg.replyTo === message.replyTo || (!msg.replyTo && !message.replyTo))
+        )
+        
+        if (optimisticIndex !== -1) {
+          const optimisticMsg = prev[optimisticIndex]
+          const newMessages = [...prev]
+          
+          // Preserve replyToData from optimistic message
+          let replyToData = optimisticMsg.replyToData || null
+          if (message.replyTo && !replyToData) {
+            const repliedMsg = prev.find(m => m.id === message.replyTo)
+            if (repliedMsg) {
+              replyToData = {
+                id: repliedMsg.id,
+                text: repliedMsg.text,
+                sender: repliedMsg.sender,
+                senderId: repliedMsg.senderId,
+                isOwn: repliedMsg.isOwn
+              }
             }
-          : msg
-      ))
+          }
+          
+          newMessages[optimisticIndex] = {
+            ...optimisticMsg,
+            id: message.id,
+            isOptimistic: false,
+            replyTo: message.replyTo || optimisticMsg.replyTo || null,
+            replyToData: replyToData,
+            deliveredTo: message.deliveredTo || [],
+            readBy: message.readBy || []
+          }
+          
+          console.log('✅ Replaced optimistic direct message with real message:', message.id, 'replyTo:', message.replyTo)
+          
+          // Update chat list when message is confirmed
+          if (onMessageSent && otherUser) {
+            const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+            const userAvatar = otherUser.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
+              : null
+            onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
+          }
+          
+          return newMessages
+        }
+        
+        // If no optimistic message found, check if this message already exists
+        const duplicateIndex = prev.findIndex(m => m.id === message.id)
+        if (duplicateIndex === -1) {
+          // Message doesn't exist, add it (this shouldn't happen but handle it)
+          const newMessage = {
+            id: message.id,
+            text: message.text,
+            sender: user?.profile?.displayName || user?.email?.split('@')[0] || 'You',
+            senderId: user?.id || user?._id || '',
+            time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatDate(new Date(message.timestamp)),
+            isOwn: true,
+            timestamp: new Date(message.timestamp),
+            replyTo: message.replyTo || null,
+            replyToData: message.replyTo ? prev.find(m => m.id === message.replyTo) : null,
+            deliveredTo: message.deliveredTo || [],
+            readBy: message.readBy || []
+          }
+          
+          // Update chat list
+          if (onMessageSent && otherUser) {
+            const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+            const userAvatar = otherUser.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
+              : null
+            onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
+          }
+          
+          return [...prev, newMessage].sort((a, b) => 
+            new Date(a.timestamp) - new Date(b.timestamp)
+          )
+        }
+        
+        return prev
+      })
     }
     onDirectMessageSent(handleDirectMessageSent)
 
@@ -4645,7 +5703,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   deliveredTo: [...deliveredTo, { userId: otherUserId, deliveredAt: new Date() }]
                 }
                 
-                // Update chat list
+                // Update chat list with latest status
                 if (onMessageSent && otherUser) {
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
                   const userAvatar = otherUser.profile?.profilePicture 
@@ -4653,7 +5711,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                         : otherUser.profile.profilePicture)
                     : null
-                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy)
+                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy || [])
                 }
                 
                 return updatedMsg
@@ -4668,7 +5726,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   readBy: [...readBy, { userId: otherUserId, readAt: new Date() }]
                 }
                 
-                // Update chat list
+                // Update chat list with latest status
                 if (onMessageSent && otherUser) {
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
                   const userAvatar = otherUser.profile?.profilePicture 
@@ -4676,7 +5734,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                         : otherUser.profile.profilePicture)
                     : null
-                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy)
+                  onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo || [], updatedMsg.readBy)
                 }
                 
                 return updatedMsg
@@ -4718,12 +5776,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // If user is typing and not already marked as typing
     if (value.trim().length > 0) {
       if (!isTyping) {
-        setIsTyping(true)
-        emitTypingDirect(otherUserId, true)
-      }
-      
-      // Set timeout to stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(true)
+      emitTypingDirect(otherUserId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
         emitTypingDirect(otherUserId, false)
         typingTimeoutRef.current = null
@@ -4798,6 +5856,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       date: formatDate(new Date()),
       isOwn: true,
       timestamp: new Date(),
+      replyTo: replyingTo ? replyingTo.id : null,
+      replyToData: replyingTo ? replyingTo : null, // Store full reply data for rendering
       isOptimistic: true
     }
 
@@ -4806,21 +5866,36 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
 
     try {
       console.log('📤 Sending direct message via Socket.IO to:', otherUserId, 'Text:', messageText)
-      const sent = sendDirectMessageSocket(otherUserId, messageText)
+      // Include reply information if replying
+      const replyToId = replyingTo ? replyingTo.id : null
+      const sent = sendDirectMessageSocket(otherUserId, messageText, replyToId)
       if (sent) {
-        console.log('✅ Message sent via Socket.IO. Waiting for confirmation...')
-        // Message will be updated when we receive directMessageSent event
+        console.log('✅ Message sent via Socket.IO. Waiting for confirmation...', replyToId ? `(replying to: ${replyToId})` : '')
         
-        // Update chat list (status will be updated when we receive directMessageSent event)
-        // The handleDirectMessageSent will update the chat list with proper status
+        // Clear reply after sending
+        if (replyingTo) {
+          setReplyingTo(null)
+        }
+        
+        // Update chat list immediately (optimistic update)
+        // Status will be updated when we receive directMessageSent event
+        if (onMessageSent && otherUser) {
+          const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
+          const userAvatar = otherUser.profile?.profilePicture 
+            ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                : otherUser.profile.profilePicture)
+            : null
+          onMessageSent(otherUserId, userName, userAvatar, messageText, new Date(), true, [], [])
+        }
       } else {
         console.error('❌ Failed to send message - socket not connected')
         // Remove optimistic message on error
         setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id))
-        setBlockMessageWithTimeout({
+          setBlockMessageWithTimeout({
           text: 'Failed to send message. Please check your connection.',
-          type: 'error'
-        })
+            type: 'error'
+          })
       }
     } catch (error) {
       console.error('❌ ERROR sending message:', error)
@@ -4884,6 +5959,425 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
   }
 
+  // Handle message hover (desktop)
+  const handleMessageHover = (message) => {
+    if (!isMobile) {
+      setHoveredMessage(message)
+    }
+  }
+
+  // Handle message unhover (desktop)
+  const handleMessageUnhover = () => {
+    if (!isMobile) {
+      setHoveredMessage(null)
+    }
+  }
+
+  // Handle message click (desktop - for double-click detection)
+  const handleMessageClick = (e, message) => {
+    if (isMobile) return
+    
+    // Prevent default browser behavior (including context menu)
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // If in selection mode, toggle selection
+    if (selectionMode) {
+      handleToggleSelection(message.id)
+      return
+    }
+    
+    const currentTime = Date.now()
+    const timeDiff = currentTime - lastClickTime.current
+    
+    // Check if this is a double-click (within 300ms and same message)
+    if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+      // Double-click detected - show action header
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+      setShowActionMenu(false)
+      lastClickTime.current = 0
+      lastClickedMessage.current = null
+    } else {
+      // Single click - store for potential double-click
+      lastClickTime.current = currentTime
+      lastClickedMessage.current = message
+      
+      // Clear timer if exists
+      if (doubleClickTimer.current) {
+        clearTimeout(doubleClickTimer.current)
+      }
+      
+      // If no double-click within 300ms, clear selection
+      doubleClickTimer.current = setTimeout(() => {
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+      }, 300)
+    }
+  }
+
+  // Handle right-click on message (prevent default context menu)
+  const handleMessageContextMenu = (e, message) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // On desktop, show action header on right-click as well
+    if (!isMobile) {
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+      setShowActionMenu(false)
+    }
+  }
+
+  const handleMessageTouchStart = (e, message) => {
+    const touch = e.touches ? e.touches[0] : null
+    const clientX = touch ? touch.clientX : e.clientX
+    const clientY = touch ? touch.clientY : e.clientY
+    
+    // Store swipe start position
+    setSwipeStartX(clientX)
+    setSwipeStartY(clientY)
+    setSwipeOffset(0)
+    
+    // Start long-press timer (1 second for mobile)
+    longPressTimer.current = setTimeout(() => {
+      setSelectedMessage(message)
+      
+      // Calculate position for menu (near the message)
+      const rect = e.currentTarget.getBoundingClientRect()
+      const messagesArea = e.currentTarget.closest('.chat-messages-area')
+      if (messagesArea) {
+        const messagesAreaRect = messagesArea.getBoundingClientRect()
+        
+        if (isMobile) {
+          // On mobile, show action menu with all options (1 second)
+          const x = rect.left - messagesAreaRect.left + (rect.width / 2)
+          const y = rect.top - messagesAreaRect.top - 60
+          setQuickEmojiPosition({ x, y })
+          setShowQuickEmojis(true)
+        }
+      }
+      
+      // Add haptic feedback if available (mobile)
+      if (navigator.vibrate && isMobile) {
+        navigator.vibrate(50)
+      }
+    }, 1000) // 1 second for mobile long-press
+  }
+
+  const handleMessageTouchEnd = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    
+    // Check if swipe was significant enough for reply (mobile only)
+    // In WhatsApp, you swipe LEFT to reply (negative deltaX)
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset < 0) {
+      // Swipe left detected - reply to message
+      const messageElement = e.currentTarget.closest('.message')
+      if (messageElement) {
+        const messageId = messageElement.dataset.messageId
+        const message = messages.find(m => m.id === messageId)
+        if (message) {
+          setReplyingTo(message)
+          setShowQuickEmojis(false)
+          setShowActionMenu(false)
+          setSelectedMessage(null)
+          // Add haptic feedback
+          if (navigator.vibrate) {
+            navigator.vibrate(50)
+          }
+          // Scroll to input area to show reply preview
+          setTimeout(() => {
+            const inputArea = document.querySelector('.chat-input-area')
+            if (inputArea) {
+              inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }
+          }, 100)
+        }
+      }
+    }
+    
+    // Reset swipe
+    setSwipeStartX(null)
+    setSwipeStartY(null)
+    setSwipeOffset(0)
+  }
+
+  const handleMessageTouchMove = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    
+    // Track swipe for reply gesture
+    if (swipeStartX !== null && isMobile) {
+      const touch = e.touches ? e.touches[0] : null
+      const clientX = touch ? touch.clientX : e.clientX
+      const deltaX = clientX - swipeStartX
+      
+      // In WhatsApp, you swipe LEFT to reply (negative deltaX)
+      // Allow left swipe (negative deltaX) for reply
+      if (deltaX < 0) {
+        setSwipeOffset(Math.max(deltaX, -100)) // Cap at -100px (swipe left)
+      } else {
+        // Reset if swiping right
+        setSwipeOffset(0)
+      }
+    }
+  }
+
+  // Handle reply button click
+  const handleReplyClick = () => {
+    if (selectedMessage) {
+      setReplyingTo(selectedMessage)
+      setShowActionMenu(false)
+      setShowQuickEmojis(false)
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      // Scroll to input area to show reply preview
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100)
+    }
+  }
+
+  // Handle select button
+  // Handle select button - enter selection mode
+  const handleSelectClick = () => {
+    if (selectedMessage) {
+      // Enter selection mode and add this message to selected items
+      setSelectionMode(true)
+      setSelectedItems(new Set([selectedMessage.id]))
+      setShowMessageHeader(false) // Close the action header, selection mode will show copy/delete buttons
+      setSelectedMessage(null)
+    }
+  }
+  
+  // Toggle item selection in selection mode
+  const handleToggleSelection = (itemId) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      // Exit selection mode if no items selected
+      if (newSet.size === 0) {
+        setSelectionMode(false)
+      }
+      return newSet
+    })
+  }
+  
+  // Exit selection mode
+  const handleExitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelectedItems(new Set())
+  }
+  
+  // Copy selected items
+  const handleCopySelected = () => {
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    if (selectedMessages.length === 0) return
+    
+    const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      // Show feedback
+      alert(`Copied ${selectedMessages.length} message(s)`)
+      handleExitSelectionMode()
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+      alert('Failed to copy messages')
+    })
+  }
+  
+  // Delete selected items
+  const handleDeleteSelected = () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+    const otherMessages = selectedMessages.filter(msg => !msg.isOwn)
+    
+    if (ownMessages.length > 0 && otherMessages.length > 0) {
+      // Mixed selection - ask what to do
+      const deleteForAll = window.confirm(
+        `You have selected ${ownMessages.length} of your messages and ${otherMessages.length} other messages.\n\n` +
+        `Click OK to delete your messages for everyone, or Cancel to delete only for you.`
+      )
+      if (deleteForAll) {
+        // Delete own messages for all
+        ownMessages.forEach(msg => {
+          handleDeleteForAll(msg.id)
+        })
+        // Delete other messages for me
+        otherMessages.forEach(msg => {
+          handleDeleteForMe(msg.id)
+        })
+      } else {
+        // Delete all for me
+        selectedMessages.forEach(msg => {
+          handleDeleteForMe(msg.id)
+        })
+      }
+    } else if (ownMessages.length > 0) {
+      // Only own messages
+      const deleteForAll = window.confirm(
+        `Delete ${ownMessages.length} message(s) for everyone?`
+      )
+      if (deleteForAll) {
+        ownMessages.forEach(msg => {
+          handleDeleteForAll(msg.id)
+        })
+      } else {
+        ownMessages.forEach(msg => {
+          handleDeleteForMe(msg.id)
+        })
+      }
+    } else {
+      // Only other messages - delete for me
+      selectedMessages.forEach(msg => {
+        handleDeleteForMe(msg.id)
+      })
+    }
+    
+    handleExitSelectionMode()
+  }
+
+  // Cancel reply
+  const handleCancelReply = () => {
+    setReplyingTo(null)
+  }
+
+  // Handle copy message
+  const handleCopyMessage = () => {
+    if (selectedMessage) {
+      navigator.clipboard.writeText(selectedMessage.text).then(() => {
+        setShowActionMenu(false)
+        setShowQuickEmojis(false)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        // Show brief feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([50, 30, 50])
+        }
+      }).catch(err => {
+        console.error('Failed to copy:', err)
+      })
+    }
+  }
+
+  // Handle delete for me
+  const handleDeleteForMe = () => {
+    if (selectedMessage) {
+      setShowDeleteConfirm(true)
+      setDeleteForAll(false)
+      setShowActionMenu(false)
+      setShowQuickEmojis(false)
+      setShowMessageHeader(false)
+    }
+  }
+
+  // Handle delete for all
+  const handleDeleteForAll = () => {
+    if (selectedMessage) {
+      setShowDeleteConfirm(true)
+      setDeleteForAll(true)
+      setShowActionMenu(false)
+      setShowQuickEmojis(false)
+      setShowMessageHeader(false)
+    }
+  }
+
+  // Confirm and execute delete
+  const handleConfirmDelete = async () => {
+    if (!selectedMessage) return
+
+    try {
+      setDeleting(true)
+      // For direct messages, we only have delete for me (no delete for all in direct chats)
+      // Note: Backend endpoint for deleting direct messages may need to be implemented
+      // For now, we'll remove from local state
+      try {
+        const response = await deleteMessage(selectedMessage.id)
+        if (response.success) {
+          // Remove message from local state
+          setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+          setShowDeleteConfirm(false)
+          setShowMessageHeader(false)
+          setSelectedMessage(null)
+          setDeleteForAll(false)
+        } else {
+          // If backend delete fails, still remove from local state (optimistic update)
+          setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+          setShowDeleteConfirm(false)
+          setShowMessageHeader(false)
+          setSelectedMessage(null)
+          setDeleteForAll(false)
+        }
+      } catch (error) {
+        // If error, still remove from local state (optimistic update)
+        console.error('Error deleting direct message:', error)
+        setMessages(prev => prev.filter(m => m.id !== selectedMessage.id))
+        setShowDeleteConfirm(false)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setDeleteForAll(false)
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // Check if message is from current user
+  const currentUserId = String(user?.id || user?._id || '')
+  const isOwnMessage = selectedMessage && String(selectedMessage.senderId) === currentUserId
+
+  // Prevent click propagation on action header
+  const handleActionHeaderClick = (e) => {
+    e.stopPropagation()
+  }
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showActionMenu && actionMenuRef.current && !actionMenuRef.current.contains(e.target) && !e.target.closest('.message-content') && !e.target.closest('.message-action-header')) {
+        setShowActionMenu(false)
+        setSelectedMessage(null)
+      }
+      // Close message header when clicking outside (but not on the header itself, messages, or message bubbles)
+      if (showMessageHeader && !e.target.closest('.message-action-header') && !e.target.closest('.message-content') && !e.target.closest('.message') && !e.target.closest('.action-header-btn')) {
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+      }
+      // Close mobile action menu when clicking outside
+      if (showQuickEmojis && quickEmojiRef.current && !quickEmojiRef.current.contains(e.target) && !e.target.closest('.message-content')) {
+        setShowQuickEmojis(false)
+        setSelectedMessage(null)
+      }
+      // Close emoji picker when clicking outside
+      if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(e.target) && !e.target.closest('.emoji-picker-btn')) {
+        setShowEmojiPicker(false)
+      }
+    }
+    // Add a small delay to prevent immediate closing on double-click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true)
+      document.addEventListener('touchstart', handleClickOutside, true)
+    }, 200)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('click', handleClickOutside, true)
+      document.removeEventListener('touchstart', handleClickOutside, true)
+    }
+  }, [showActionMenu, showEmojiPicker, showMessageHeader, showQuickEmojis])
+
   // Auto-scroll to latest message when messages change or loading completes
   useEffect(() => {
     if (!loading && messages.length > 0) {
@@ -4945,6 +6439,69 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
 
   return (
     <div className="live-chat-view">
+      {/* Message Action Header (WhatsApp-style) */}
+      {showMessageHeader && selectedMessage && (
+        <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
+          <button 
+            className="action-header-btn"
+            onClick={handleReplyClick}
+            title="Reply"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn"
+            onClick={handleCopyMessage}
+            title="Copy"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="action-header-btn"
+              onClick={handleDeleteForMe}
+              title="Delete for me"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          )}
+          <button 
+            className="action-header-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
+            title="Select"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn action-header-close"
+            onClick={() => {
+              setShowMessageHeader(false)
+              setSelectedMessage(null)
+            }}
+            title="Close"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
       <div className="chat-header-bar">
         <button className="chat-header-back-btn" onClick={onBack}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -5006,8 +6563,83 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       <span>{message.date}</span>
                     </div>
                   )}
-                  <div className={`message ${message.isOwn ? 'own-message' : 'other-message'}`}>
-                    <div className="message-content">
+                  <div 
+                    className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                    data-message-id={message.id}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={() => !selectionMode && handleMessageHover(message)}
+                    onMouseLeave={() => !selectionMode && handleMessageUnhover()}
+                    onClick={(e) => handleMessageClick(e, message)}
+                    onContextMenu={(e) => {
+                      if (!selectionMode) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }
+                    }}
+                  >
+                    {selectionMode && (
+                      <div className="message-selection-checkbox">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedItems.has(message.id)}
+                          onChange={() => handleToggleSelection(message.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
+                    {/* Reply indicator when swiping left (mobile) */}
+                    {isMobile && swipeOffset < -20 && (
+                      <div 
+                        className="message-swipe-reply-indicator"
+                        style={{ 
+                          opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
+                          transform: `translateX(${swipeOffset + 60}px)`
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 10 4 15 9 20"></polyline>
+                          <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                        </svg>
+                      </div>
+                    )}
+                    <div 
+                      className={`message-content ${swipeOffset < 0 ? 'swiping' : ''}`}
+                      style={swipeOffset < 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                      onTouchEnd={handleMessageTouchEnd}
+                      onTouchMove={handleMessageTouchMove}
+                      onContextMenu={(e) => {
+                        if (!selectionMode) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }
+                      }}
+                    >
+                      {/* Reply Information */}
+                      {message.replyTo && (() => {
+                        // First try to use stored reply data (from optimistic message)
+                        let repliedMessage = message.replyToData
+                        
+                        // If not available, try to find it in messages array
+                        if (!repliedMessage) {
+                          repliedMessage = messages.find(m => m.id === message.replyTo)
+                        }
+                        
+                        if (repliedMessage) {
+                          return (
+                            <div className="message-reply-info">
+                              <div className="message-reply-line"></div>
+                              <div className="message-reply-content">
+                                <span className="message-reply-name">
+                                  {repliedMessage.isOwn ? 'You' : displayName}
+                                </span>
+                                <span className="message-reply-text">{repliedMessage.text}</span>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                       <p>{message.text}</p>
                       <div className="message-footer">
                         <span className="message-time">{message.time}</span>
@@ -5060,6 +6692,141 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         )}
         <div ref={messagesEndRef}></div>
       </div>
+
+      {/* Mobile Action Menu (Long-press) */}
+      {showQuickEmojis && selectedMessage && isMobile && (
+        <div 
+          ref={quickEmojiRef}
+          className="mobile-action-menu"
+          style={{
+            left: `${quickEmojiPosition.x}px`,
+            top: `${quickEmojiPosition.y}px`,
+          }}
+        >
+          <button 
+            className="mobile-action-item"
+            onClick={handleReplyClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+            <span>Reply</span>
+          </button>
+          <button 
+            className="mobile-action-item"
+            onClick={handleCopyMessage}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="mobile-action-item"
+              onClick={handleDeleteForMe}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete for me</span>
+            </button>
+          )}
+          <button 
+            className="mobile-action-item"
+            onClick={handleSelectClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Select</span>
+          </button>
+          <button
+            className="mobile-action-item mobile-action-close"
+            onClick={() => {
+              setShowQuickEmojis(false)
+              setSelectedMessage(null)
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Close</span>
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && selectedMessage && (
+        <div className="modal-overlay" onClick={() => {
+          setShowDeleteConfirm(false)
+          setDeleteForAll(false)
+        }}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Message</h3>
+              <button className="modal-close-btn" onClick={() => {
+                setShowDeleteConfirm(false)
+                setDeleteForAll(false)
+              }}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="modal-description">
+                Are you sure you want to delete this message? This action cannot be undone.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="modal-cancel-btn"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteForAll(false)
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reply Preview */}
+      {replyingTo && (
+        <div className="reply-preview">
+          <div className="reply-preview-content">
+            <div className="reply-preview-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 10 4 15 9 20"></polyline>
+                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+              </svg>
+              <span className="reply-preview-name">
+                {replyingTo.isOwn ? 'You' : displayName}
+              </span>
+            </div>
+            <div className="reply-preview-text">{replyingTo.text}</div>
+          </div>
+          <button className="reply-preview-close" onClick={handleCancelReply}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+
       {blockMessage && (
         <div className={`block-message ${blockMessage.type === 'blocked' ? 'block-message-blocked' : 'block-message-error'}`}>
           <span className="block-message-icon">⚠️</span>

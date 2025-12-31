@@ -1,4 +1,5 @@
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 import { authenticateSocket } from '../middleware/socketAuth.js';
 import Message from '../models/Message.js';
 import DirectMessage from '../models/DirectMessage.js';
@@ -110,7 +111,7 @@ export const initializeSocket = (server) => {
     // Handle sendMessage event - allow sending to any college room
     socket.on('sendMessage', async (data) => {
       try {
-        const { text, collegeId } = data;
+        const { text, collegeId, replyToId } = data;
 
         // Validate message
         if (!text || !text.trim()) {
@@ -146,6 +147,18 @@ export const initializeSocket = (server) => {
                           `${socket.user.profile?.firstName || ''} ${socket.user.profile?.lastName || ''}`.trim() ||
                           socket.user.email.split('@')[0];
 
+        // Validate replyToId if provided
+        let validReplyToId = null;
+        if (replyToId) {
+          // Check if replyToId is a valid ObjectId format
+          if (mongoose.Types.ObjectId.isValid(replyToId)) {
+            validReplyToId = replyToId;
+          } else {
+            console.warn('Invalid replyToId format:', replyToId);
+            // Don't fail, just ignore invalid replyToId
+          }
+        }
+
         // Create message object
         const messageData = {
           senderId: socket.user.userId,
@@ -153,13 +166,34 @@ export const initializeSocket = (server) => {
           collegeId: messageCollegeId,
           text: text.trim(),
           timestamp: new Date(),
+          replyTo: validReplyToId || null,
         };
 
         // Save message to database
-        const message = new Message(messageData);
-        const savedMessage = await message.save();
-        
-        console.log(`💾 Message saved to DB: ${savedMessage._id} for college: ${messageCollegeId}`);
+        let savedMessage = null;
+        try {
+          const message = new Message(messageData);
+          savedMessage = await message.save();
+          
+          console.log(`💾 Message saved to DB: ${savedMessage._id} for college: ${messageCollegeId}`, {
+            text: savedMessage.text.substring(0, 50),
+            senderId: savedMessage.senderId.toString(),
+            timestamp: savedMessage.timestamp
+          });
+        } catch (dbError) {
+          console.error('❌ Database error saving message:', dbError);
+          console.error('Error details:', {
+            message: dbError.message,
+            stack: dbError.stack,
+            name: dbError.name,
+            errors: dbError.errors
+          });
+          socket.emit('error', {
+            message: 'Failed to save message to database',
+            details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+          });
+          return;
+        }
 
         // Track chat history to ensure chat persists even if all messages are cleared
         try {
@@ -183,13 +217,19 @@ export const initializeSocket = (server) => {
         }
 
         // Mark message as delivered to sender immediately
-        savedMessage.deliveredTo.push({
-          userId: socket.user.userId,
-          deliveredAt: new Date(),
-        });
-        await savedMessage.save();
+        try {
+          savedMessage.deliveredTo.push({
+            userId: socket.user.userId,
+            deliveredAt: new Date(),
+          });
+          await savedMessage.save();
+        } catch (updateError) {
+          // Non-critical, log but continue
+          console.error('Error updating deliveredTo:', updateError);
+        }
 
         // Prepare message for broadcast
+        // Safely map arrays to handle any potential data issues
         const messageToSend = {
           id: savedMessage._id.toString(),
           senderId: savedMessage.senderId.toString(),
@@ -197,26 +237,95 @@ export const initializeSocket = (server) => {
           collegeId: savedMessage.collegeId,
           text: savedMessage.text,
           timestamp: savedMessage.timestamp,
-          deliveredTo: savedMessage.deliveredTo.map(d => ({
-            userId: d.userId.toString(),
-            deliveredAt: d.deliveredAt,
-          })),
-          readBy: savedMessage.readBy.map(r => ({
-            userId: r.userId.toString(),
-            readAt: r.readAt,
-          })),
+          replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
+          deliveredTo: (savedMessage.deliveredTo || []).map(d => {
+            try {
+              return {
+                userId: d.userId ? d.userId.toString() : String(d.userId),
+                deliveredAt: d.deliveredAt || new Date(),
+              };
+            } catch (e) {
+              console.warn('Error mapping deliveredTo entry:', e);
+              return null;
+            }
+          }).filter(Boolean), // Remove any null entries
+          readBy: (savedMessage.readBy || []).map(r => {
+            try {
+              return {
+                userId: r.userId ? r.userId.toString() : String(r.userId),
+                readAt: r.readAt || new Date(),
+              };
+            } catch (e) {
+              console.warn('Error mapping readBy entry:', e);
+              return null;
+            }
+          }).filter(Boolean), // Remove any null entries
         };
 
         // Broadcast to all users in the college room
-        const roomName = `college:${messageCollegeId}`;
-        io.to(roomName).emit('receiveMessage', messageToSend);
+        try {
+          const roomName = `college:${messageCollegeId}`;
+          io.to(roomName).emit('receiveMessage', messageToSend);
+          
+          // Also emit confirmation to sender
+          socket.emit('messageSent', {
+            messageId: savedMessage._id.toString(),
+            collegeId: messageCollegeId,
+            replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
+            text: savedMessage.text // Include text for better matching
+          });
 
-        console.log(`💬 Message sent in ${roomName} by ${socket.user.email}`);
+          console.log(`💬 Message sent in ${roomName} by ${socket.user.email}`, {
+            messageId: savedMessage._id.toString(),
+            text: savedMessage.text.substring(0, 50)
+          });
+        } catch (broadcastError) {
+          // Message is saved, but broadcasting failed - log but don't emit error to user
+          // The message will be loaded on refresh
+          console.error('Error broadcasting message (message is saved):', broadcastError);
+          // Still emit confirmation to sender since message was saved
+          socket.emit('messageSent', {
+            messageId: savedMessage._id.toString(),
+            collegeId: messageCollegeId,
+            replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
+            text: savedMessage.text
+          });
+        }
       } catch (error) {
-        console.error('Error sending message:', error);
-        socket.emit('error', {
-          message: 'Failed to send message',
-        });
+        // This should only catch unexpected errors
+        // If message was saved, don't emit error - it will be loaded on refresh
+        if (savedMessage) {
+          console.error('❌ Error after message was saved (message is in DB):', error);
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
+          // Don't emit error to user - message is saved and will be loaded on refresh
+          // Still emit confirmation so frontend knows message was saved
+          try {
+            socket.emit('messageSent', {
+              messageId: savedMessage._id.toString(),
+              collegeId: messageCollegeId,
+              replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
+              text: savedMessage.text
+            });
+          } catch (emitError) {
+            console.error('Error emitting messageSent confirmation:', emitError);
+          }
+        } else {
+          // Message was not saved - this is a real error
+          console.error('❌ Unexpected error sending message (message NOT saved):', error);
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
+          socket.emit('error', {
+            message: 'Failed to send message',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+          });
+        }
       }
     });
 
@@ -315,7 +424,7 @@ export const initializeSocket = (server) => {
     // Handle sending direct message via Socket.IO
     socket.on('sendDirectMessage', async (data) => {
       try {
-        const { receiverId, text } = data;
+        const { receiverId, text, replyToId } = data;
         const senderId = socket.user.userId.toString();
 
         if (!receiverId || !text || !text.trim()) {
@@ -350,6 +459,18 @@ export const initializeSocket = (server) => {
           return;
         }
 
+        // Validate replyToId if provided
+        let validReplyToId = null;
+        if (replyToId) {
+          // Check if replyToId is a valid ObjectId format
+          if (mongoose.Types.ObjectId.isValid(replyToId)) {
+            validReplyToId = replyToId;
+          } else {
+            console.warn('Invalid replyToId format for direct message:', replyToId);
+            // Don't fail, just ignore invalid replyToId
+          }
+        }
+
         // Get sender name
         const senderProfile = await UserProfile.findOne({ userId: senderId });
         const senderName = senderProfile?.displayName || 
@@ -362,6 +483,7 @@ export const initializeSocket = (server) => {
           receiverId,
           senderName,
           text: text.trim(),
+          replyTo: validReplyToId || null,
         });
 
         await message.save();
@@ -395,6 +517,7 @@ export const initializeSocket = (server) => {
           senderName: message.senderName,
           text: message.text,
           timestamp: message.timestamp,
+          replyTo: message.replyTo ? message.replyTo.toString() : null,
           deliveredTo: [],
           readBy: [],
         };

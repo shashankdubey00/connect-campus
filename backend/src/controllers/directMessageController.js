@@ -133,27 +133,58 @@ export const getDirectMessages = async (req, res) => {
     }
 
     // Get messages where current user is sender or receiver
+    // Get recent messages (last 200 to balance performance and completeness)
     const messages = await DirectMessage.find({
       $or: [
         { senderId: currentUserObjectId, receiverId: otherUserObjectId },
         { senderId: otherUserObjectId, receiverId: currentUserObjectId },
       ],
     })
-      .sort({ timestamp: 1 })
-      .limit(100)
+      .sort({ timestamp: -1 }) // Get most recent first
+      .limit(200)
       .lean();
 
-    console.log('📨 Found messages:', messages.length, 'for users:', currentUserId, 'and', decodedOtherUserId);
+    // Get all replyTo IDs from the messages
+    const replyToIds = messages
+      .filter(msg => msg.replyTo)
+      .map(msg => msg.replyTo)
+      .filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+
+    // Find any replied-to messages that might not be in the recent 200
+    let additionalMessages = [];
+    if (replyToIds.length > 0) {
+      const messageIds = messages.map(msg => msg._id);
+      const missingReplyToIds = replyToIds.filter(replyId => 
+        !messageIds.some(msgId => msgId.toString() === replyId.toString())
+      );
+      
+      if (missingReplyToIds.length > 0) {
+        additionalMessages = await DirectMessage.find({
+          _id: { $in: missingReplyToIds },
+          $or: [
+            { senderId: currentUserObjectId, receiverId: otherUserObjectId },
+            { senderId: otherUserObjectId, receiverId: currentUserObjectId },
+          ],
+        }).lean();
+      }
+    }
+
+    // Combine and sort all messages
+    const allMessages = [...messages, ...additionalMessages]
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    console.log('📨 Found messages:', allMessages.length, 'for users:', currentUserId, 'and', decodedOtherUserId);
 
     res.json({
       success: true,
-      messages: messages.map(msg => ({
+      messages: allMessages.map(msg => ({
         id: msg._id.toString(),
         senderId: msg.senderId.toString(),
         receiverId: msg.receiverId.toString(),
         senderName: msg.senderName,
         text: msg.text,
         timestamp: msg.timestamp,
+        replyTo: msg.replyTo ? msg.replyTo.toString() : null,
         deliveredTo: msg.deliveredTo || [],
         readBy: msg.readBy || [],
       })),

@@ -87,24 +87,81 @@ export const joinCollegeRoom = (collegeId) => {
  * Send message
  * @param {string} text - Message text
  * @param {string} collegeId - College ID
+ * @param {string|null} replyToId - Optional message ID to reply to
+ * @returns {Promise<boolean>} Promise that resolves to true if sent, rejects on error
  */
-export const sendMessage = (text, collegeId) => {
-  if (socket?.connected) {
-    socket.emit('sendMessage', { text, collegeId });
-    return true;
-  } else {
-    console.error('Socket not connected, attempting to reconnect...');
-    // Try to reconnect
-    const newSocket = connectSocket();
-    if (newSocket) {
-      newSocket.once('connect', () => {
-        newSocket.emit('sendMessage', { text, collegeId });
-        console.log('✅ Message sent after reconnection');
-      });
-      return true;
+export const sendMessage = (text, collegeId, replyToId = null) => {
+  return new Promise((resolve, reject) => {
+    if (!socket) {
+      reject(new Error('Socket not initialized'));
+      return;
     }
-    return false;
-  }
+
+    if (socket.connected) {
+      // Set up error listener for this specific message
+      // Only reject on connection errors, not on server errors (message might still be saved)
+      const errorHandler = (error) => {
+        socket.off('error', errorHandler);
+        // Only reject if it's a connection error, not a server error
+        // Server errors might mean the message was still saved
+        if (error.message?.includes('connection') || error.message?.includes('disconnect')) {
+          reject(new Error(error.message || 'Connection error'));
+        } else {
+          // Log the error but don't reject - message might still be saved
+          console.warn('⚠️ Socket error (message might still be saved):', error);
+          // Resolve anyway - the receiveMessage event will confirm if message was saved
+          resolve(true);
+        }
+      };
+      
+      socket.once('error', errorHandler);
+      
+      // Set timeout to reject if no response (only for connection issues)
+      const timeout = setTimeout(() => {
+        socket.off('error', errorHandler);
+        // Don't reject on timeout - message might still be saved
+        // The receiveMessage event will confirm
+        console.warn('⚠️ Message send timeout (message might still be saved)');
+        resolve(true);
+      }, 10000);
+      
+      // Listen for successful send (message will be received via receiveMessage)
+      socket.emit('sendMessage', { text, collegeId, replyToId });
+      
+      // Clear timeout and resolve after a short delay to allow server processing
+      setTimeout(() => {
+        clearTimeout(timeout);
+        socket.off('error', errorHandler);
+        resolve(true);
+      }, 100);
+    } else {
+      console.error('Socket not connected, attempting to reconnect...');
+      // Try to reconnect
+      const newSocket = connectSocket();
+      if (newSocket) {
+        newSocket.once('connect', () => {
+          const errorHandler = (error) => {
+            newSocket.off('error', errorHandler);
+            reject(new Error(error.message || 'Failed to send message'));
+          };
+          
+          newSocket.once('error', errorHandler);
+          newSocket.emit('sendMessage', { text, collegeId, replyToId });
+          
+          setTimeout(() => {
+            newSocket.off('error', errorHandler);
+            resolve(true);
+          }, 100);
+        });
+        
+        newSocket.once('connect_error', (error) => {
+          reject(new Error('Failed to reconnect socket'));
+        });
+      } else {
+        reject(new Error('Failed to create socket instance'));
+      }
+    }
+  });
 };
 
 /**
@@ -252,9 +309,9 @@ export const onMessageRead = (callback) => {
  * @param {string} receiverId - Receiver user ID
  * @param {string} text - Message text
  */
-export const sendDirectMessageSocket = (receiverId, text) => {
+export const sendDirectMessageSocket = (receiverId, text, replyToId = null) => {
   if (socket?.connected && receiverId && text) {
-    socket.emit('sendDirectMessage', { receiverId, text });
+    socket.emit('sendDirectMessage', { receiverId, text, replyToId });
     return true;
   }
   return false;

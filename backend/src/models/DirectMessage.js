@@ -23,6 +23,11 @@ const directMessageSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'DirectMessage',
+      default: null,
+    },
     timestamp: {
       type: Date,
       default: Date.now,

@@ -196,9 +196,11 @@ router.get('/college/:collegeId', protect, async (req, res) => {
     }
 
     // Fetch messages - sort by timestamp ascending (oldest first) for chronological display
+    // Increased limit to ensure we get all recent messages
+    const limitValue = Math.min(parseInt(limit) || 50, 200); // Increased limit to 200
     const allMessages = await Message.find(query)
-      .sort({ timestamp: 1 }) // Ascending order (oldest first)
-      .limit(Math.min(parseInt(limit) || 50, 100)) // Max 100 messages
+      .sort({ timestamp: 1 }) // Ascending order (oldest first) for chronological display
+      .limit(limitValue)
       .lean();
 
     // Get list of message IDs that this user has deleted "for me"
@@ -223,6 +225,7 @@ router.get('/college/:collegeId', protect, async (req, res) => {
               collegeId: msg.collegeId,
               text: msg.text,
               timestamp: msg.timestamp,
+              replyTo: msg.replyTo ? msg.replyTo.toString() : null,
               readBy: msg.readBy || [],
               deliveredTo: msg.deliveredTo || [],
             })),
@@ -310,7 +313,7 @@ router.get('/user/colleges', protect, async (req, res) => {
 
     // Combine colleges with their last messages
     const collegesWithMessages = colleges.map((college) => {
-      const collegeId = college.aisheCode || college.name;
+        const collegeId = college.aisheCode || college.name;
       const lastMessage = lastMessageMap.get(collegeId);
 
       // Check if last message was sent by current user
@@ -336,23 +339,23 @@ router.get('/user/colleges', protect, async (req, res) => {
         isLastMessageOwn = senderIdStr === userIdStr;
       }
 
-      return {
-        id: college._id.toString(),
-        aisheCode: college.aisheCode,
-        name: college.name,
-        state: college.state,
-        district: college.district,
-        logo: college.logo,
-        lastMessage: lastMessage ? {
-          text: lastMessage.text,
-          timestamp: lastMessage.timestamp,
+        return {
+          id: college._id.toString(),
+          aisheCode: college.aisheCode,
+          name: college.name,
+          state: college.state,
+          district: college.district,
+          logo: college.logo,
+          lastMessage: lastMessage ? {
+            text: lastMessage.text,
+            timestamp: lastMessage.timestamp,
           senderId: lastMessage.senderId.toString ? lastMessage.senderId.toString() : String(lastMessage.senderId),
           senderName: lastMessage.senderName,
           lastMessageIsOwn: isLastMessageOwn,
           lastMessageDeliveredTo: lastMessage.deliveredTo || [],
           lastMessageReadBy: lastMessage.readBy || [],
         } : null // null means no messages, but chat should still appear
-      };
+        };
     });
 
     res.json({
