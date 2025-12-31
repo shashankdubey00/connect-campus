@@ -11,6 +11,8 @@ import ChangePassword from './pages/ChangePassword';
 import SetPassword from './pages/SetPassword';
 import About from './pages/About';
 import Chat from './pages/Chat';
+import Invite from './pages/Invite';
+import GroupInvite from './pages/GroupInvite';
 import './App.css';
 
 function App() {
@@ -29,6 +31,8 @@ function App() {
           <Route path="/set-password" element={<SetPassword />} />
           <Route path="/auth/success" element={<AuthSuccess />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/invite/:token" element={<Invite />} />
+          <Route path="/group-invite/:token" element={<GroupInvite />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

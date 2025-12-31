@@ -12,6 +12,8 @@ import authRoutes from './src/routes/authRoutes.js';
 import messageRoutes from './src/routes/messageRoutes.js';
 import profileRoutes from './src/routes/profileRoutes.js';
 import directMessageRoutes from './src/routes/directMessageRoutes.js';
+import inviteRoutes from './src/routes/inviteRoutes.js';
+import groupRoutes from './src/routes/groupRoutes.js';
 import passport from './src/config/passport.js';
 import { initializeSocket } from './src/socket/socketServer.js';
 
@@ -88,6 +90,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
+app.use('/api/invites', inviteRoutes);
+app.use('/api/groups', groupRoutes);
 app.use('/auth', authRoutes); // Also support /auth routes for OAuth
 
 // Health check

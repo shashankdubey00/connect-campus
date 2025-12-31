@@ -7,7 +7,12 @@ import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, del
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus, getCollegeActiveStudentsCount } from '../services/profileService'
 import { sendDirectMessage, getDirectMessages, clearDirectMessages, getDirectMessageConversations, deleteDirectMessage, deleteDirectMessageForAll, deleteAllDirectMessages } from '../services/directMessageService'
+import { getMyGroups, createGroup as createGroupAPI } from '../services/groupService'
 import EmojiPicker from 'emoji-picker-react'
+import InviteModal from '../components/InviteModal'
+import CreateGroupModal from '../components/CreateGroupModal'
+import GroupInviteModal from '../components/GroupInviteModal'
+import { getCollegeLogoUrl } from '../utils/collegeLogo'
 import './Chat.css'
 
 
@@ -28,6 +33,12 @@ const Chat = () => {
     const saved = localStorage.getItem('notificationsEnabled')
     return saved !== null ? JSON.parse(saved) : true
   })
+
+  // Handler to update notifications and save to localStorage
+  const handleToggleNotifications = (enabled) => {
+    localStorage.setItem('notificationsEnabled', JSON.stringify(enabled))
+    setNotificationsEnabled(enabled)
+  }
   const [totalUnreadCount, setTotalUnreadCount] = useState(0) // Total unread messages across all chats
   const [chatsWithUnreadCount, setChatsWithUnreadCount] = useState(0) // Number of chats with unread messages (like WhatsApp)
   const [verificationStatus, setVerificationStatus] = useState(null) // User verification status
@@ -58,7 +69,15 @@ const Chat = () => {
   const [selectedChatsBlockStatus, setSelectedChatsBlockStatus] = useState({ allBlocked: false, allUnblocked: false, mixed: false }) // Block status for selected chats
   const [unreadCounts, setUnreadCounts] = useState({}) // Track unread counts per chat
   const [isLoading, setIsLoading] = useState(true) // Loading state
+  const [isLoadingChats, setIsLoadingChats] = useState(false) // Loading state for chats
+  const isLoadingChatsRef = useRef(false) // Prevent duplicate calls
   const navigationHistory = useRef([]) // Track navigation history for back button
+  const [groups, setGroups] = useState([]) // User's groups
+  const [loadingGroups, setLoadingGroups] = useState(false)
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState([]) // Users available to add to groups
+  const [showGroupInviteModal, setShowGroupInviteModal] = useState(false)
+  const [selectedGroupForInvite, setSelectedGroupForInvite] = useState(null)
   const [middlePanelWidth, setMiddlePanelWidth] = useState(() => {
     // Load from localStorage or use default
     const saved = localStorage.getItem('middlePanelWidth')
@@ -360,7 +379,7 @@ const Chat = () => {
       name: college.name,
       district: college.district || '',
       state: college.state || '',
-      logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=100&background=00a8ff&color=fff`,
+      logo: getCollegeLogoUrl(college, 100),
       about: `Connect with students from ${college.name}`,
       totalMembers: 0, // Will be fetched from backend later
       isVerified: false, // Will be checked from backend later
@@ -370,7 +389,7 @@ const Chat = () => {
     
     const collegeId = college.aisheCode || college.name
     const collegeName = college.name || 'College Chat'
-    const collegeLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+    const collegeLogo = getCollegeLogoUrl(college, 50)
     
     // Use functional update to check and create chat atomically
     setChats(prev => {
@@ -464,7 +483,15 @@ const Chat = () => {
 
   // Load all colleges with messages and direct message conversations
   const loadAllCollegesWithMessages = useCallback(async () => {
+    // Prevent duplicate calls
+    if (isLoadingChatsRef.current) {
+      return
+    }
+    
     try {
+      isLoadingChatsRef.current = true
+      setIsLoadingChats(true)
+      
       // Fetch both college chats and direct message conversations in parallel
       const [collegesResponse, directMessagesResponse] = await Promise.all([
         fetchUserCollegesWithMessages().catch(err => {
@@ -484,7 +511,7 @@ const Chat = () => {
         const collegeChats = collegesResponse.colleges.map(college => {
           const collegeId = college.aisheCode || college.name
           const collegeName = college.name || 'College Chat'
-          const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+          const collegeLogo = getCollegeLogoUrl(college, 50)
           
           return {
             id: `college-${collegeId}`,
@@ -582,6 +609,9 @@ const Chat = () => {
       })
     } catch (error) {
       console.error('Error loading chats:', error)
+    } finally {
+      setIsLoadingChats(false)
+      isLoadingChatsRef.current = false
     }
   }, [unreadCounts])
 
@@ -591,6 +621,108 @@ const Chat = () => {
       loadAllCollegesWithMessages()
     }
   }, [user, activeSection, isLoading, loadAllCollegesWithMessages])
+
+  // Load groups when community section is active
+  const loadGroups = useCallback(async () => {
+    try {
+      setLoadingGroups(true)
+      const response = await getMyGroups()
+      if (response.success) {
+        setGroups(response.groups || [])
+      }
+    } catch (error) {
+      console.error('Error loading groups:', error)
+    } finally {
+      setLoadingGroups(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user && activeSection === 'community' && !isLoading) {
+      loadGroups()
+    }
+  }, [user, activeSection, isLoading, loadGroups])
+
+  // Load available users for group creation (combine direct message contacts + college members)
+  const loadAvailableUsers = useCallback(async () => {
+    try {
+      const allUsers = new Map() // Use Map to avoid duplicates by userId
+      
+      // 1. Get users from direct message conversations (people you've chatted with)
+      try {
+        const dmResponse = await getDirectMessageConversations()
+        if (dmResponse.success && dmResponse.conversations) {
+          dmResponse.conversations.forEach(conv => {
+            if (conv.userId) {
+              const userId = String(conv.userId)
+              if (!allUsers.has(userId)) {
+                allUsers.set(userId, {
+                  _id: userId,
+                  id: userId,
+                  email: '', // Email not included in conversations response
+                  profile: {
+                    displayName: conv.name || 'User',
+                    profilePicture: conv.profilePicture || null,
+                  },
+                  source: 'direct_message', // Track where this user came from
+                })
+              }
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error loading direct message contacts:', error)
+      }
+      
+      // 2. Get users from college (college members/followers)
+      if (user?.profile?.college) {
+        try {
+          const collegeObj = {
+            aisheCode: user.profile.college.aisheCode,
+            name: user.profile.college.name,
+          }
+          const collegeResponse = await getCollegeFollowers(collegeObj)
+          if (collegeResponse.success && collegeResponse.members) {
+            collegeResponse.members.forEach(member => {
+              const userId = String(member.id)
+              if (!allUsers.has(userId)) {
+                allUsers.set(userId, {
+                  _id: userId,
+                  id: userId,
+                  email: `${member.name?.replace(/\s+/g, '.').toLowerCase()}@example.com`, // Placeholder
+                  profile: {
+                    displayName: member.name,
+                    profilePicture: member.avatar,
+                  },
+                  source: 'college', // Track where this user came from
+                })
+              }
+            })
+          }
+        } catch (error) {
+          console.error('Error loading college members:', error)
+        }
+      }
+      
+      // Convert Map to array and sort by display name
+      const usersArray = Array.from(allUsers.values()).sort((a, b) => {
+        const nameA = a.profile.displayName.toLowerCase()
+        const nameB = b.profile.displayName.toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+      
+      setAvailableUsers(usersArray)
+    } catch (error) {
+      console.error('Error loading available users:', error)
+      setAvailableUsers([])
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (user && showCreateGroupModal) {
+      loadAvailableUsers()
+    }
+  }, [user, showCreateGroupModal, loadAvailableUsers])
 
   // Save current navigation state to history
   const saveNavigationState = () => {
@@ -1072,7 +1204,7 @@ const Chat = () => {
     saveNavigationState() // Save current state before navigating
     const collegeId = college.aisheCode || college.name || college.id
     const collegeName = college.name || 'College Chat'
-    const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+    const collegeLogo = getCollegeLogoUrl(college, 50)
     
     // Find chat in the actual chats state
     const chat = chats.find(c => 
@@ -1277,7 +1409,7 @@ const Chat = () => {
 
     const collegeId = college.aisheCode || college.name
     const collegeName = college.name || 'College Chat'
-    const collegeLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+    const collegeLogo = getCollegeLogoUrl(college, 50)
 
     try {
       // Fetch last message for preview
@@ -1424,7 +1556,7 @@ const Chat = () => {
         // This happens when user sends first message without following
         if (isOwnMessage && selectedCollege) {
           const collegeName = selectedCollege.name || 'College Chat'
-          const collegeLogo = selectedCollege.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+          const collegeLogo = getCollegeLogoUrl(selectedCollege, 50)
           
           const newChat = {
             id: `college-${collegeId}`,
@@ -1847,7 +1979,7 @@ const Chat = () => {
                             // Add college to chats list in home section if not already there
                             const collegeId = college.aisheCode || college.name
                             const collegeName = college.name || 'College Chat'
-                            const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+                            const collegeLogo = getCollegeLogoUrl(college, 50)
                             
                             setChats(prev => {
                               const exists = prev.find(c => 
@@ -1932,7 +2064,7 @@ const Chat = () => {
                             }}
                           >
                             <div className="search-result-avatar">
-                              <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
+                              <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
                               <span className="verified-badge-small">
                                 <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
                               </span>
@@ -1956,7 +2088,7 @@ const Chat = () => {
                             }}
                           >
                             <div className="search-result-avatar">
-                              <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=50&background=00a8ff&color=fff`} alt={college.name} />
+                              <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
                               <span className="verified-badge-small">
                                 <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
                               </span>
@@ -2112,7 +2244,20 @@ const Chat = () => {
             )}
           </div>
           <div className="panel-list">
-            {filteredChats.length === 0 ? (
+            {isLoadingChats && chats.length === 0 ? (
+              // Loading skeleton
+              <>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="chat-skeleton-item">
+                    <div className="chat-skeleton-avatar"></div>
+                    <div className="chat-skeleton-content">
+                      <div className="chat-skeleton-line chat-skeleton-name"></div>
+                      <div className="chat-skeleton-line chat-skeleton-message"></div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : filteredChats.length === 0 ? (
               <div className="empty-chat-list">
                 <div className="empty-chat-icon">💬</div>
                 <p className="empty-chat-message">No chats yet</p>
@@ -2263,34 +2408,107 @@ const Chat = () => {
     } else if (activeSection === 'community') {
       return (
         <>
-          <div className="panel-header">
-            <h2>Colleges</h2>
+          <div className="panel-header panel-header-with-button">
+            <h2>My Groups</h2>
+            <button
+              className="create-group-header-btn"
+              onClick={() => setShowCreateGroupModal(true)}
+              title="Create New Group"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Create Group
+            </button>
           </div>
           <div className="panel-list">
-            {dummyColleges.map(college => (
-              <div
-                key={college.id}
-                className="panel-item"
-                onClick={() => handleViewCollegeProfile(college)}
-              >
-                <div className="panel-item-avatar">
-                  <img src={college.logo} alt={college.name} />
-                  <span className="verified-badge">
-                    <img src="/blutick.jpg" alt="Verified" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
-                  </span>
-                </div>
-                <div className="panel-item-info">
-                  <div className="panel-item-header">
-                    <span className="panel-item-name">{college.name}</span>
-                  </div>
-                  <div className="panel-item-preview">
-                    <span className="panel-item-location">{college.district}, {college.state}</span>
-                    <span className="panel-item-members">{college.totalMembers} members</span>
-                  </div>
-                </div>
+            {loadingGroups ? (
+              <div className="groups-loading">
+                <div className="loading-spinner-small"></div>
+                <p>Loading groups...</p>
               </div>
-            ))}
+            ) : groups.length === 0 ? (
+              <div className="empty-groups-list">
+                <div className="empty-groups-icon">👥</div>
+                <p className="empty-groups-message">No groups yet</p>
+                <p className="empty-groups-hint">Create a private group to chat with your friends</p>
+                <button
+                  className="create-group-empty-btn"
+                  onClick={() => setShowCreateGroupModal(true)}
+                >
+                  Create Your First Group
+                </button>
+              </div>
+            ) : (
+              groups.map(group => {
+                const groupAvatar = group.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&size=50&background=00a8ff&color=fff`
+                return (
+                  <div
+                    key={group.id}
+                    className="panel-item panel-item-with-actions"
+                    onClick={() => {
+                      // TODO: Open group chat view
+                      console.log('Open group:', group)
+                    }}
+                  >
+                    <div className="panel-item-avatar">
+                      <img src={groupAvatar} alt={group.name} />
+                    </div>
+                    <div className="panel-item-info">
+                      <div className="panel-item-header">
+                        <span className="panel-item-name">{group.name}</span>
+                        {group.isAdmin && (
+                          <span className="group-admin-badge" title="Admin">👑</span>
+                        )}
+                      </div>
+                      <div className="panel-item-preview">
+                        <span className="panel-item-message">
+                          {group.description || 'No description'}
+                        </span>
+                        <span className="panel-item-members">{group.memberCount} members</span>
+                      </div>
+                    </div>
+                    <button
+                      className="group-invite-item-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedGroupForInvite(group)
+                        setShowGroupInviteModal(true)
+                      }}
+                      title="Invite to group"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })
+            )}
           </div>
+          {showCreateGroupModal && (
+            <CreateGroupModal
+              onClose={() => setShowCreateGroupModal(false)}
+              onGroupCreated={(newGroup) => {
+                setGroups(prev => [newGroup, ...prev])
+                setShowCreateGroupModal(false)
+              }}
+              user={user}
+              availableUsers={availableUsers}
+            />
+          )}
+          {showGroupInviteModal && selectedGroupForInvite && (
+            <GroupInviteModal
+              group={selectedGroupForInvite}
+              onClose={() => {
+                setShowGroupInviteModal(false)
+                setSelectedGroupForInvite(null)
+              }}
+            />
+          )}
         </>
       )
     }
@@ -2423,7 +2641,20 @@ const Chat = () => {
             )}
           </div>
           <div className="panel-list">
-            {filteredChats.length === 0 ? (
+            {isLoadingChats && chats.length === 0 ? (
+              // Loading skeleton
+              <>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="chat-skeleton-item">
+                    <div className="chat-skeleton-avatar"></div>
+                    <div className="chat-skeleton-content">
+                      <div className="chat-skeleton-line chat-skeleton-name"></div>
+                      <div className="chat-skeleton-line chat-skeleton-message"></div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : filteredChats.length === 0 ? (
               <div className="empty-chat-list">
                 <div className="empty-chat-icon">💬</div>
                 <p className="empty-chat-message">No chats yet</p>
@@ -2593,7 +2824,7 @@ const Chat = () => {
               // Add college to chats list in home section if not already there
               const collegeId = college.aisheCode || college.name
               const collegeName = college.name || 'College Chat'
-              const collegeLogo = college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(collegeName)}&size=50&background=00a8ff&color=fff`
+              const collegeLogo = getCollegeLogoUrl(college, 50)
               
               setChats(prev => {
                 const exists = prev.find(c => 
@@ -2802,12 +3033,38 @@ const Chat = () => {
       />
     }
     if (view === 'settings') {
-      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={setNotificationsEnabled} onLogout={handleLogout} onBack={navigateBack} />
+      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={handleToggleNotifications} onLogout={handleLogout} onBack={navigateBack} />
     }
     return (
       <div className="right-panel-placeholder">
         <div className="placeholder-content">
-          <div className="placeholder-icon">💬</div>
+          <div className="animated-chat-icon">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Main chat bubble */}
+              <path 
+                d="M30 20C30 15.5817 33.5817 12 38 12H82C86.4183 12 90 15.5817 90 20V60C90 64.4183 86.4183 68 82 68H50L30 88V20Z" 
+                fill="url(#chatGradient)" 
+                className="chat-bubble-main"
+              />
+              {/* Chat bubble tail */}
+              <path 
+                d="M30 68L20 78L30 88V68Z" 
+                fill="url(#chatGradient)" 
+                className="chat-bubble-tail"
+              />
+              {/* Typing dots */}
+              <circle cx="45" cy="40" r="4" fill="white" className="typing-dot typing-dot-1" opacity="0.6"/>
+              <circle cx="60" cy="40" r="4" fill="white" className="typing-dot typing-dot-2" opacity="0.6"/>
+              <circle cx="75" cy="40" r="4" fill="white" className="typing-dot typing-dot-3" opacity="0.6"/>
+              {/* Gradient definition */}
+              <defs>
+                <linearGradient id="chatGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#00a884" stopOpacity="0.8"/>
+                  <stop offset="100%" stopColor="#06cf9c" stopOpacity="0.9"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <h3>Select a chat or college to get started</h3>
           <p>Choose from the list to view details and start chatting</p>
         </div>
@@ -2861,15 +3118,6 @@ const Chat = () => {
         {/* Search bar on the right side - same as landing page */}
         {!isMobileView && (
           <div className="header-search-wrapper">
-            <button 
-              className="header-search-back-btn"
-              onClick={() => navigate('/')}
-              title="Back to Home"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
             <form 
               className="header-search-form"
               onSubmit={handleCollegeSearch}
@@ -2915,7 +3163,7 @@ const Chat = () => {
                       onClick={() => handleCollegeSuggestionClick(college)}
                     >
                       <div className="suggestion-avatar">
-                        <img src={college.logo} alt={college.name} />
+                        <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
                         <span className="verified-badge-small">
                           <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
                         </span>
@@ -2934,7 +3182,7 @@ const Chat = () => {
                       onClick={() => handleCollegeSuggestionClick(college)}
                     >
                       <div className="suggestion-avatar">
-                        <img src={college.logo} alt={college.name} />
+                        <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
                         <span className="verified-badge-small">
                           <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
                         </span>
@@ -3023,13 +3271,23 @@ const Chat = () => {
             }}
             title="Toggle Theme"
           >
-            <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 3C12 3 6 7.582 6 13C6 16.3137 8.68629 19 12 19C15.3137 19 18 16.3137 18 13C18 7.582 12 3 12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 3V1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 23V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M3 12H1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M23 12H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            {theme === 'dark' ? (
+              <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
           </button>
           <button
             className="sidebar-bottom-item logout-btn-sidebar"
@@ -3169,6 +3427,7 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
   const [isFollowing, setIsFollowing] = useState(false)
   const [isLoadingFollow, setIsLoadingFollow] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
 
   // Check follow status on mount and when college changes
   useEffect(() => {
@@ -3409,10 +3668,24 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
 
   return (
     <div className="college-profile-view">
+      {/* Back Button Header */}
+      {showBackButton && onBack && (
+        <div className="college-profile-back-header">
+          <button 
+            className="college-profile-back-btn" 
+            onClick={onBack}
+            title="Back"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
       <div className="college-profile-content-new">
         {/* Logo in the middle */}
         <div className="college-logo-center">
-          <img src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name)}&size=150&background=00a8ff&color=fff`} alt={college.name} />
+          <img src={getCollegeLogoUrl(college, 150)} alt={college.name} />
           <div className="verified-badge-center" title="Verified College">
             <img src="/blutick.jpg" alt="Verified" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
           </div>
@@ -3471,7 +3744,27 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
           >
             Join Chat
           </button>
+          <button 
+            type="button"
+            className="btn-invite animated-invite-btn" 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowInviteModal(true)
+            }}
+            title="Invite friends to join this college"
+          >
+            <span className="invite-icon">📤</span>
+            <span className="invite-text">Invite</span>
+          </button>
         </div>
+
+        {showInviteModal && (
+          <InviteModal
+            college={collegeData}
+            onClose={() => setShowInviteModal(false)}
+          />
+        )}
 
         {/* About Section */}
         <div className="college-about-section">
@@ -3550,6 +3843,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [senderProfiles, setSenderProfiles] = useState({}) // Cache for sender profiles: { userId: { displayName, profilePicture, ... } }
   const [blockedUsers, setBlockedUsers] = useState(new Set()) // Set of blocked user IDs
   const [blockMessage, setBlockMessage] = useState(null) // Professional block message to show
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [clearError, setClearError] = useState(null) // Error message for clear chat
@@ -4514,7 +4808,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     return words.slice(0, maxWords).join(' ') + '...'
   }
   const displayName = isDirectMessage ? chat.name : truncateName(fullCollegeName, 3)
-  const displayAvatar = chat.avatar || (college?.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullCollegeName)}&size=50&background=00a8ff&color=fff`)
+  const displayAvatar = chat.avatar || (college ? getCollegeLogoUrl(college, 50) : getCollegeLogoUrl({ name: fullCollegeName }, 50))
   // Get typing users list (limit to 5 most recent)
   const typingUsersList = Array.from(typingUsers.entries())
     .sort((a, b) => b[1].timestamp - a[1].timestamp)
@@ -4670,8 +4964,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
     
     // Check if swipe was significant enough for reply (mobile only)
-    // In WhatsApp, you swipe LEFT to reply (negative deltaX)
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset < 0) {
+    // Swipe RIGHT to reply (opposite of WhatsApp)
+    // swipeOffset > 0 means right swipe
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
       // Swipe left detected - reply to message
       const messageElement = e.currentTarget.closest('.message')
       if (messageElement) {
@@ -4715,12 +5010,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const clientX = touch ? touch.clientX : e.clientX
       const deltaX = clientX - swipeStartX
       
-      // In WhatsApp, you swipe LEFT to reply (negative deltaX)
-      // Allow left swipe (negative deltaX) for reply
-      if (deltaX < 0) {
-        setSwipeOffset(Math.max(deltaX, -100)) // Cap at -100px (swipe left)
+      // Swipe RIGHT to reply (opposite of WhatsApp)
+      // Swipe RIGHT means your finger moves to a larger X coordinate
+      // deltaX = currentX - startX will be positive when swiping right
+      if (deltaX > 0) {
+        // Swipe right detected - allow reply gesture
+        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
       } else {
-        // Reset if swiping right
+        // Reset if swiping left (negative deltaX)
         setSwipeOffset(0)
       }
     }
@@ -5294,7 +5591,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 <h3>{displayName}</h3>
                 {!isDirectMessage && (
                   <div className="verified-badge-blue-inline" title="Verified College">
-                    <img src="/blutick.jpg" alt="Verified" style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <linearGradient id="verifiedGradientChat" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#1DA1F2" />
+                          <stop offset="100%" stopColor="#0084CC" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="12" cy="12" r="11" fill="url(#verifiedGradientChat)" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="0.5"/>
+                      <path d="M7 12l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                    </svg>
                   </div>
                 )}
                 {!isDirectMessage && verificationStatus?.status === 'verified' && (
@@ -5324,19 +5630,43 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 )}
               </span>
             </div>
+            {/* Invite Button - Only for college chats */}
+            {!isDirectMessage && college && (
+              <button 
+                className="invite-header-btn animated-invite-btn"
+                onClick={() => setShowInviteModal(true)}
+                title="Invite friends to join this college"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="8.5" cy="7" r="4"></circle>
+                  <line x1="20" y1="8" x2="20" y2="14"></line>
+                  <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+              </button>
+            )}
             {/* Clear Chat Button */}
             <button 
               className="clear-chat-btn"
               onClick={() => setShowClearConfirm(true)}
               title="Clear Chat"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
             </button>
           </>
       </div>
+      {showInviteModal && college && (
+        <InviteModal
+          college={college}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
       <div className="chat-messages-area">
         {loading ? (
           <div className="loading-messages">Loading messages...</div>
@@ -5421,13 +5751,13 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         </div>
                       </div>
                     )}
-                    {/* Reply indicator when swiping left (mobile) */}
-                    {isMobile && swipeOffset < -20 && (
+                    {/* Reply indicator when swiping right (mobile) */}
+                    {isMobile && swipeOffset > 20 && (
                       <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
                           opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
-                          transform: `translateX(${swipeOffset + 60}px)`
+                          transform: `translateX(${swipeOffset - 60}px)`
                         }}
                       >
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -5437,8 +5767,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       </div>
                     )}
                     <div 
-                      className={`message-content ${swipeOffset < 0 ? 'swiping' : ''}`}
-                      style={swipeOffset < 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      className={`message-content ${swipeOffset > 0 ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
                       onTouchEnd={handleMessageTouchEnd}
                       onTouchMove={handleMessageTouchMove}
@@ -6909,8 +7239,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
     
     // Check if swipe was significant enough for reply (mobile only)
-    // In WhatsApp, you swipe LEFT to reply (negative deltaX)
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset < 0) {
+    // Swipe RIGHT to reply (opposite of WhatsApp)
+    // swipeOffset > 0 means right swipe
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
       // Swipe left detected - reply to message
       const messageElement = e.currentTarget.closest('.message')
       if (messageElement) {
@@ -6954,12 +7285,14 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const clientX = touch ? touch.clientX : e.clientX
       const deltaX = clientX - swipeStartX
       
-      // In WhatsApp, you swipe LEFT to reply (negative deltaX)
-      // Allow left swipe (negative deltaX) for reply
-      if (deltaX < 0) {
-        setSwipeOffset(Math.max(deltaX, -100)) // Cap at -100px (swipe left)
+      // Swipe RIGHT to reply (opposite of WhatsApp)
+      // Swipe RIGHT means your finger moves to a larger X coordinate
+      // deltaX = currentX - startX will be positive when swiping right
+      if (deltaX > 0) {
+        // Swipe right detected - allow reply gesture
+        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
       } else {
-        // Reset if swiping right
+        // Reset if swiping left (negative deltaX)
         setSwipeOffset(0)
       }
     }
@@ -7686,9 +8019,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           onClick={() => setShowClearConfirm(true)}
           title="Clear Chat"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
           </svg>
         </button>
       </div>
@@ -7734,13 +8070,13 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         />
                       </div>
                     )}
-                    {/* Reply indicator when swiping left (mobile) */}
-                    {isMobile && swipeOffset < -20 && (
+                    {/* Reply indicator when swiping right (mobile) */}
+                    {isMobile && swipeOffset > 20 && (
                       <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
                           opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
-                          transform: `translateX(${swipeOffset + 60}px)`
+                          transform: `translateX(${swipeOffset - 60}px)`
                         }}
                       >
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -7750,8 +8086,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       </div>
                     )}
                     <div 
-                      className={`message-content ${swipeOffset < 0 ? 'swiping' : ''}`}
-                      style={swipeOffset < 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      className={`message-content ${swipeOffset > 0 ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
                       onTouchEnd={handleMessageTouchEnd}
                       onTouchMove={handleMessageTouchMove}
@@ -8673,7 +9009,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                     style={{ cursor: 'pointer' }}
                   >
                     <img 
-                      src={college.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(college.name || 'College')}&size=40&background=00a8ff&color=fff`}
+                      src={getCollegeLogoUrl(college, 40)}
                       alt={college.name}
                       className="common-group-logo"
                     />
@@ -8791,6 +9127,22 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
 
 // Settings View Component
 const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNotifications, onLogout, onBack }) => {
+  const navigate = useNavigate()
+
+  const handleChangePassword = () => {
+    navigate('/change-password')
+  }
+
+  const handlePrivacySettings = () => {
+    // For now, show an alert. Can be expanded to a privacy settings modal/page later
+    alert('Privacy settings feature coming soon!')
+  }
+
+  const handleToggleNotifications = (enabled) => {
+    // Call the parent handler (which saves to localStorage)
+    onToggleNotifications(enabled)
+  }
+
   return (
     <div className="settings-view">
       <div className="view-header">
@@ -8817,7 +9169,10 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
               <span className="settings-item-label">Enable Notifications</span>
               <span className="settings-item-desc">Receive alerts for new messages</span>
             </div>
-            <button className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} onClick={() => onToggleNotifications(!notificationsEnabled)}>
+            <button 
+              className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} 
+              onClick={() => handleToggleNotifications(!notificationsEnabled)}
+            >
               {notificationsEnabled ? 'ON' : 'OFF'}
             </button>
           </div>
@@ -8829,7 +9184,7 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
               <span className="settings-item-label">Privacy Settings</span>
               <span className="settings-item-desc">Manage your privacy preferences</span>
             </div>
-            <button className="btn-secondary">Manage</button>
+            <button className="btn-secondary" onClick={handlePrivacySettings}>Manage</button>
           </div>
         </div>
         <div className="settings-section">
@@ -8839,7 +9194,7 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
               <span className="settings-item-label">Change Password</span>
               <span className="settings-item-desc">Update your account password</span>
             </div>
-            <button className="btn-secondary">Change</button>
+            <button className="btn-secondary" onClick={handleChangePassword}>Change</button>
           </div>
         </div>
         <div className="settings-section">

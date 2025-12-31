@@ -147,6 +147,12 @@
   transform: translateY(0);
 }
 
+.join-campus-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .college-profile-card {

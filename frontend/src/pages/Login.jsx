@@ -15,6 +15,8 @@ const Login = () => {
   const collegeContext = location.state?.college || null;
   const returnPath = location.state?.returnPath || '/';
   const successMessage = location.state?.message || null;
+  const inviteToken = location.state?.inviteToken || null;
+  const groupInviteToken = location.state?.groupInviteToken || null;
 
   useEffect(() => {
     // Check if already logged in
@@ -34,6 +36,18 @@ const Login = () => {
   }, []);
 
   const handleRedirect = () => {
+    // If there's a group invite token, redirect back to group invite page
+    if (groupInviteToken) {
+      navigate(`/group-invite/${groupInviteToken}`);
+      return;
+    }
+    
+    // If there's an invite token, redirect back to invite page
+    if (inviteToken) {
+      navigate(`/invite/${inviteToken}`);
+      return;
+    }
+    
     if (returnPath === '/chat' && collegeContext) {
       // Redirect to chat with college context
       navigate('/chat', {
@@ -48,7 +62,7 @@ const Login = () => {
         state: { 
           openCollegeModal: true, 
           college: collegeContext 
-        } 
+        }
       });
     } else {
       navigate(returnPath);

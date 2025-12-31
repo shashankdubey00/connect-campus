@@ -17,6 +17,16 @@ const followSchema = new mongoose.Schema(
       type: String,
       index: true,
     },
+    // Invite tracking
+    joinedViaInvite: {
+      type: Boolean,
+      default: false,
+    },
+    inviteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Invite',
+      default: null,
+    },
   },
   {
     timestamps: true,

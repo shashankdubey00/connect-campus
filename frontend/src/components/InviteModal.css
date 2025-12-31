@@ -1,0 +1,260 @@
+.invite-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.invite-modal {
+  background: var(--bg-secondary, #1e1e1e);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.invite-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.invite-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary, #ffffff);
+  font-weight: 600;
+}
+
+.invite-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  font-size: 2rem;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.invite-modal-close:hover {
+  background: var(--bg-hover, #333);
+  color: var(--text-primary, #ffffff);
+}
+
+.invite-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invite-modal-text {
+  color: var(--text-secondary, #aaa);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+.invite-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color, #333);
+  border-top-color: var(--primary-color, #25d366);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.invite-loading p {
+  color: var(--text-secondary, #aaa);
+  margin: 0;
+}
+
+.invite-link-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invite-link-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.invite-link-input {
+  flex: 1;
+  background: var(--bg-primary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  color: var(--text-primary, #ffffff);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.invite-link-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #25d366);
+}
+
+.invite-copy-btn {
+  background: var(--primary-color, #25d366);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.invite-copy-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #20ba5a);
+  transform: translateY(-1px);
+}
+
+.invite-copy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invite-copy-btn.copied {
+  background: #25d366;
+  animation: pulse 0.3s ease;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.invite-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.invite-share-btn {
+  background: transparent;
+  color: var(--primary-color, #25d366);
+  border: 2px solid var(--primary-color, #25d366);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.invite-share-btn:hover:not(:disabled) {
+  background: var(--primary-color, #25d366);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.invite-share-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invite-retry-btn {
+  background: transparent;
+  color: var(--primary-color, #25d366);
+  border: 2px solid var(--primary-color, #25d366);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.invite-retry-btn:hover {
+  background: var(--primary-color, #25d366);
+  color: white;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .invite-modal {
+    padding: 20px;
+    width: 95%;
+  }
+
+  .invite-modal-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .invite-link-input-wrapper {
+    flex-direction: column;
+  }
+
+  .invite-copy-btn {
+    width: 100%;
+  }
+}
+

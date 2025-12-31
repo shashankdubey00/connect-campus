@@ -1,0 +1,377 @@
+.invite-manager {
+  background: var(--bg-secondary, #1e1e1e);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  color: var(--text-primary, #ffffff);
+}
+
+.invite-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.invite-manager-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary, #ffffff);
+}
+
+.back-button,
+.close-button {
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #ffffff);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 5px;
+  transition: background 0.2s;
+}
+
+.back-button:hover,
+.close-button:hover {
+  background: var(--bg-hover, #333);
+}
+
+.create-invite-button {
+  background: var(--primary-color, #25d366);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 20px;
+  transition: background 0.2s;
+}
+
+.create-invite-button:hover {
+  background: var(--primary-hover, #20ba5a);
+}
+
+.invites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-item {
+  background: var(--bg-primary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.invite-item:hover {
+  background: var(--bg-hover, #333);
+  border-color: var(--primary-color, #25d366);
+}
+
+.invite-item.inactive {
+  opacity: 0.6;
+}
+
+.invite-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.invite-item-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary-color, #25d366);
+  background: var(--bg-secondary, #1e1e1e);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.invite-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.invite-status.active {
+  background: #25d366;
+  color: white;
+}
+
+.invite-status.inactive {
+  background: #666;
+  color: white;
+}
+
+.invite-item-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.invite-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invite-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.invite-code-display {
+  margin-top: 15px;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+}
+
+.invite-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-field label {
+  font-weight: 600;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+}
+
+.invite-value {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.invite-value code {
+  flex: 1;
+  background: var(--bg-primary, #2a2a2a);
+  padding: 10px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+}
+
+.invite-url-input {
+  flex: 1;
+  background: var(--bg-primary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  color: var(--text-primary, #ffffff);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.invite-value button,
+.invite-actions button {
+  background: var(--primary-color, #25d366);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.invite-value button:hover,
+.invite-actions button:hover {
+  background: var(--primary-hover, #20ba5a);
+}
+
+.invite-stats {
+  display: flex;
+  gap: 20px;
+  padding: 15px;
+  background: var(--bg-primary, #2a2a2a);
+  border-radius: 8px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+
+.stat-value.valid {
+  color: var(--primary-color, #25d366);
+}
+
+.stat-value.invalid {
+  color: #ff4444;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.share-button {
+  flex: 1;
+}
+
+.deactivate-button {
+  background: #ff4444 !important;
+}
+
+.deactivate-button:hover {
+  background: #cc0000 !important;
+}
+
+.create-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.create-invite-form h3 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary, #ffffff);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--text-secondary, #aaa);
+  font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group textarea {
+  background: var(--bg-primary, #2a2a2a);
+  border: 1px solid var(--border-color, #333);
+  color: var(--text-primary, #ffffff);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.create-button {
+  flex: 1;
+  background: var(--primary-color, #25d366);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.create-button:hover:not(:disabled) {
+  background: var(--primary-hover, #20ba5a);
+}
+
+.create-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  background: transparent;
+  color: var(--text-primary, #ffffff);
+  border: 1px solid var(--border-color, #333);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background: var(--bg-hover, #333);
+}
+
+.loading,
+.no-invites {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #aaa);
+}
+
+.no-invites p {
+  margin: 5px 0;
+}
+
+@media (max-width: 768px) {
+  .invite-manager {
+    padding: 15px;
+  }
+
+  .invite-details {
+    gap: 15px;
+  }
+
+  .invite-qr-section {
+    padding: 15px;
+  }
+
+  .invite-code-display {
+    font-size: 1.1rem;
+  }
+
+  .invite-stats {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+

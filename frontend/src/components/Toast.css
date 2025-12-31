@@ -1,0 +1,130 @@
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: slideInRight 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.toast-icon {
+  font-size: 20px;
+  font-weight: bold;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  font-size: 14px;
+  line-height: 1.5;
+  color: white;
+  flex: 1;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Toast Types */
+.toast-success {
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  border-left: 4px solid #20ba5a;
+}
+
+.toast-success .toast-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.toast-error {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  border-left: 4px solid #cc0000;
+}
+
+.toast-error .toast-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.toast-info {
+  background: linear-gradient(135deg, #00a8ff 0%, #0097e6 100%);
+  border-left: 4px solid #0088cc;
+}
+
+.toast-info .toast-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.toast-warning {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  border-left: 4px solid #d68910;
+}
+
+.toast-warning .toast-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+}
+

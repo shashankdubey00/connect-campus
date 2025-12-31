@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifyAuth } from '../services/authService';
+import { getCollegeLogoUrl } from '../utils/collegeLogo';
 import './CollegeProfileCard.css'
 
-const CollegeProfileCard = ({ college }) => {
+const CollegeProfileCard = ({ college, onJoinCampus: customOnJoinCampus, disabled = false }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const navigate = useNavigate();
@@ -25,12 +26,19 @@ const CollegeProfileCard = ({ college }) => {
 
   if (!college) return null
 
-  const { name, district, state, aisheCode } = college
+  const { name, district, state, aisheCode, logo } = college
 
-  // Placeholder logo - can be replaced with actual logo URL later
-  const logoUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=120&background=00a8ff&color=fff&bold=true`
+  // Use smart logo generation (Layer 1: auto-generated, Layer 2: Wikipedia if available)
+  const logoUrl = getCollegeLogoUrl(college, 120)
 
   const handleJoinCampus = () => {
+    // If custom handler is provided (e.g., from invite page), use it
+    if (customOnJoinCampus) {
+      customOnJoinCampus();
+      return;
+    }
+
+    // Default behavior for search-based join
     if (checkingAuth) return; // Wait for auth check to complete
 
     if (!isAuthenticated) {
@@ -79,8 +87,9 @@ const CollegeProfileCard = ({ college }) => {
         <button 
           className="join-campus-btn"
           onClick={handleJoinCampus}
+          disabled={disabled || checkingAuth}
         >
-          Join Campus
+          {disabled ? 'Joining...' : 'Join Campus'}
         </button>
       </div>
     </div>

@@ -305,7 +305,7 @@ export const getDirectMessageConversations = async (req, res) => {
         // Only add if not in deleted chats
         if (!deletedUserIds.has(otherUserIdStr)) {
           userIds.add(otherUserIdStr);
-        }
+      }
       }
     });
 
