@@ -14,6 +14,7 @@ import InviteModal from '../components/InviteModal'
 import CreateGroupModal from '../components/CreateGroupModal'
 import GroupInviteModal from '../components/GroupInviteModal'
 import ProfilePictureCropModal from '../components/ProfilePictureCropModal'
+import PrivacySettingsModal from '../components/PrivacySettingsModal'
 import { getCollegeLogoUrl } from '../utils/collegeLogo'
 import './Chat.css'
 
@@ -3295,7 +3296,7 @@ const Chat = () => {
       />
     }
     if (view === 'settings') {
-      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={handleToggleNotifications} onLogout={handleLogout} onBack={navigateBack} />
+      return <SettingsView theme={theme} onToggleTheme={toggleTheme} notificationsEnabled={notificationsEnabled} onToggleNotifications={handleToggleNotifications} onLogout={handleLogout} onBack={navigateBack} user={user} />
     }
     return (
       <div className="right-panel-placeholder">
@@ -10885,16 +10886,16 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
 }
 
 // Settings View Component
-const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNotifications, onLogout, onBack }) => {
+const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNotifications, onLogout, onBack, user }) => {
   const navigate = useNavigate()
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false)
 
   const handleChangePassword = () => {
     navigate('/change-password')
   }
 
   const handlePrivacySettings = () => {
-    // For now, show an alert. Can be expanded to a privacy settings modal/page later
-    alert('Privacy settings feature coming soon!')
+    setShowPrivacyModal(true)
   }
 
   const handleToggleNotifications = (enabled) => {
@@ -10903,66 +10904,74 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
   }
 
   return (
-    <div className="settings-view">
-      <div className="view-header">
-        <button className="back-btn" onClick={onBack}>←</button>
-        <h2>Settings</h2>
+    <>
+      <div className="settings-view">
+        <div className="view-header">
+          <button className="back-btn" onClick={onBack}>←</button>
+          <h2>Settings</h2>
+        </div>
+        <div className="settings-content">
+          <div className="settings-section">
+            <h3>Appearance</h3>
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <span className="settings-item-label">Theme</span>
+                <span className="settings-item-desc">Switch between dark and light mode</span>
+              </div>
+              <button className="toggle-btn" onClick={onToggleTheme}>
+                {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
+              </button>
+            </div>
+          </div>
+          <div className="settings-section">
+            <h3>Notifications</h3>
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <span className="settings-item-label">Enable Notifications</span>
+                <span className="settings-item-desc">Receive alerts for new messages</span>
+              </div>
+              <button 
+                className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} 
+                onClick={() => handleToggleNotifications(!notificationsEnabled)}
+              >
+                {notificationsEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+          </div>
+          <div className="settings-section">
+            <h3>Privacy</h3>
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <span className="settings-item-label">Privacy Settings</span>
+                <span className="settings-item-desc">Manage your privacy preferences</span>
+              </div>
+              <button className="btn-secondary" onClick={handlePrivacySettings}>Manage</button>
+            </div>
+          </div>
+          <div className="settings-section">
+            <h3>Account</h3>
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <span className="settings-item-label">Change Password</span>
+                <span className="settings-item-desc">Update your account password</span>
+              </div>
+              <button className="btn-secondary" onClick={handleChangePassword}>Change</button>
+            </div>
+          </div>
+          <div className="settings-section">
+            <div className="settings-item">
+              <button className="btn-danger" onClick={onLogout}>Logout</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="settings-content">
-        <div className="settings-section">
-          <h3>Appearance</h3>
-          <div className="settings-item">
-            <div className="settings-item-info">
-              <span className="settings-item-label">Theme</span>
-              <span className="settings-item-desc">Switch between dark and light mode</span>
-            </div>
-            <button className="toggle-btn" onClick={onToggleTheme}>
-              {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
-            </button>
-          </div>
-        </div>
-        <div className="settings-section">
-          <h3>Notifications</h3>
-          <div className="settings-item">
-            <div className="settings-item-info">
-              <span className="settings-item-label">Enable Notifications</span>
-              <span className="settings-item-desc">Receive alerts for new messages</span>
-            </div>
-            <button 
-              className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} 
-              onClick={() => handleToggleNotifications(!notificationsEnabled)}
-            >
-              {notificationsEnabled ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-        <div className="settings-section">
-          <h3>Privacy</h3>
-          <div className="settings-item">
-            <div className="settings-item-info">
-              <span className="settings-item-label">Privacy Settings</span>
-              <span className="settings-item-desc">Manage your privacy preferences</span>
-            </div>
-            <button className="btn-secondary" onClick={handlePrivacySettings}>Manage</button>
-          </div>
-        </div>
-        <div className="settings-section">
-          <h3>Account</h3>
-          <div className="settings-item">
-            <div className="settings-item-info">
-              <span className="settings-item-label">Change Password</span>
-              <span className="settings-item-desc">Update your account password</span>
-            </div>
-            <button className="btn-secondary" onClick={handleChangePassword}>Change</button>
-          </div>
-        </div>
-        <div className="settings-section">
-          <div className="settings-item">
-            <button className="btn-danger" onClick={onLogout}>Logout</button>
-          </div>
-        </div>
-      </div>
-    </div>
+      {showPrivacyModal && (
+        <PrivacySettingsModal
+          onClose={() => setShowPrivacyModal(false)}
+          user={user}
+        />
+      )}
+    </>
   )
 }
 

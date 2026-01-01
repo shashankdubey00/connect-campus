@@ -901,3 +901,85 @@ export const getCollegeActiveStudentsCount = async (req, res) => {
   }
 };
 
+/**
+ * Get all blocked users for the current user
+ */
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const blockerId = req.user.userId;
+
+    // Get all blocks by this user
+    const blocks = await Block.find({ blockerId }).lean();
+
+    // Get user profiles for blocked users
+    const blockedUserIds = blocks.map(b => {
+      // Handle both ObjectId and string formats
+      if (mongoose.Types.ObjectId.isValid(b.blockedId)) {
+        return new mongoose.Types.ObjectId(b.blockedId);
+      }
+      return b.blockedId;
+    });
+    const userProfiles = await UserProfile.find({ userId: { $in: blockedUserIds } }).lean();
+    const users = await User.find({ _id: { $in: blockedUserIds } }).select('email').lean();
+
+    // Create maps for quick lookup
+    const profileMap = new Map();
+    userProfiles.forEach(profile => {
+      profileMap.set(profile.userId.toString(), profile);
+    });
+    const userMap = new Map();
+    users.forEach(user => {
+      userMap.set(user._id.toString(), user);
+    });
+
+    // Format blocked users with details
+    const blockedUsers = blocks
+      .map(block => {
+        const userId = block.blockedId.toString();
+        const profile = profileMap.get(userId);
+        const user = userMap.get(userId);
+
+        if (!user) return null;
+
+        const displayName = profile?.displayName || 
+          (profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : '') || 
+          user.email?.split('@')[0] || 
+          'User';
+        
+        let avatar = '';
+        if (profile?.profilePicture) {
+          if (profile.profilePicture.startsWith('/uploads/')) {
+            avatar = profile.profilePicture;
+          } else {
+            avatar = profile.profilePicture;
+          }
+        } else {
+          const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=50&background=00a8ff&color=fff`;
+        }
+
+        return {
+          id: userId,
+          name: displayName,
+          email: user.email,
+          avatar: avatar,
+          blockedAt: block.createdAt,
+        };
+      })
+      .filter(u => u !== null);
+
+    res.json({
+      success: true,
+      blockedUsers,
+      count: blockedUsers.length,
+    });
+  } catch (error) {
+    console.error('Error getting blocked users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting blocked users',
+      error: error.message,
+    });
+  }
+};
+

@@ -254,3 +254,13 @@ export const getCollegeActiveStudentsCount = async (collegeId) => {
   });
 };
 
+/**
+ * Get all blocked users for the current user
+ * @returns {Promise} API response with blockedUsers array
+ */
+export const getBlockedUsers = async () => {
+  return await api('/api/profile/blocked-users', {
+    method: 'GET',
+  });
+};
+
