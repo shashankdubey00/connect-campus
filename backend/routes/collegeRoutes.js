@@ -1,5 +1,7 @@
 import express from 'express';
 import College from '../models/College.js';
+import { normalizeCollegeName } from '../src/utils/normalizeCollegeName.js';
+import { isAisheCode } from '../src/utils/detectAisheCode.js';
 
 const router = express.Router();
 
@@ -37,24 +39,42 @@ router.get('/search', async (req, res) => {
       searchCriteria.district = district.trim();
     }
 
-    // Text search on searchText field (uses existing text index)
-    // Note: $text must be used with find(), not as part of searchCriteria object
+    // Check if query is an AISHE code
+    const trimmedQuery = query ? query.trim() : '';
     let searchQuery;
     
-    if (query && query.trim()) {
-      // Use text search with filters
-      searchCriteria.$text = { $search: query.trim() };
+    if (trimmedQuery && isAisheCode(trimmedQuery)) {
+      // AISHE code detected: search by aisheCode with case-insensitive exact match
+      searchCriteria.aisheCode = { $regex: `^${trimmedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' };
       searchQuery = College.find(searchCriteria);
-      // Sort by text score for relevance
-      searchQuery = searchQuery.sort({ score: { $meta: 'textScore' } });
-    } else {
-      // No text search, just use filters and sort by name
-      searchQuery = College.find(searchCriteria);
+      // Sort by name for consistency
       searchQuery = searchQuery.sort({ name: 1 });
-    }
+      // Limit to 1 result for AISHE code search (exact match)
+      searchQuery = searchQuery.limit(1);
+    } else {
+      // Not an AISHE code: use normalizedSearchText search logic
+      let normalizedQuery = '';
+      if (trimmedQuery) {
+        normalizedQuery = normalizeCollegeName(trimmedQuery);
+      }
 
-    // Limit results
-    searchQuery = searchQuery.limit(searchLimit);
+      if (normalizedQuery) {
+        // Escape special regex characters in the query to prevent regex injection
+        const escapedQuery = normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Use regex search on normalizedSearchText field
+        searchCriteria.normalizedSearchText = { $regex: escapedQuery, $options: 'i' };
+        searchQuery = College.find(searchCriteria);
+        // Sort by name for consistency
+        searchQuery = searchQuery.sort({ name: 1 });
+      } else {
+        // No text search, just use filters and sort by name
+        searchQuery = College.find(searchCriteria);
+        searchQuery = searchQuery.sort({ name: 1 });
+      }
+
+      // Limit results to 10 for name-based search
+      searchQuery = searchQuery.limit(searchLimit);
+    }
 
     // Execute query
     const colleges = await searchQuery.select('aisheCode name state district').lean();

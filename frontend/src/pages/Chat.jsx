@@ -876,8 +876,8 @@ const Chat = () => {
     setSelectedChat(null)
     setSelectedCollege(null)
     
-    // Show chat list on mobile when switching to chats section
-    if (section === 'chats' && isMobileView) {
+    // Show chat list on mobile when switching to chats or community section
+    if ((section === 'chats' || section === 'community') && isMobileView) {
       setShowChatList(true)
     }
     
@@ -889,6 +889,11 @@ const Chat = () => {
     // Load all colleges with messages when switching to chats section
     if (section === 'chats') {
       loadAllCollegesWithMessages()
+    }
+    
+    // Load groups when switching to community section
+    if (section === 'community' && user && !isLoading) {
+      loadGroups()
     }
     
     if (section !== 'search') {

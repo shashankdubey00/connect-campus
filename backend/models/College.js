@@ -22,6 +22,10 @@ const collegeSchema = new mongoose.Schema({
   searchText: {
     type: String,
     required: true
+  },
+  normalizedSearchText: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: false
