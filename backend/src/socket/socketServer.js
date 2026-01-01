@@ -432,34 +432,12 @@ export const initializeSocket = (server) => {
           });
           await message.save();
 
-          // Reload message to get latest readBy array
-          const updatedMessage = await Message.findById(messageId);
-
           // Broadcast read receipt to others in the room
           const roomName = `college:${collegeId}`;
           socket.to(roomName).emit('messageRead', {
             messageId: messageId,
             userId: userId,
             readAt: new Date(),
-          });
-
-          // Broadcast chat list update to ALL connected users (for real-time updates)
-          io.emit('chatListUpdate', {
-            type: 'college',
-            collegeId: collegeId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: updatedMessage.senderId.toString(),
-            senderName: updatedMessage.senderName,
-            isOwnMessage: false, // Each client will determine if it's their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
           });
         }
       } catch (error) {
@@ -489,28 +467,6 @@ export const initializeSocket = (server) => {
             deliveredAt: new Date(),
           });
           await message.save();
-
-          // Reload message to get latest deliveredTo array
-          const updatedMessage = await Message.findById(messageId);
-
-          // Broadcast chat list update to ALL connected users (for real-time updates)
-          io.emit('chatListUpdate', {
-            type: 'college',
-            collegeId: collegeId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: updatedMessage.senderId.toString(),
-            senderName: updatedMessage.senderName,
-            isOwnMessage: false, // Each client will determine if it's their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
-          });
         }
       } catch (error) {
         console.error('Error marking message as delivered:', error);
@@ -715,55 +671,13 @@ export const initializeSocket = (server) => {
           });
           await message.save();
 
-          // Reload message to get latest deliveredTo and readBy arrays
-          const updatedMessage = await DirectMessage.findById(messageId);
-          const senderId = updatedMessage.senderId.toString();
-          const receiverId = updatedMessage.receiverId.toString();
-
           // Notify sender that message was delivered
+          const senderId = message.senderId.toString();
           io.to(`user:${senderId}`).emit('message:update', {
             messageId: messageId,
             status: 'delivered',
             receiverId: userId,
           });
-
-          // Broadcast chat list update to BOTH sender and receiver (for real-time updates)
-          io.to(`user:${senderId}`).emit('directChatListUpdate', {
-            type: 'direct',
-            otherUserId: receiverId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: senderId,
-            senderName: updatedMessage.senderName,
-            isOwnMessage: true, // For sender, it's their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
-          });
-
-          io.to(`user:${receiverId}`).emit('directChatListUpdate', {
-            type: 'direct',
-            otherUserId: senderId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: senderId,
-            senderName: updatedMessage.senderName,
-            isOwnMessage: false, // For receiver, it's not their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
-          });
-
           console.log(`✅ Message ${messageId} marked as delivered. Notified sender: ${senderId}`);
         }
       } catch (error) {
@@ -799,55 +713,13 @@ export const initializeSocket = (server) => {
           });
           await message.save();
 
-          // Reload message to get latest deliveredTo and readBy arrays
-          const updatedMessage = await DirectMessage.findById(messageId);
-          const senderId = updatedMessage.senderId.toString();
-          const receiverId = updatedMessage.receiverId.toString();
-
           // Notify sender that message was read
+          const senderId = message.senderId.toString();
           io.to(`user:${senderId}`).emit('message:update', {
             messageId: messageId,
             status: 'read',
             receiverId: userId,
           });
-
-          // Broadcast chat list update to BOTH sender and receiver (for real-time updates)
-          io.to(`user:${senderId}`).emit('directChatListUpdate', {
-            type: 'direct',
-            otherUserId: receiverId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: senderId,
-            senderName: updatedMessage.senderName,
-            isOwnMessage: true, // For sender, it's their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
-          });
-
-          io.to(`user:${receiverId}`).emit('directChatListUpdate', {
-            type: 'direct',
-            otherUserId: senderId,
-            messageText: updatedMessage.text,
-            messageTimestamp: updatedMessage.timestamp,
-            senderId: senderId,
-            senderName: updatedMessage.senderName,
-            isOwnMessage: false, // For receiver, it's not their own message
-            deliveredTo: (updatedMessage.deliveredTo || []).map(d => ({
-              userId: d.userId.toString(),
-              deliveredAt: d.deliveredAt
-            })),
-            readBy: (updatedMessage.readBy || []).map(r => ({
-              userId: r.userId.toString(),
-              readAt: r.readAt
-            }))
-          });
-
           console.log(`✅ Message ${messageId} marked as read. Notified sender: ${senderId}`);
         }
       } catch (error) {

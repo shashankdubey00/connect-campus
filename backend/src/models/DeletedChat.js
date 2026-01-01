@@ -6,18 +6,15 @@ const deletedChatSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     // For college chats
     collegeId: {
       type: String,
-      index: true,
     },
     // For direct messages
     otherUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      index: true,
     },
     chatType: {
       type: String,

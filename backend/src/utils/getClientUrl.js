@@ -22,3 +22,4 @@ export const generateInviteUrl = (token) => {
   return `${baseUrl}/invite/${token}`;
 };
 
+

@@ -6,13 +6,11 @@ const deletedMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     messageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
       required: true,
-      index: true,
     },
     // Track if it's a college message or direct message
     messageType: {
@@ -23,13 +21,11 @@ const deletedMessageSchema = new mongoose.Schema(
     // For college messages
     collegeId: {
       type: String,
-      index: true,
     },
     // For direct messages
     otherUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      index: true,
     },
     deletedAt: {
       type: Date,

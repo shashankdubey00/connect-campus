@@ -194,3 +194,4 @@ const GroupInviteModal = ({ group, onClose }) => {
 
 export default GroupInviteModal;
 
+

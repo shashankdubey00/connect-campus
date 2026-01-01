@@ -6,7 +6,6 @@ const groupMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     senderName: {
       type: String,
@@ -16,7 +15,6 @@ const groupMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Group',
       required: true,
-      index: true,
     },
     text: {
       type: String,
@@ -31,7 +29,6 @@ const groupMessageSchema = new mongoose.Schema(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
     },
     readBy: [{
       userId: {
@@ -77,4 +74,5 @@ groupMessageSchema.index({ senderId: 1 });
 const GroupMessage = mongoose.models.GroupMessage || mongoose.model('GroupMessage', groupMessageSchema);
 
 export default GroupMessage;
+
 

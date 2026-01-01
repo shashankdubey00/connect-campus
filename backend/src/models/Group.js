@@ -21,7 +21,6 @@ const groupSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     // Group members (users who are part of the group)
     members: [{
@@ -64,7 +63,6 @@ const groupSchema = new mongoose.Schema(
     collegeId: {
       type: String,
       default: null,
-      index: true,
     },
   },
   {
@@ -97,4 +95,5 @@ groupSchema.virtual('memberCount').get(function() {
 const Group = mongoose.models.Group || mongoose.model('Group', groupSchema);
 
 export default Group;
+
 

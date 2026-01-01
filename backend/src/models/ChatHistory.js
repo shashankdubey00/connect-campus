@@ -6,18 +6,15 @@ const chatHistorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     // For college chats
     collegeId: {
       type: String,
-      index: true,
     },
     // For direct messages
     otherUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      index: true,
     },
     chatType: {
       type: String,
@@ -44,6 +41,7 @@ chatHistorySchema.index({ userId: 1, otherUserId: 1, chatType: 1 }, { unique: tr
 const ChatHistory = mongoose.models.ChatHistory || mongoose.model('ChatHistory', chatHistorySchema);
 
 export default ChatHistory;
+
 
 
 

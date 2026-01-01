@@ -307,3 +307,4 @@ const InviteManager = ({ collegeId, collegeName, onClose }) => {
 
 export default InviteManager;
 
+

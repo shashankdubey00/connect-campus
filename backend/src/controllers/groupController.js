@@ -1,7 +1,9 @@
 import Group from '../models/Group.js';
 import GroupInvite from '../models/GroupInvite.js';
+import GroupMessage from '../models/GroupMessage.js';
 import User from '../models/User.js';
 import UserProfile from '../models/UserProfile.js';
+import DeletedMessage from '../models/DeletedMessage.js';
 import { generateInviteUrl } from '../utils/getClientUrl.js';
 import crypto from 'crypto';
 
@@ -763,6 +765,322 @@ export const joinGroupViaInvite = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error joining group via invite',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get group messages
+ */
+export const getGroupMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { limit = 50, before } = req.query;
+    const userId = req.user.userId;
+
+    // Verify user is a member of the group
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+      });
+    }
+
+    const isMember = group.members.some(m => String(m.userId) === String(userId));
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must be a member to view messages',
+      });
+    }
+
+    // Build query
+    const query = { groupId: groupId };
+    if (before) {
+      query.timestamp = { $lt: new Date(before) };
+    }
+
+    // Fetch messages
+    const limitValue = Math.min(parseInt(limit) || 50, 200);
+    const allMessages = await GroupMessage.find(query)
+      .sort({ timestamp: 1 })
+      .limit(limitValue)
+      .lean();
+
+    // Get list of message IDs that are marked as deleted for this user
+    const messageIds = allMessages.map(msg => msg._id);
+    const deletedMessages = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'group'
+    }).select('messageId').lean();
+
+    const deletedMessageIds = new Set(deletedMessages.map(d => d.messageId.toString()));
+    const visibleMessages = allMessages.filter(msg => !deletedMessageIds.has(msg._id.toString()));
+
+    res.json({
+      success: true,
+      count: visibleMessages.length,
+      messages: visibleMessages.map(msg => ({
+        id: msg._id.toString(),
+        senderId: msg.senderId.toString(),
+        senderName: msg.senderName,
+        groupId: msg.groupId.toString(),
+        text: msg.text,
+        timestamp: msg.timestamp,
+        replyTo: msg.replyTo ? msg.replyTo.toString() : null,
+        readBy: msg.readBy || [],
+        deliveredTo: msg.deliveredTo || [],
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching group messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching group messages',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Send group message
+ */
+export const sendGroupMessage = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { text, replyTo } = req.body;
+    const userId = req.user.userId;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message text is required',
+      });
+    }
+
+    // Verify user is a member of the group
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+      });
+    }
+
+    const isMember = group.members.some(m => String(m.userId) === String(userId));
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must be a member to send messages',
+      });
+    }
+
+    // Get user profile for sender name
+    const userProfile = await UserProfile.findOne({ userId });
+    const senderName = userProfile?.displayName || userProfile?.firstName || 'User';
+
+    // Create message
+    const message = new GroupMessage({
+      senderId: userId,
+      senderName: senderName,
+      groupId: groupId,
+      text: text.trim(),
+      replyTo: replyTo || null,
+      timestamp: new Date(),
+    });
+
+    await message.save();
+
+    // Mark as delivered to all group members (except sender)
+    const memberIds = group.members
+      .map(m => m.userId)
+      .filter(id => String(id) !== String(userId));
+    
+    message.deliveredTo = memberIds.map(id => ({
+      userId: id,
+      deliveredAt: new Date(),
+    }));
+
+    await message.save();
+
+    res.json({
+      success: true,
+      message: {
+        id: message._id.toString(),
+        senderId: message.senderId.toString(),
+        senderName: message.senderName,
+        groupId: message.groupId.toString(),
+        text: message.text,
+        timestamp: message.timestamp,
+        replyTo: message.replyTo ? message.replyTo.toString() : null,
+        readBy: message.readBy || [],
+        deliveredTo: message.deliveredTo || [],
+      },
+    });
+  } catch (error) {
+    console.error('Error sending group message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending group message',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Delete group message (for me only)
+ */
+export const deleteGroupMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.userId;
+
+    const message = await GroupMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    // Mark as deleted for this user only
+    const existingDeletion = await DeletedMessage.findOne({
+      userId: userId,
+      messageId: messageId,
+      messageType: 'group'
+    });
+
+    if (!existingDeletion) {
+      await DeletedMessage.create({
+        userId: userId,
+        messageId: messageId,
+        messageType: 'group',
+        groupId: message.groupId,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Message deleted for you only',
+    });
+  } catch (error) {
+    console.error('Error deleting group message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting group message',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Delete group message for everyone
+ */
+export const deleteGroupMessageForAll = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.userId;
+
+    const message = await GroupMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    // Only allow deleting own messages
+    if (String(message.senderId) !== String(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete your own messages',
+      });
+    }
+
+    // Delete the message from database
+    await GroupMessage.findByIdAndDelete(messageId);
+
+    // Remove all "delete for me" records
+    await DeletedMessage.deleteMany({ messageId: messageId });
+
+    res.json({
+      success: true,
+      message: 'Message deleted for everyone',
+    });
+  } catch (error) {
+    console.error('Error deleting group message for all:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting group message',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Clear all group messages (for me only)
+ */
+export const clearGroupMessages = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user.userId;
+
+    // Verify user is a member
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found',
+      });
+    }
+
+    const isMember = group.members.some(m => String(m.userId) === String(userId));
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must be a member to clear messages',
+      });
+    }
+
+    // Get all messages in this group
+    const allMessages = await GroupMessage.find({ groupId }).select('_id').lean();
+    const messageIds = allMessages.map(msg => msg._id);
+    
+    // Get existing deletions
+    const existingDeletions = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'group'
+    }).select('messageId').lean();
+    
+    const existingIds = new Set(existingDeletions.map(d => d.messageId.toString()));
+    const newMessageIds = messageIds.filter(id => !existingIds.has(id.toString()));
+
+    // Mark all messages as deleted for this user
+    if (newMessageIds.length > 0) {
+      await DeletedMessage.insertMany(
+        newMessageIds.map(messageId => ({
+          userId: userId,
+          messageId: messageId,
+          messageType: 'group',
+          groupId: groupId,
+        }))
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Messages cleared successfully for you only',
+      markedDeletedCount: newMessageIds.length,
+    });
+  } catch (error) {
+    console.error('Error clearing group messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error clearing group messages',
       error: error.message,
     });
   }

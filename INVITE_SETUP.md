@@ -85,3 +85,4 @@ After deployment, test by:
 - `frontend/src/pages/Invite.jsx` - Handles invite link rendering
 - `backend/src/config/env.js` - Validates CLIENT_URL on startup
 
+

@@ -14,7 +14,6 @@ const messageSchema = new mongoose.Schema(
     collegeId: {
       type: String,
       required: true,
-      index: true, // Index for faster queries by college
     },
     text: {
       type: String,
@@ -29,7 +28,6 @@ const messageSchema = new mongoose.Schema(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true, // Index for sorting by time
     },
     readBy: [{
       userId: {

@@ -12,6 +12,11 @@ import {
   createGroupInvite,
   getGroupInviteDetails,
   joinGroupViaInvite,
+  getGroupMessages,
+  sendGroupMessage,
+  deleteGroupMessage,
+  deleteGroupMessageForAll,
+  clearGroupMessages,
 } from '../controllers/groupController.js';
 
 const router = express.Router();
@@ -38,5 +43,13 @@ router.post('/:groupId/leave', leaveGroup);
 router.post('/:groupId/invites/create', createGroupInvite);
 router.post('/invites/join', joinGroupViaInvite);
 
+// Group messages (must be before /:groupId route to avoid conflict)
+router.get('/:groupId/messages', getGroupMessages);
+router.post('/:groupId/messages', sendGroupMessage);
+router.delete('/:groupId/messages/clear', clearGroupMessages);
+router.delete('/messages/:messageId', deleteGroupMessage);
+router.delete('/messages/:messageId/for-all', deleteGroupMessageForAll);
+
 export default router;
+
 

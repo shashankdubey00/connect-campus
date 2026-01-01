@@ -188,3 +188,4 @@ export const isFamousCollege = (collegeName) => {
   return popularUniversities.some(uni => nameUpper.includes(uni));
 };
 
+

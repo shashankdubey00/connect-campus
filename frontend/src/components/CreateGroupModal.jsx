@@ -113,7 +113,7 @@ const CreateGroupModal = ({ onClose, onGroupCreated, user, availableUsers = [] }
             <div className="create-group-form-section">
               <label>Add Members</label>
               <p className="member-selection-hint">
-                Select members from your direct chats or college. You can also invite external users after creating the group.
+                Select members from your direct chats or from any college groups you've joined. You can also invite external users after creating the group.
               </p>
               <div className="member-search-container">
                 <input
@@ -148,6 +148,7 @@ const CreateGroupModal = ({ onClose, onGroupCreated, user, availableUsers = [] }
                       const isSelected = selectedMembers.has(String(userId));
                       const isCurrentUser = String(userId) === String(user?._id || user?.id);
                       const userSource = userItem.source || 'unknown'; // 'direct_message', 'college', etc.
+                      const collegeName = userItem.collegeName || ''
 
                       if (isCurrentUser) return null; // Don't show current user
 
@@ -163,7 +164,7 @@ const CreateGroupModal = ({ onClose, onGroupCreated, user, availableUsers = [] }
                               <span className="member-source-badge" title="Direct chat contact">💬</span>
                             )}
                             {userSource === 'college' && (
-                              <span className="member-source-badge" title="College member">🏫</span>
+                              <span className="member-source-badge" title={`College member from ${collegeName}`}>🏫</span>
                             )}
                           </div>
                           <div className="member-select-info">
@@ -173,7 +174,9 @@ const CreateGroupModal = ({ onClose, onGroupCreated, user, availableUsers = [] }
                                 ? userItem.email 
                                 : userSource === 'direct_message' 
                                   ? 'Direct chat contact'
-                                  : 'College member'}
+                                  : collegeName 
+                                    ? `${collegeName} member`
+                                    : 'College member'}
                             </div>
                           </div>
                           <div className="member-select-checkbox">

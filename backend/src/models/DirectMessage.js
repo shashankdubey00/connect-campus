@@ -6,13 +6,11 @@ const directMessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     receiverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     senderName: {
       type: String,
@@ -31,7 +29,6 @@ const directMessageSchema = new mongoose.Schema(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
     },
     deliveredTo: [{
       userId: {

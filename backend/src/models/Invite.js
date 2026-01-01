@@ -6,7 +6,6 @@ const inviteSchema = new mongoose.Schema(
     collegeId: {
       type: String,
       required: true,
-      index: true,
     },
     
     // User who created the invite
@@ -14,15 +13,12 @@ const inviteSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     
     // Unique invite code (e.g., "JOIN-ABC123")
     inviteCode: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
       uppercase: true,
     },
     
@@ -30,8 +26,6 @@ const inviteSchema = new mongoose.Schema(
     token: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
     },
     
     // Type of invite: 'college' or 'community'
@@ -90,8 +84,9 @@ const inviteSchema = new mongoose.Schema(
 
 // Index for efficient lookups
 inviteSchema.index({ collegeId: 1, isActive: 1 });
-inviteSchema.index({ token: 1 });
-inviteSchema.index({ inviteCode: 1 });
+inviteSchema.index({ token: 1 }, { unique: true });
+inviteSchema.index({ inviteCode: 1 }, { unique: true });
+inviteSchema.index({ createdBy: 1 });
 
 // Method to check if invite is valid
 inviteSchema.methods.isValid = function() {
@@ -114,4 +109,5 @@ inviteSchema.methods.recordUsage = function(userId) {
 const Invite = mongoose.model('Invite', inviteSchema);
 
 export default Invite;
+
 

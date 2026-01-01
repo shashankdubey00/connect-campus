@@ -6,28 +6,22 @@ const groupInviteSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Group',
       required: true,
-      index: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     // Unique invite code
     inviteCode: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
       uppercase: true,
     },
     // Unique token for invite link
     token: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
     },
     // Invite expiration date (optional)
     expiresAt: {
@@ -73,9 +67,12 @@ const groupInviteSchema = new mongoose.Schema(
 
 // Indexes
 groupInviteSchema.index({ groupId: 1, isActive: 1 });
-groupInviteSchema.index({ token: 1 });
+groupInviteSchema.index({ token: 1 }, { unique: true });
+groupInviteSchema.index({ inviteCode: 1 }, { unique: true });
+groupInviteSchema.index({ createdBy: 1 });
 
 const GroupInvite = mongoose.models.GroupInvite || mongoose.model('GroupInvite', groupInviteSchema);
 
 export default GroupInvite;
+
 

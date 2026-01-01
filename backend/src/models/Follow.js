@@ -6,16 +6,13 @@ const followSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     collegeId: {
       type: String,
       required: true,
-      index: true,
     },
     collegeAisheCode: {
       type: String,
-      index: true,
     },
     // Invite tracking
     joinedViaInvite: {
@@ -35,6 +32,7 @@ const followSchema = new mongoose.Schema(
 
 // Compound index to ensure a user can only follow a college once
 followSchema.index({ userId: 1, collegeId: 1 }, { unique: true });
+followSchema.index({ collegeAisheCode: 1 });
 
 const Follow = mongoose.models.Follow || mongoose.model('Follow', followSchema);
 

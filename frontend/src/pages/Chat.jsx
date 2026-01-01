@@ -2,16 +2,18 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { verifyAuth, logout } from '../services/authService'
-import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate, onCollegeActiveCountUpdate, markMessageRead } from '../services/socketService'
+import { connectSocket, disconnectSocket, getSocket, onJoinedRoom, onReceiveMessage, onSocketError, sendMessage, removeAllListeners, joinCollegeRoom, emitTyping, emitTypingDirect, onUserTyping, onUserTypingDirect, onUserOnline, onUserOffline, onMessageRead, sendDirectMessageSocket, markDirectMessageDelivered, markDirectMessageRead, onNewDirectMessage, onDirectMessageSent, onMessageUpdate, onCollegeActiveCountUpdate, markMessageRead, joinGroupRoom, leaveGroupRoom, emitTypingGroup, onUserTypingGroup, onGroupMessage, markGroupMessageRead, markGroupMessageDelivered, sendGroupMessageSocket } from '../services/socketService'
 import { fetchMessages, fetchUserCollegesWithMessages, clearCollegeMessages, deleteMessage, deleteMessageForAll, deleteAllCollegeMessages } from '../services/messageService'
 import { getCollegeChatInfo } from '../services/chatService'
 import { uploadCollegeId, getVerificationStatus, uploadProfilePicture, updateProfile, joinCollege, leaveCollege, followCollege, unfollowCollege, checkFollowStatus, getCollegeFollowersCount, getCollegeFollowers, getUserProfile, getUserColleges, blockUser, unblockUser, checkBlockStatus, getCollegeActiveStudentsCount } from '../services/profileService'
 import { sendDirectMessage, getDirectMessages, clearDirectMessages, getDirectMessageConversations, deleteDirectMessage, deleteDirectMessageForAll, deleteAllDirectMessages } from '../services/directMessageService'
-import { getMyGroups, createGroup as createGroupAPI } from '../services/groupService'
+import { getMyGroups, createGroup as createGroupAPI, getGroupDetails, leaveGroup as leaveGroupAPI, addMembersToGroup } from '../services/groupService'
+import { fetchGroupMessages, sendGroupMessage, clearGroupMessages, deleteGroupMessage, deleteGroupMessageForAll } from '../services/groupMessageService'
 import EmojiPicker from 'emoji-picker-react'
 import InviteModal from '../components/InviteModal'
 import CreateGroupModal from '../components/CreateGroupModal'
 import GroupInviteModal from '../components/GroupInviteModal'
+import ProfilePictureCropModal from '../components/ProfilePictureCropModal'
 import { getCollegeLogoUrl } from '../utils/collegeLogo'
 import './Chat.css'
 
@@ -24,7 +26,7 @@ const Chat = () => {
   const [selectedChat, setSelectedChat] = useState(null)
   const [selectedCollege, setSelectedCollege] = useState(null)
   const [selectedStudent, setSelectedStudent] = useState(null) // For viewing other students' profiles
-  const [view, setView] = useState('list') // list, college-profile, live-chat, student-profile, settings, direct-chat
+  const [view, setView] = useState('list') // list, college-profile, live-chat, student-profile, settings, direct-chat, group-profile, group-chat
   const [user, setUser] = useState(null)
   const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768)
   const [showChatList, setShowChatList] = useState(true)
@@ -78,6 +80,7 @@ const Chat = () => {
   const [availableUsers, setAvailableUsers] = useState([]) // Users available to add to groups
   const [showGroupInviteModal, setShowGroupInviteModal] = useState(false)
   const [selectedGroupForInvite, setSelectedGroupForInvite] = useState(null)
+  const [selectedGroup, setSelectedGroup] = useState(null) // Selected group for profile view
   const [middlePanelWidth, setMiddlePanelWidth] = useState(() => {
     // Load from localStorage or use default
     const saved = localStorage.getItem('middlePanelWidth')
@@ -674,34 +677,59 @@ const Chat = () => {
         console.error('Error loading direct message contacts:', error)
       }
       
-      // 2. Get users from college (college members/followers)
-      if (user?.profile?.college) {
-        try {
-          const collegeObj = {
-            aisheCode: user.profile.college.aisheCode,
-            name: user.profile.college.name,
-          }
-          const collegeResponse = await getCollegeFollowers(collegeObj)
-          if (collegeResponse.success && collegeResponse.members) {
-            collegeResponse.members.forEach(member => {
-              const userId = String(member.id)
-              if (!allUsers.has(userId)) {
-                allUsers.set(userId, {
-                  _id: userId,
-                  id: userId,
-                  email: `${member.name?.replace(/\s+/g, '.').toLowerCase()}@example.com`, // Placeholder
-                  profile: {
-                    displayName: member.name,
-                    profilePicture: member.avatar,
-                  },
-                  source: 'college', // Track where this user came from
-                })
+      // 2. Get users from ALL colleges the user has joined/followed
+      try {
+        // Get all colleges the user has joined
+        const userCollegesResponse = await getUserColleges(user?.id || user?._id)
+        if (userCollegesResponse.success && userCollegesResponse.colleges) {
+          // Process each college the user has joined
+          const collegePromises = userCollegesResponse.colleges.map(async (college) => {
+            try {
+              const collegeObj = {
+                aisheCode: college.aisheCode || college.identifier,
+                name: college.name,
               }
-            })
-          }
-        } catch (error) {
-          console.error('Error loading college members:', error)
+              const collegeResponse = await getCollegeFollowers(collegeObj)
+              if (collegeResponse.success && collegeResponse.members) {
+                return {
+                  collegeName: college.name,
+                  members: collegeResponse.members
+                }
+              }
+              return null
+            } catch (error) {
+              console.error(`Error loading members for college ${college.name}:`, error)
+              return null
+            }
+          })
+          
+          // Wait for all college member requests to complete
+          const collegeResults = await Promise.all(collegePromises)
+          
+          // Add all members from all colleges
+          collegeResults.forEach((result) => {
+            if (result && result.members) {
+              result.members.forEach(member => {
+                const userId = String(member.id)
+                if (!allUsers.has(userId)) {
+                  allUsers.set(userId, {
+                    _id: userId,
+                    id: userId,
+                    email: `${member.name?.replace(/\s+/g, '.').toLowerCase()}@example.com`, // Placeholder
+                    profile: {
+                      displayName: member.name,
+                      profilePicture: member.avatar,
+                    },
+                    source: 'college', // Track where this user came from
+                    collegeName: result.collegeName, // Track which college they're from
+                  })
+                }
+              })
+            }
+          })
         }
+      } catch (error) {
+        console.error('Error loading user colleges:', error)
       }
       
       // Convert Map to array and sort by display name
@@ -1353,7 +1381,18 @@ const Chat = () => {
   // Get user avatar
   const getUserAvatar = () => {
     if (user?.profile?.profilePicture) {
-      return user.profile.profilePicture
+      // If it's a relative path, prepend the backend URL
+      if (user.profile.profilePicture.startsWith('/uploads/')) {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        return `${backendUrl}${user.profile.profilePicture}`
+      }
+      // If it's already a full URL, use it as is
+      if (user.profile.profilePicture.startsWith('http://') || user.profile.profilePicture.startsWith('https://')) {
+        return user.profile.profilePicture
+      }
+      // Otherwise, treat as relative path
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+      return `${backendUrl}${user.profile.profilePicture}`
     }
     const name = user?.profile?.displayName || user?.email || 'User'
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -2448,8 +2487,11 @@ const Chat = () => {
                     key={group.id}
                     className="panel-item panel-item-with-actions"
                     onClick={() => {
-                      // TODO: Open group chat view
-                      console.log('Open group:', group)
+                      setSelectedGroup(group)
+                      setView('group-profile')
+                      if (isMobileView) {
+                        setShowChatList(false)
+                      }
                     }}
                   >
                     <div className="panel-item-avatar">
@@ -2890,6 +2932,74 @@ const Chat = () => {
         }}
       />
     }
+    if (view === 'group-profile' && selectedGroup) {
+      return <GroupProfileView 
+        group={selectedGroup} 
+        user={user}
+        onBack={navigateBack}
+        onViewStudentProfile={handleViewStudentProfile}
+        onJoinChat={() => {
+          // Create a chat object for the group
+          const groupChat = {
+            id: `group-${selectedGroup.id}`,
+            type: 'group',
+            groupId: selectedGroup.id,
+            name: selectedGroup.name,
+            avatar: selectedGroup.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedGroup.name)}&size=50&background=00a8ff&color=fff`,
+            lastMessage: 'No messages yet',
+            timestamp: '',
+            lastMessageTime: new Date(),
+            unreadCount: 0,
+            group: selectedGroup
+          }
+          setSelectedChat(groupChat)
+          setView('group-chat')
+          if (isMobileView) {
+            setShowChatList(false)
+          }
+        }}
+        onJoinGroup={async (group) => {
+          // Reload groups after joining
+          await loadGroups()
+        }}
+        onLeaveGroup={async (group) => {
+          // Reload groups after leaving
+          await loadGroups()
+        }}
+        onReloadGroups={loadGroups}
+      />
+    }
+    if (view === 'group-chat' && selectedChat && selectedChat.type === 'group') {
+      return <GroupChatView 
+        chat={selectedChat} 
+        group={selectedChat.group || selectedGroup} 
+        user={user} 
+        onBack={() => {
+          if (selectedGroup) {
+            setView('group-profile')
+          } else {
+            setView('list')
+          }
+          if (isMobileView) setShowChatList(true)
+        }} 
+        onViewProfile={() => selectedGroup && setView('group-profile')} 
+        onViewStudentProfile={handleViewStudentProfile} 
+        onMessageSent={(groupId, messageText, timestamp, isOwnMessage, deliveredTo, readBy) => {
+          // Update groups list with latest message
+          setGroups(prev => prev.map(g => {
+            if (String(g.id) === String(groupId)) {
+              return {
+                ...g,
+                lastMessage: messageText,
+                lastMessageTime: timestamp,
+                lastMessageIsOwn: isOwnMessage
+              }
+            }
+            return g
+          }))
+        }}
+      />
+    }
     if (view === 'live-chat' && selectedChat) {
       const college = selectedChat.type === 'college' 
         ? selectedChat.college
@@ -3205,7 +3315,16 @@ const Chat = () => {
       <div className="chat-sidebar">
         <div className="sidebar-header">
           <div className="profile-icon" onClick={handleProfileClick} title="Profile">
-            <img src={getUserAvatar()} alt="Profile" />
+            <img 
+              src={getUserAvatar()} 
+              alt="Profile"
+              onError={(e) => {
+                // Fallback to ui-avatars if image fails to load
+                const name = user?.profile?.displayName || user?.email || 'User'
+                const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=50&background=00a8ff&color=fff`
+              }}
+            />
           </div>
           <div className="profile-name-sidebar">{getUserDisplayName()}</div>
         </div>
@@ -3831,6 +3950,341 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
   )
 }
 
+// Group Profile View Component
+const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, onBack, showBackButton = true, onViewStudentProfile, onReloadGroups }) => {
+  const [showMembers, setShowMembers] = useState(false)
+  const [members, setMembers] = useState([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [groupData, setGroupData] = useState(group) // Local state for group data
+  const [isMember, setIsMember] = useState(false)
+  const [isLoadingJoin, setIsLoadingJoin] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+
+  // Check if user is a member
+  useEffect(() => {
+    if (user && groupData) {
+      const userId = String(user?.id || user?._id || '')
+      const memberIds = (groupData.members || []).map(m => String(m.userId || m.id || ''))
+      setIsMember(memberIds.includes(userId))
+    }
+  }, [user, groupData])
+
+  // Load group details on mount
+  useEffect(() => {
+    const loadGroupDetails = async () => {
+      if (group?.id) {
+        try {
+          const response = await getGroupDetails(group.id)
+          if (response.success && response.group) {
+            setGroupData(response.group)
+            const userId = String(user?.id || user?._id || '')
+            const memberIds = (response.group.members || []).map(m => String(m.userId || m.id || ''))
+            setIsMember(memberIds.includes(userId))
+          }
+        } catch (error) {
+          console.error('Error loading group details:', error)
+        }
+      }
+    }
+    loadGroupDetails()
+  }, [group?.id, user])
+
+  // Fetch members when toggle is clicked
+  const handleToggleMembers = async () => {
+    if (!showMembers && groupData?.id) {
+      setLoadingMembers(true)
+      try {
+        const response = await getGroupDetails(groupData.id)
+        if (response.success && response.group) {
+          const groupMembers = response.group.members || []
+          setMembers(groupMembers.map(m => ({
+            id: m.userId || m.id,
+            name: m.name || 'Member',
+            avatar: m.avatar || null
+          })))
+          setGroupData(prev => ({
+            ...prev,
+            memberCount: groupMembers.length
+          }))
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error)
+        setMembers([])
+      } finally {
+        setLoadingMembers(false)
+      }
+    }
+    setShowMembers(!showMembers)
+  }
+
+  // Handle join group
+  const handleJoinGroup = async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    if (!groupData?.id) {
+      alert('Error: Invalid group data')
+      return
+    }
+    
+    if (isLoadingJoin || isMember) {
+      return
+    }
+    
+    setIsLoadingJoin(true)
+    
+    try {
+      // Add current user as member
+      const userId = String(user?.id || user?._id || '')
+      const response = await addMembersToGroup(groupData.id, [userId])
+      
+      if (response?.success) {
+        setIsMember(true)
+        
+        // Reload group details
+        const groupResponse = await getGroupDetails(groupData.id)
+        if (groupResponse.success && groupResponse.group) {
+          setGroupData(groupResponse.group)
+          const memberIds = (groupResponse.group.members || []).map(m => String(m.userId || m.id || ''))
+          setIsMember(memberIds.includes(userId))
+        }
+        
+        // Call parent handler
+        if (onJoinGroup) {
+          await onJoinGroup(groupData)
+        }
+        
+        // Reload groups list
+        if (onReloadGroups) {
+          await onReloadGroups()
+        }
+        
+        // Reload groups list
+        if (loadGroups) {
+          loadGroups()
+        }
+      } else {
+        alert(response?.message || 'Failed to join group')
+      }
+    } catch (error) {
+      console.error('Error joining group:', error)
+      alert('Error joining group: ' + (error.message || 'Unknown error'))
+    } finally {
+      setIsLoadingJoin(false)
+    }
+  }
+
+  // Handle leave group
+  const handleLeaveGroup = async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    if (isLoadingJoin || !isMember) return
+    
+    setIsLoadingJoin(true)
+    
+    try {
+      const response = await leaveGroupAPI(groupData.id)
+      if (response?.success) {
+        setIsMember(false)
+        
+        // Reload group details
+        const groupResponse = await getGroupDetails(groupData.id)
+        if (groupResponse.success && groupResponse.group) {
+          setGroupData(groupResponse.group)
+        }
+        
+        // Call parent handler
+        if (onLeaveGroup) {
+          await onLeaveGroup(groupData)
+        }
+        
+        // Reload groups list
+        if (onReloadGroups) {
+          await onReloadGroups()
+        }
+      } else {
+        alert(response?.message || 'Failed to leave group')
+      }
+    } catch (error) {
+      console.error('Error leaving group:', error)
+      alert('Error leaving group: ' + (error.message || 'Unknown error'))
+    } finally {
+      setIsLoadingJoin(false)
+    }
+  }
+
+  const groupAvatar = groupData?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupData?.name || 'Group')}&size=150&background=00a8ff&color=fff`
+  const memberCount = groupData?.memberCount || groupData?.members?.length || 0
+
+  return (
+    <div className="college-profile-view">
+      {showBackButton && onBack && (
+        <div className="college-profile-back-header">
+          <button 
+            className="college-profile-back-btn" 
+            onClick={onBack}
+            title="Back"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className="college-profile-content-new">
+        {/* Group Avatar */}
+        <div className="college-logo-center">
+          <img src={groupAvatar} alt={groupData?.name} style={{ width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover' }} />
+        </div>
+
+        {/* Group Name and Description */}
+        <div className="college-name-section">
+          <h1 className="college-name-full">{groupData?.name || 'Group'}</h1>
+          {groupData?.description && (
+            <p className="college-location-full">{groupData.description}</p>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="college-action-buttons">
+          <button 
+            type="button"
+            className={isMember ? "btn-join-campus btn-remove-campus" : "btn-join-campus"} 
+            onClick={async (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              
+              if (isLoadingJoin) {
+                return
+              }
+              
+              try {
+                if (isMember) {
+                  await handleLeaveGroup(e)
+                } else {
+                  await handleJoinGroup(e)
+                }
+              } catch (error) {
+                console.error('Error in button onClick:', error)
+                alert('Error: ' + (error.message || 'Unknown error'))
+              }
+            }}
+            disabled={isLoadingJoin}
+            style={{ 
+              pointerEvents: isLoadingJoin ? 'none' : 'auto', 
+              position: 'relative', 
+              zIndex: 100,
+              cursor: isLoadingJoin ? 'not-allowed' : 'pointer',
+              minWidth: '100px',
+              opacity: isLoadingJoin ? 0.6 : 1
+            }}
+          >
+            {isLoadingJoin ? 'Loading...' : (isMember ? 'Leave' : 'Join')}
+          </button>
+          {isMember && (
+            <>
+              <button 
+                type="button"
+                className="btn-join-chat" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onJoinChat()
+                }}
+              >
+                Join Chat
+              </button>
+              <button 
+                type="button"
+                className="btn-invite animated-invite-btn" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowInviteModal(true)
+                }}
+                title="Invite friends to join this group"
+              >
+                <span className="invite-icon">📤</span>
+                <span className="invite-text">Invite</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        {showInviteModal && (
+          <GroupInviteModal
+            group={groupData}
+            onClose={() => setShowInviteModal(false)}
+          />
+        )}
+
+        {/* About Section */}
+        {groupData?.description && (
+          <div className="college-about-section">
+            <h3 className="section-title">About</h3>
+            <p className="about-text">{groupData.description}</p>
+          </div>
+        )}
+
+        {/* Total Members Toggle */}
+        <div className="college-members-section">
+          <button 
+            className="members-toggle"
+            onClick={handleToggleMembers}
+          >
+            <span className="toggle-label">Total Members</span>
+            <span className="toggle-count">{memberCount}</span>
+            <span className="toggle-arrow">{showMembers ? '▼' : '▶'}</span>
+          </button>
+
+          {/* Members List */}
+          {showMembers && (
+            <div className="members-list-container">
+              {loadingMembers ? (
+                <div className="members-loading">Loading members...</div>
+              ) : members.length > 0 ? (
+                <div className="members-list-whatsapp">
+                  {members.map((member, index) => (
+                    <div 
+                      key={member.id || index} 
+                      className="member-item-whatsapp"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        if (onViewStudentProfile && member.id) {
+                          const userIdStr = String(member.id).trim()
+                          if (userIdStr && userIdStr !== 'undefined' && userIdStr !== 'null') {
+                            onViewStudentProfile(userIdStr)
+                          }
+                        }
+                      }}
+                      style={{ cursor: onViewStudentProfile ? 'pointer' : 'default' }}
+                    >
+                      <div className="member-avatar-whatsapp">
+                        <img 
+                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`} 
+                          alt={member.name || 'Member'} 
+                        />
+                      </div>
+                      <div className="member-name-whatsapp">{member.name || 'Member'}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="members-empty">No members found</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Live Chat View Component
 const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfile, user, verificationStatus, onMessageSent }) => {
   const [messageInput, setMessageInput] = useState('')
@@ -3995,9 +4449,20 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const newProfiles = {}
       profiles.forEach(profile => {
         if (profile) {
-          newProfiles[profile.userId] = {
+          // Ensure userId is stored as string for consistent lookup
+          const userIdKey = String(profile.userId || '')
+          
+          // Process profile picture URL - if it's a relative path, keep it as is
+          // (will be processed when rendering)
+          let profilePicture = profile.profilePicture
+          if (profilePicture && !profilePicture.startsWith('http') && !profilePicture.startsWith('/uploads/')) {
+            // If it's not a URL and not a relative path, it might be invalid
+            profilePicture = null
+          }
+          
+          newProfiles[userIdKey] = {
             displayName: profile.displayName,
-            profilePicture: profile.profilePicture,
+            profilePicture: profilePicture,
             profile: profile.profile
           }
         }
@@ -5725,8 +6190,35 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                           style={{ cursor: 'pointer' }}
                         >
                           <img 
-                            src={senderProfiles[message.senderId]?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderProfiles[message.senderId]?.displayName || message.sender || 'User')}&size=40&background=00a8ff&color=fff`}
-                            alt={senderProfiles[message.senderId]?.displayName || message.sender || 'User'}
+                            src={(() => {
+                              // Ensure senderId is converted to string for lookup
+                              const senderIdKey = String(message.senderId || '')
+                              const senderProfile = senderProfiles[senderIdKey]
+                              const profilePic = senderProfile?.profilePicture
+                              
+                              if (profilePic) {
+                                // If it's a relative path, prepend the backend URL
+                                if (profilePic.startsWith('/uploads/')) {
+                                  return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${profilePic}`
+                                }
+                                // If it's already a full URL, use it as is
+                                if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
+                                  return profilePic
+                                }
+                                // Otherwise, treat as relative path
+                                return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${profilePic}`
+                              }
+                              // Fallback to ui-avatars
+                              const displayName = senderProfile?.displayName || message.sender || 'User'
+                              return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
+                            })()}
+                            alt={senderProfiles[String(message.senderId || '')]?.displayName || message.sender || 'User'}
+                            onError={(e) => {
+                              // Fallback to ui-avatars if image fails to load
+                              const senderIdKey = String(message.senderId || '')
+                              const displayName = senderProfiles[senderIdKey]?.displayName || message.sender || 'User'
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
+                            }}
                           />
                         </div>
                         <div 
@@ -5747,7 +6239,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                           }}
                           style={{ cursor: 'pointer' }}
                         >
-                          {senderProfiles[message.senderId]?.displayName || message.sender}
+                          {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
                         </div>
                       </div>
                     )}
@@ -5808,11 +6300,15 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
+                            // For college chats, always show single tick (sent status)
+                            if (chat.type === 'college') {
+                              return 'sent'
+                            }
+                            
                             const readBy = message.readBy || []
                             const deliveredTo = message.deliveredTo || []
                             const currentUserId = String(user?.id || user?._id || '')
                             
-                            // For group chats, check if read by at least one other user
                             // For direct chats, check if read by the other user
                             const isRead = readBy.some(r => String(r.userId) !== currentUserId)
                             const isDelivered = deliveredTo.some(d => String(d.userId) !== currentUserId)
@@ -5820,13 +6316,22 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                             return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
                           })()}`}>
                             {(() => {
+                              // For college chats, always show single tick
+                              if (chat.type === 'college') {
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              }
+                              
                               const readBy = message.readBy || []
                               const deliveredTo = message.deliveredTo || []
                               const currentUserId = String(user?.id || user?._id || '')
                               
-              // Check if message is read by at least one other user
-              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
-              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
+                              // Check if message is read by the other user (for direct chats)
+                              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
+                              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
                               
                               if (isRead) {
                                 // Blue double checkmark (read)
@@ -6186,6 +6691,278 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             />
           </div>
         )}
+      </form>
+    </div>
+  )
+}
+
+// Group Chat View Component (similar to LiveChatView but for groups, single tick only)
+const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudentProfile, onMessageSent }) => {
+  const [messageInput, setMessageInput] = useState('')
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [senderProfiles, setSenderProfiles] = useState({})
+  const [replyingTo, setReplyingTo] = useState(null)
+  const messagesEndRef = useRef(null)
+  const socket = getSocket()
+  const groupId = group?.id || chat?.groupId
+
+  // Fetch group messages
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!groupId) return
+      
+      try {
+        setLoading(true)
+        const response = await fetchGroupMessages(groupId, 200)
+        if (response.success) {
+          const formattedMessages = response.messages.map(msg => ({
+            id: msg.id,
+            text: msg.text,
+            sender: msg.senderName,
+            senderId: msg.senderId,
+            timestamp: new Date(msg.timestamp),
+            isOwn: String(msg.senderId) === String(user?.id || user?._id),
+            replyTo: msg.replyTo,
+            readBy: msg.readBy || [],
+            deliveredTo: msg.deliveredTo || [],
+          }))
+          setMessages(formattedMessages)
+          
+          // Fetch sender profiles
+          const senderIds = [...new Set(formattedMessages.map(m => m.senderId))]
+          await fetchSenderProfiles(senderIds)
+        }
+      } catch (error) {
+        console.error('Error loading group messages:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadMessages()
+  }, [groupId, user])
+
+  // Fetch sender profiles
+  const fetchSenderProfiles = async (senderIds) => {
+    try {
+      const profiles = await Promise.all(
+        senderIds.map(async (senderId) => {
+          try {
+            const profileResponse = await getUserProfile(senderId)
+            if (profileResponse.success && profileResponse.profile) {
+              let profilePicture = profileResponse.profile.profilePicture
+              if (profilePicture && profilePicture.startsWith('/uploads/')) {
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+                profilePicture = `${backendUrl}${profilePicture}`
+              }
+              return {
+                userId: senderId,
+                displayName: profileResponse.profile.displayName || 'User',
+                profilePicture: profilePicture,
+                profile: profileResponse.profile
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching profile for ${senderId}:`, error)
+          }
+          return null
+        })
+      )
+      
+      const newProfiles = {}
+      profiles.forEach(profile => {
+        if (profile) {
+          newProfiles[String(profile.userId)] = profile
+        }
+      })
+      setSenderProfiles(prev => ({ ...prev, ...newProfiles }))
+    } catch (error) {
+      console.error('Error fetching sender profiles:', error)
+    }
+  }
+
+  // Socket listeners for group messages
+  useEffect(() => {
+    if (!socket || !groupId) return
+
+    const handleNewMessage = (data) => {
+      if (data.groupId === groupId) {
+        const newMessage = {
+          id: data.message.id,
+          text: data.message.text,
+          sender: data.message.senderName,
+          senderId: data.message.senderId,
+          timestamp: new Date(data.message.timestamp),
+          isOwn: String(data.message.senderId) === String(user?.id || user?._id),
+          replyTo: data.message.replyTo,
+          readBy: data.message.readBy || [],
+          deliveredTo: data.message.deliveredTo || [],
+        }
+        setMessages(prev => [...prev, newMessage])
+        
+        // Fetch sender profile if not cached
+        if (!senderProfiles[String(data.message.senderId)]) {
+          fetchSenderProfiles([data.message.senderId])
+        }
+      }
+    }
+
+    socket.on('groupMessage', handleNewMessage)
+    socket.emit('joinGroup', groupId)
+
+    return () => {
+      socket.off('groupMessage', handleNewMessage)
+      socket.emit('leaveGroup', groupId)
+    }
+  }, [socket, groupId, user, senderProfiles])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages])
+
+  // Send message
+  const handleSendMessage = async (e) => {
+    e.preventDefault()
+    if (!messageInput.trim() || !groupId) return
+
+    const text = messageInput.trim()
+    setMessageInput('')
+    setReplyingTo(null)
+
+    try {
+      const response = await sendGroupMessage(groupId, text, replyingTo?.id)
+      if (response.success && onMessageSent) {
+        onMessageSent(groupId, text, new Date(), true, [], [])
+      }
+    } catch (error) {
+      console.error('Error sending group message:', error)
+      alert('Failed to send message')
+    }
+  }
+
+  if (!groupId) {
+    return (
+      <div className="live-chat-view">
+        <div className="chat-header-bar">
+          <button className="chat-header-back-btn" onClick={onBack}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <p>Error: Group information not found.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const groupName = group?.name || chat?.name || 'Group'
+  const groupAvatar = group?.avatar || chat?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&size=50&background=00a8ff&color=fff`
+
+  return (
+    <div className="live-chat-view">
+      <div className="chat-header-bar">
+        <button className="chat-header-back-btn" onClick={onBack}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <div className="chat-header-info" onClick={onViewProfile}>
+          <img src={groupAvatar} alt={groupName} className="chat-header-avatar" />
+          <div className="chat-header-text">
+            <div className="chat-header-name">{groupName}</div>
+            <div className="chat-header-status">Group</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="chat-messages-container">
+        {loading ? (
+          <div className="chat-loading">Loading messages...</div>
+        ) : messages.length === 0 ? (
+          <div className="chat-empty">No messages yet. Start the conversation!</div>
+        ) : (
+          messages.map((message, index) => {
+            const prevMessage = index > 0 ? messages[index - 1] : null
+            const showSender = !prevMessage || prevMessage.senderId !== message.senderId || 
+              (message.timestamp - prevMessage.timestamp) > 300000 // 5 minutes
+            const senderProfile = senderProfiles[String(message.senderId)]
+            const senderAvatar = senderProfile?.profilePicture || 
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
+
+            return (
+              <div key={message.id} className={`message ${message.isOwn ? 'own' : ''}`} data-message-id={message.id}>
+                {!message.isOwn && showSender && (
+                  <div className="message-sender-avatar">
+                    <img 
+                      src={senderAvatar}
+                      alt={message.sender}
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="message-content-wrapper">
+                  {!message.isOwn && showSender && (
+                    <div className="message-sender-name">{message.sender}</div>
+                  )}
+                  {message.replyTo && (
+                    <div className="message-reply-preview">
+                      <div className="reply-to-name">{messages.find(m => m.id === message.replyTo)?.sender || 'User'}</div>
+                      <div className="reply-to-text">{messages.find(m => m.id === message.replyTo)?.text || 'Message'}</div>
+                    </div>
+                  )}
+                  <div className="message-content">
+                    <div className="message-text">{message.text}</div>
+                    <div className="message-time">
+                      {formatChatTimestamp(message.timestamp)}
+                      {message.isOwn && (
+                        <span className="message-status sent">
+                          <svg width="16" height="16" viewBox="0 0 16 15" fill="none">
+                            <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {replyingTo && (
+        <div className="reply-preview-bar">
+          <div className="reply-preview-content">
+            <div className="reply-preview-label">Replying to {replyingTo.sender}</div>
+            <div className="reply-preview-text">{replyingTo.text}</div>
+          </div>
+          <button className="reply-preview-close" onClick={() => setReplyingTo(null)}>×</button>
+        </div>
+      )}
+
+      <form className="chat-input-area" onSubmit={handleSendMessage}>
+        <textarea
+          className="chat-input"
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          placeholder="Type a message..."
+          rows="1"
+        />
+        <button type="submit" className="chat-send-btn" disabled={!messageInput.trim()}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
       </form>
     </div>
   )
@@ -8472,6 +9249,8 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
   const [pictureError, setPictureError] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
   const [showVerificationModal, setShowVerificationModal] = useState(false)
+  const [showCropModal, setShowCropModal] = useState(false)
+  const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [isBlocked, setIsBlocked] = useState(false)
   const [blockLoading, setBlockLoading] = useState(false)
   const [commonColleges, setCommonColleges] = useState([])
@@ -8650,7 +9429,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
     }
   }
 
-  const handleProfilePictureSelect = async (e) => {
+  const handleProfilePictureSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
 
@@ -8664,18 +9443,30 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
       return
     }
 
+    // Show crop modal instead of directly uploading
+    setSelectedImageFile(file)
+    setShowCropModal(true)
+    setPictureError(null)
+    
+    // Reset input
+    if (profilePictureInputRef.current) {
+      profilePictureInputRef.current.value = ''
+    }
+  }
+
+  const handleCropComplete = async (croppedFile) => {
+    setShowCropModal(false)
+    setSelectedImageFile(null)
+
     try {
       setUploadingPicture(true)
       setPictureError(null)
 
-      const response = await uploadProfilePicture(file)
+      const response = await uploadProfilePicture(croppedFile)
       
       if (response.success) {
         if (onProfileUpdate) {
           await onProfileUpdate()
-        }
-        if (profilePictureInputRef.current) {
-          profilePictureInputRef.current.value = ''
         }
       } else {
         setPictureError(response.message || 'Failed to upload profile picture')
@@ -8686,6 +9477,11 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
     } finally {
       setUploadingPicture(false)
     }
+  }
+
+  const handleCropCancel = () => {
+    setShowCropModal(false)
+    setSelectedImageFile(null)
   }
 
   const handleEditProfile = async () => {
@@ -9120,6 +9916,15 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Profile Picture Crop Modal */}
+      {showCropModal && selectedImageFile && (
+        <ProfilePictureCropModal
+          imageFile={selectedImageFile}
+          onClose={handleCropCancel}
+          onCrop={handleCropComplete}
+        />
       )}
     </div>
   )
