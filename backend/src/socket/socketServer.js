@@ -7,6 +7,8 @@ import UserProfile from '../models/UserProfile.js';
 import Block from '../models/Block.js';
 import ChatHistory from '../models/ChatHistory.js';
 import DeletedChat from '../models/DeletedChat.js';
+import GroupMessage from '../models/GroupMessage.js';
+import Group from '../models/Group.js';
 
 let io;
 
@@ -726,6 +728,249 @@ export const initializeSocket = (server) => {
         console.error('Error marking message as read:', error);
       }
     });
+
+    // ========== GROUP MESSAGE HANDLERS ==========
+    
+    // Handle join group room
+    socket.on('joinGroupRoom', async (data) => {
+      try {
+        const { groupId } = data;
+        if (!groupId) return;
+
+        // Verify user is a member of the group
+        const group = await Group.findById(groupId);
+        if (!group) {
+          socket.emit('error', { message: 'Group not found' });
+          return;
+        }
+
+        const userId = socket.user.userId.toString();
+        const isMember = group.members.some(m => String(m.userId) === String(userId));
+        if (!isMember) {
+          socket.emit('error', { message: 'You must be a member to join the group room' });
+          return;
+        }
+
+        const roomName = `group:${String(groupId)}`;
+        socket.join(roomName);
+        const room = io.sockets.adapter.rooms.get(roomName);
+        const roomSize = room ? room.size : 0;
+        console.log(`✅ User ${socket.user.email} joined group room: ${roomName}, total members: ${roomSize}`);
+      } catch (error) {
+        console.error('Error joining group room:', error);
+        socket.emit('error', { message: 'Failed to join group room' });
+      }
+    });
+
+    // Handle leave group room
+    socket.on('leaveGroupRoom', (data) => {
+      try {
+        const { groupId } = data;
+        if (!groupId) return;
+
+        const roomName = `group:${groupId}`;
+        socket.leave(roomName);
+        console.log(`❌ User ${socket.user.email} left group room: ${roomName}`);
+      } catch (error) {
+        console.error('Error leaving group room:', error);
+      }
+    });
+
+    // Handle send group message via socket
+    socket.on('sendGroupMessage', async (data) => {
+      try {
+        const { groupId, text, replyTo } = data;
+        const userId = socket.user.userId.toString();
+
+        if (!groupId || !text || !text.trim()) {
+          socket.emit('error', { message: 'Group ID and message text are required' });
+          return;
+        }
+
+        // Verify user is a member of the group
+        const group = await Group.findById(groupId);
+        if (!group) {
+          socket.emit('error', { message: 'Group not found' });
+          return;
+        }
+
+        const isMember = group.members.some(m => String(m.userId) === String(userId));
+        if (!isMember) {
+          socket.emit('error', { message: 'You must be a member to send messages' });
+          return;
+        }
+
+        // Get user profile for sender name
+        const userProfile = await UserProfile.findOne({ userId });
+        const senderName = userProfile?.displayName || userProfile?.firstName || 'User';
+
+        // Create message
+        const message = new GroupMessage({
+          senderId: userId,
+          senderName: senderName,
+          groupId: groupId,
+          text: text.trim(),
+          replyTo: replyTo || null,
+          timestamp: new Date(),
+        });
+
+        await message.save();
+
+        // Mark as delivered to all group members (except sender)
+        const memberIds = group.members
+          .map(m => m.userId)
+          .filter(id => String(id) !== String(userId));
+        
+        message.deliveredTo = memberIds.map(id => ({
+          userId: id,
+          deliveredAt: new Date(),
+        }));
+
+        await message.save();
+
+        // Format message for socket emission
+        const messageToSend = {
+          groupId: groupId.toString(),
+          message: {
+            id: message._id.toString(),
+            senderId: message.senderId.toString(),
+            senderName: message.senderName,
+            text: message.text,
+            timestamp: message.timestamp,
+            replyTo: message.replyTo ? message.replyTo.toString() : null,
+            readBy: message.readBy || [],
+            deliveredTo: message.deliveredTo || [],
+          },
+        };
+
+        // Broadcast to all users in the group room
+        const roomName = `group:${String(groupId)}`;
+        const room = io.sockets.adapter.rooms.get(roomName);
+        const roomSize = room ? room.size : 0;
+        console.log(`📢 Broadcasting group message to room: ${roomName}, members in room: ${roomSize}`);
+        io.to(roomName).emit('groupMessage', messageToSend);
+        
+        // Broadcast group chat list update to ALL connected users who are members of this group
+        // This ensures groups list updates in real-time across all systems
+        // Get all group members
+        const allMemberIds = group.members.map(m => m.userId.toString());
+        
+        // Emit to all group members (not just those in the room)
+        allMemberIds.forEach(memberId => {
+          io.to(`user:${memberId}`).emit('groupChatListUpdate', {
+            type: 'group',
+            groupId: groupId.toString(),
+            messageText: message.text,
+            messageTimestamp: message.timestamp,
+            senderId: userId,
+            senderName: senderName,
+            isOwnMessage: false, // Each client will determine if it's their own message
+            deliveredTo: message.deliveredTo || [],
+            readBy: message.readBy || []
+          });
+        });
+        
+        console.log(`💬 Group message sent in ${roomName} by ${socket.user.email}`);
+      } catch (error) {
+        console.error('Error sending group message:', error);
+        socket.emit('error', { message: 'Failed to send group message' });
+      }
+    });
+
+    // Handle typing indicator for group messages
+    socket.on('typingGroup', (data) => {
+      try {
+        const { groupId, isTyping } = data;
+        if (!groupId) return;
+
+        const roomName = `group:${groupId}`;
+        // Broadcast to others in the room (not to sender)
+        socket.to(roomName).emit('userTypingGroup', {
+          userId: socket.user.userId.toString(),
+          userName: socket.user.profile?.displayName || socket.user.email.split('@')[0],
+          groupId: groupId,
+          isTyping: isTyping,
+        });
+      } catch (error) {
+        console.error('Error handling typing indicator:', error);
+      }
+    });
+
+    // Handle mark group message as read
+    socket.on('markGroupMessageRead', async (data) => {
+      try {
+        const { messageId, groupId } = data;
+        if (!messageId || !groupId) return;
+
+        const message = await GroupMessage.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Check if already read
+        const alreadyRead = message.readBy.some(
+          read => String(read.userId) === String(userId)
+        );
+
+        if (!alreadyRead) {
+          message.readBy.push({
+            userId: socket.user.userId,
+            readAt: new Date(),
+          });
+          await message.save();
+
+          // Notify sender that message was read
+          const senderId = message.senderId.toString();
+          io.to(`user:${senderId}`).emit('message:update', {
+            messageId: messageId,
+            status: 'read',
+            groupId: groupId,
+            userId: userId,
+          });
+        }
+      } catch (error) {
+        console.error('Error marking group message as read:', error);
+      }
+    });
+
+    // Handle mark group message as delivered
+    socket.on('markGroupMessageDelivered', async (data) => {
+      try {
+        const { messageId, groupId } = data;
+        if (!messageId || !groupId) return;
+
+        const message = await GroupMessage.findById(messageId);
+        if (!message) return;
+
+        const userId = socket.user.userId.toString();
+        
+        // Check if already delivered
+        const alreadyDelivered = message.deliveredTo.some(
+          delivered => String(delivered.userId) === String(userId)
+        );
+
+        if (!alreadyDelivered) {
+          message.deliveredTo.push({
+            userId: socket.user.userId,
+            deliveredAt: new Date(),
+          });
+          await message.save();
+
+          // Notify sender that message was delivered
+          const senderId = message.senderId.toString();
+          io.to(`user:${senderId}`).emit('message:update', {
+            messageId: messageId,
+            status: 'delivered',
+            groupId: groupId,
+            userId: userId,
+          });
+        }
+      } catch (error) {
+        console.error('Error marking group message as delivered:', error);
+      }
+    });
+
+    // ========== END GROUP MESSAGE HANDLERS ==========
 
     // Handle disconnect
     socket.on('disconnect', async () => {

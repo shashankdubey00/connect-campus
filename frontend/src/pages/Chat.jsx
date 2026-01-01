@@ -42,7 +42,8 @@ const Chat = () => {
     setNotificationsEnabled(enabled)
   }
   const [totalUnreadCount, setTotalUnreadCount] = useState(0) // Total unread messages across all chats
-  const [chatsWithUnreadCount, setChatsWithUnreadCount] = useState(0) // Number of chats with unread messages (like WhatsApp)
+  const [chatsWithUnreadCount, setChatsWithUnreadCount] = useState(0) // Number of chats with unread messages (like WhatsApp) - only for chats, not groups
+  const [groupsWithUnreadCount, setGroupsWithUnreadCount] = useState(0) // Number of groups with unread messages
   const [verificationStatus, setVerificationStatus] = useState(null) // User verification status
   const [searchQuery, setSearchQuery] = useState('') // For filtering chats
   const [collegeSearchQuery, setCollegeSearchQuery] = useState('') // For college search
@@ -403,10 +404,17 @@ const Chat = () => {
       )
       
       if (existingChat) {
-        // Chat exists, open college profile first (user can then join chat from profile)
+        // Check if user just joined via invite - show profile, otherwise go directly to chat
+        const justJoined = location.state?.justJoined || false
         setSelectedCollege(collegeData)
         setSelectedChat(existingChat)
-        setView('college-profile')
+        if (justJoined) {
+          // Show profile for invited students
+          setView('college-profile')
+        } else {
+          // Go directly to chat
+          setView('live-chat')
+        }
         setActiveSection('chats')
         if (isMobileView) {
           setShowChatList(false)
@@ -447,10 +455,17 @@ const Chat = () => {
         console.error('Error loading chat info:', error)
       })
       
-      // Open the college profile first (user can then join chat from profile)
+      // Check if user just joined via invite - show profile, otherwise go directly to chat
+      const justJoined = location.state?.justJoined || false
       setSelectedCollege(collegeData)
       setSelectedChat(newChat)
-      setView('college-profile')
+      if (justJoined) {
+        // Show profile for invited students
+        setView('college-profile')
+      } else {
+        // Go directly to chat
+        setView('live-chat')
+      }
       setActiveSection('chats')
       if (isMobileView) {
         setShowChatList(false)
@@ -474,15 +489,23 @@ const Chat = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Calculate total unread count and number of chats with unread messages
+  // Calculate total unread count and number of chats/groups with unread messages (separate)
   useEffect(() => {
-    const total = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)
-    setTotalUnreadCount(total)
-    
-    // Count number of chats with unread messages (like WhatsApp)
+    // Calculate from chats (college + direct messages) - for Home icon
+    const chatsTotal = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)
     const chatsWithUnread = chats.filter(chat => (chat.unreadCount || 0) > 0).length
-    setChatsWithUnreadCount(chatsWithUnread)
-  }, [chats])
+    
+    // Calculate from groups - for Community icon
+    const groupsTotal = groups.reduce((sum, group) => sum + (group.unreadCount || 0), 0)
+    const groupsWithUnread = groups.filter(group => (group.unreadCount || 0) > 0).length
+    
+    // Combine totals for overall count (if needed elsewhere)
+    setTotalUnreadCount(chatsTotal + groupsTotal)
+    
+    // Keep chats and groups separate
+    setChatsWithUnreadCount(chatsWithUnread) // Only chats for Home icon
+    setGroupsWithUnreadCount(groupsWithUnread) // Only groups for Community icon
+  }, [chats, groups])
 
   // Load all colleges with messages and direct message conversations
   const loadAllCollegesWithMessages = useCallback(async () => {
@@ -631,7 +654,14 @@ const Chat = () => {
       setLoadingGroups(true)
       const response = await getMyGroups()
       if (response.success) {
-        setGroups(response.groups || [])
+        const groups = response.groups || []
+        // Sort by last message time (most recent first)
+        const sortedGroups = groups.sort((a, b) => {
+          if (!a.lastMessageTime) return 1
+          if (!b.lastMessageTime) return -1
+          return new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+        })
+        setGroups(sortedGroups)
       }
     } catch (error) {
       console.error('Error loading groups:', error)
@@ -1738,6 +1768,84 @@ const Chat = () => {
       socketInstance.on('chatListUpdate', handleChatListUpdate)
       socketInstance.on('directChatListUpdate', handleDirectChatListUpdate)
       
+      // Listen for group message updates to update groups list in real-time
+      const handleGroupChatListUpdate = (data) => {
+        if (data.type === 'group' && data.groupId) {
+          const isOwnMessage = String(data.senderId) === String(user?.id || user?._id || '')
+          const isGroupOpen = selectedChat?.type === 'group' && String(selectedChat?.groupId) === String(data.groupId)
+          
+          // Update groups list with latest message
+          setGroups(prev => {
+            const updated = prev.map(g => {
+              if (String(g.id) === String(data.groupId)) {
+                // Only increment unread count if message is not from current user and group is not open
+                let newUnreadCount = g.unreadCount || 0
+                
+                if (!isOwnMessage && !isGroupOpen) {
+                  newUnreadCount = (newUnreadCount || 0) + 1
+                } else if (isGroupOpen || isOwnMessage) {
+                  newUnreadCount = 0
+                }
+                
+                return {
+                  ...g,
+                  lastMessage: data.messageText || data.text || '',
+                  lastMessageTime: data.messageTimestamp || data.timestamp || new Date(),
+                  lastMessageIsOwn: isOwnMessage,
+                  unreadCount: newUnreadCount
+                }
+              }
+              return g
+            })
+            // Sort by last message time (most recent first)
+            return updated.sort((a, b) => {
+              if (!a.lastMessageTime) return 1
+              if (!b.lastMessageTime) return -1
+              return new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+            })
+          })
+        }
+      }
+      
+      socketInstance.on('groupChatListUpdate', handleGroupChatListUpdate)
+      
+      // Listen for groupMessage socket events (for messages in open group chat view)
+      onGroupMessage((message) => {
+        // This handles messages in the open group chat view
+        // Also update the groups list
+        if (message.groupId) {
+          const isOwnMessage = String(message.message?.senderId || message.senderId) === String(user?.id || user?._id || '')
+          const isGroupOpen = selectedChat?.type === 'group' && String(selectedChat?.groupId) === String(message.groupId)
+          
+          setGroups(prev => {
+            const updated = prev.map(g => {
+              if (String(g.id) === String(message.groupId)) {
+                // Reset unread count if group is open or message is own
+                let newUnreadCount = g.unreadCount || 0
+                if (isGroupOpen || isOwnMessage) {
+                  newUnreadCount = 0
+                }
+                
+                return {
+                  ...g,
+                  lastMessage: message.message?.text || message.text || '',
+                  lastMessageTime: message.message?.timestamp || message.timestamp || new Date(),
+                  lastMessageIsOwn: isOwnMessage,
+                  unreadCount: newUnreadCount
+                }
+              }
+              return g
+            })
+            // Sort by last message time (most recent first)
+            return updated.sort((a, b) => {
+              if (!a.lastMessageTime) return 1
+              if (!b.lastMessageTime) return -1
+              return new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+            })
+          })
+        }
+      })
+      
       // Listen for typing indicators in chat list
       const handleTypingInChat = (data) => {
         if (data.type === 'college' && data.collegeId) {
@@ -2487,8 +2595,30 @@ const Chat = () => {
                     key={group.id}
                     className="panel-item panel-item-with-actions"
                     onClick={() => {
+                      // Go directly to group chat instead of profile
+                      const groupChat = {
+                        id: `group-${group.id}`,
+                        type: 'group',
+                        name: group.name,
+                        groupId: group.id,
+                        avatar: group.avatar,
+                        lastMessage: group.lastMessage || '',
+                        timestamp: '',
+                        lastMessageTime: new Date(),
+                        unreadCount: 0,
+                        group: group
+                      }
+                      setSelectedChat(groupChat)
                       setSelectedGroup(group)
-                      setView('group-profile')
+                      setView('group-chat')
+                      
+                      // Reset unread count when opening group chat
+                      setGroups(prev => prev.map(g => 
+                        String(g.id) === String(group.id) 
+                          ? { ...g, unreadCount: 0 }
+                          : g
+                      ))
+                      
                       if (isMobileView) {
                         setShowChatList(false)
                       }
@@ -2500,32 +2630,27 @@ const Chat = () => {
                     <div className="panel-item-info">
                       <div className="panel-item-header">
                         <span className="panel-item-name">{group.name}</span>
-                        {group.isAdmin && (
-                          <span className="group-admin-badge" title="Admin">👑</span>
-                        )}
+                        <span className="panel-item-time">
+                          {group.lastMessageTime 
+                            ? formatChatTimestamp(group.lastMessageTime)
+                            : ''}
+                        </span>
                       </div>
                       <div className="panel-item-preview">
                         <span className="panel-item-message">
-                          {group.description || 'No description'}
+                          {group.lastMessageIsOwn && (
+                            <>
+                              <span style={{ color: '#8696A0', marginRight: '4px' }}>✓</span>
+                              <span>You: </span>
+                            </>
+                          )}
+                          {truncateMessage(group.lastMessage) || 'No messages yet'}
                         </span>
-                        <span className="panel-item-members">{group.memberCount} members</span>
+                        {group.unreadCount > 0 && (
+                          <span className="panel-item-unread">{group.unreadCount > 99 ? '99+' : group.unreadCount}</span>
+                        )}
                       </div>
                     </div>
-                    <button
-                      className="group-invite-item-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedGroupForInvite(group)
-                        setShowGroupInviteModal(true)
-                      }}
-                      title="Invite to group"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                      </svg>
-                    </button>
                   </div>
                 )
               })
@@ -2954,6 +3079,14 @@ const Chat = () => {
           }
           setSelectedChat(groupChat)
           setView('group-chat')
+          
+          // Reset unread count when opening group chat
+          setGroups(prev => prev.map(g => 
+            String(g.id) === String(selectedGroup.id) 
+              ? { ...g, unreadCount: 0 }
+              : g
+          ))
+          
           if (isMobileView) {
             setShowChatList(false)
           }
@@ -2975,28 +3108,42 @@ const Chat = () => {
         group={selectedChat.group || selectedGroup} 
         user={user} 
         onBack={() => {
-          if (selectedGroup) {
-            setView('group-profile')
-          } else {
-            setView('list')
-          }
+          setView('list')
           if (isMobileView) setShowChatList(true)
         }} 
-        onViewProfile={() => selectedGroup && setView('group-profile')} 
+        onViewProfile={() => {
+          if (selectedGroup) {
+            setView('group-profile')
+          }
+        }} 
         onViewStudentProfile={handleViewStudentProfile} 
         onMessageSent={(groupId, messageText, timestamp, isOwnMessage, deliveredTo, readBy) => {
-          // Update groups list with latest message
-          setGroups(prev => prev.map(g => {
-            if (String(g.id) === String(groupId)) {
-              return {
-                ...g,
-                lastMessage: messageText,
-                lastMessageTime: timestamp,
-                lastMessageIsOwn: isOwnMessage
+          // Update groups list with latest message and sort by last message time
+          setGroups(prev => {
+            const updated = prev.map(g => {
+              if (String(g.id) === String(groupId)) {
+                // Reset unread count when sending own message
+                return {
+                  ...g,
+                  lastMessage: messageText,
+                  lastMessageTime: timestamp,
+                  lastMessageIsOwn: isOwnMessage,
+                  unreadCount: isOwnMessage ? 0 : (g.unreadCount || 0)
+                }
               }
-            }
-            return g
-          }))
+              return g
+            })
+            // Sort by last message time (most recent first)
+            return updated.sort((a, b) => {
+              if (!a.lastMessageTime) return 1
+              if (!b.lastMessageTime) return -1
+              return new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+            })
+          })
+        }}
+        onInvite={() => {
+          setSelectedGroupForInvite(selectedChat.group || selectedGroup)
+          setShowGroupInviteModal(true)
         }}
       />
     }
@@ -3342,6 +3489,7 @@ const Chat = () => {
             className={`sidebar-bottom-item ${activeSection === 'community' ? 'active' : ''}`}
             onClick={() => handleSectionChange('community')}
             title="Community"
+            style={{ position: 'relative' }}
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3349,6 +3497,11 @@ const Chat = () => {
               <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            {groupsWithUnreadCount > 0 && (
+              <span className="sidebar-notification-badge">
+                {groupsWithUnreadCount > 99 ? '99+' : groupsWithUnreadCount}
+              </span>
+            )}
           </button>
           <button
             className={`sidebar-bottom-item ${activeSection === 'chats' ? 'active' : ''}`}
@@ -3496,6 +3649,7 @@ const Chat = () => {
             className={`mobile-nav-item ${activeSection === 'community' ? 'active' : ''}`}
             onClick={() => handleSectionChange('community')}
             title="Community"
+            style={{ position: 'relative' }}
           >
             <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3503,6 +3657,11 @@ const Chat = () => {
               <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            {groupsWithUnreadCount > 0 && (
+              <span className="mobile-nav-notification-badge">
+                {groupsWithUnreadCount > 99 ? '99+' : groupsWithUnreadCount}
+              </span>
+            )}
             <span className="mobile-nav-label">Community</span>
           </button>
           <button
@@ -6697,15 +6856,49 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 }
 
 // Group Chat View Component (similar to LiveChatView but for groups, single tick only)
-const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudentProfile, onMessageSent }) => {
+const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudentProfile, onMessageSent, onInvite, onClearChat }) => {
   const [messageInput, setMessageInput] = useState('')
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [senderProfiles, setSenderProfiles] = useState({})
   const [replyingTo, setReplyingTo] = useState(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState(null)
+  const [selectedMessage, setSelectedMessage] = useState(null)
+  const [showMessageHeader, setShowMessageHeader] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedItems, setSelectedItems] = useState(new Set())
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteForAll, setDeleteForAll] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const messagesEndRef = useRef(null)
+  const doubleClickTimer = useRef(null)
+  const lastClickTime = useRef(0)
+  const lastClickedMessage = useRef(null)
   const socket = getSocket()
-  const groupId = group?.id || chat?.groupId
+  const groupId = group?.id || chat?.groupId || group?._id || chat?.groupId
+
+  console.log('GroupChatView rendered', { groupId, group, chat, hasUser: !!user })
+
+  // Format timestamp helper
+  const formatChatTimestamp = (timestamp) => {
+    if (!timestamp) return ''
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
 
   // Fetch group messages
   useEffect(() => {
@@ -6721,9 +6914,16 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             text: msg.text,
             sender: msg.senderName,
             senderId: msg.senderId,
+            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatChatTimestamp(new Date(msg.timestamp)),
             timestamp: new Date(msg.timestamp),
             isOwn: String(msg.senderId) === String(user?.id || user?._id),
-            replyTo: msg.replyTo,
+            replyTo: msg.replyTo || null,
+            replyToData: null,
             readBy: msg.readBy || [],
             deliveredTo: msg.deliveredTo || [],
           }))
@@ -6732,6 +6932,40 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           // Fetch sender profiles
           const senderIds = [...new Set(formattedMessages.map(m => m.senderId))]
           await fetchSenderProfiles(senderIds)
+          
+          // Mark all unread messages as read when opening group chat (similar to college chat)
+          const currentUserId = String(user?.id || user?._id || '')
+          const unreadMessages = formattedMessages.filter(msg => {
+            const senderIdStr = String(msg.senderId)
+            if (senderIdStr === currentUserId) return false // Don't mark own messages
+            const readBy = msg.readBy || []
+            return !readBy.some(r => String(r.userId) === currentUserId)
+          })
+          
+          // Mark messages as read (staggered to avoid overwhelming the server)
+          if (unreadMessages.length > 0 && groupId) {
+            unreadMessages.forEach((msg, index) => {
+              setTimeout(() => {
+                markGroupMessageRead(msg.id, groupId)
+              }, 50 * index) // Stagger the requests (50ms apart)
+            })
+            
+            // Immediately update unread count in groups list to 0
+            // This will be called from parent component via onMessageSent callback
+            // But we also update it here to ensure it's reset immediately
+            if (onMessageSent) {
+              // Find the last message to get proper timestamp
+              const lastMessage = formattedMessages[formattedMessages.length - 1]
+              onMessageSent(
+                groupId,
+                lastMessage?.text || 'No messages yet',
+                lastMessage?.timestamp || new Date(),
+                false,
+                [],
+                []
+              )
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading group messages:', error)
@@ -6784,38 +7018,79 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Socket listeners for group messages
   useEffect(() => {
-    if (!socket || !groupId) return
+    if (!groupId) return
+
+    // Get or create socket
+    let socketInstance = getSocket()
+    if (!socketInstance || !socketInstance.connected) {
+      socketInstance = connectSocket()
+    }
+
+    if (!socketInstance) {
+      console.error('Failed to get socket instance')
+      return
+    }
+
+    const handleConnect = () => {
+      console.log('Socket connected, joining group room:', groupId)
+      joinGroupRoom(groupId)
+    }
 
     const handleNewMessage = (data) => {
-      if (data.groupId === groupId) {
+      console.log('Group message received:', data)
+      if (data && data.groupId && String(data.groupId) === String(groupId)) {
         const newMessage = {
           id: data.message.id,
           text: data.message.text,
           sender: data.message.senderName,
           senderId: data.message.senderId,
+          time: new Date(data.message.timestamp).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          date: formatChatTimestamp(new Date(data.message.timestamp)),
           timestamp: new Date(data.message.timestamp),
           isOwn: String(data.message.senderId) === String(user?.id || user?._id),
-          replyTo: data.message.replyTo,
+          replyTo: data.message.replyTo || null,
+          replyToData: null,
           readBy: data.message.readBy || [],
           deliveredTo: data.message.deliveredTo || [],
         }
-        setMessages(prev => [...prev, newMessage])
+        setMessages(prev => {
+          // Check for duplicates
+          if (prev.find(m => m.id === newMessage.id)) return prev
+          return [...prev, newMessage].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        })
         
         // Fetch sender profile if not cached
-        if (!senderProfiles[String(data.message.senderId)]) {
-          fetchSenderProfiles([data.message.senderId])
+        if (newMessage.senderId && !senderProfiles[String(newMessage.senderId)]) {
+          fetchSenderProfiles([newMessage.senderId])
         }
       }
     }
 
-    socket.on('groupMessage', handleNewMessage)
-    socket.emit('joinGroup', groupId)
+    // Join room immediately if already connected
+    if (socketInstance.connected) {
+      console.log('Socket already connected, joining group room:', groupId)
+      joinGroupRoom(groupId)
+    } else {
+      // Wait for connection
+      socketInstance.once('connect', handleConnect)
+    }
+
+    // Add message listener
+    socketInstance.on('groupMessage', handleNewMessage)
 
     return () => {
-      socket.off('groupMessage', handleNewMessage)
-      socket.emit('leaveGroup', groupId)
+      // Clean up: remove listeners and leave room
+      if (socketInstance) {
+        socketInstance.off('connect', handleConnect)
+        socketInstance.off('groupMessage', handleNewMessage)
+      }
+      leaveGroupRoom(groupId)
     }
-  }, [socket, groupId, user, senderProfiles])
+  }, [groupId, user])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -6844,12 +7119,373 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     }
   }
 
+  // Handle clear chat
+  const handleClearChat = async () => {
+    if (!groupId) return
+    
+    try {
+      setClearing(true)
+      setClearError(null)
+      const response = await clearGroupMessages(groupId)
+      if (response && response.success) {
+        setMessages([])
+        setShowClearConfirm(false)
+        
+        // Reload messages to ensure deleted ones are filtered out
+        try {
+          const messagesResponse = await fetchGroupMessages(groupId, 200)
+          if (messagesResponse.success) {
+            const formattedMessages = messagesResponse.messages.map(msg => ({
+              id: msg.id,
+              text: msg.text,
+              sender: msg.senderName,
+              senderId: msg.senderId,
+              time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+              date: formatChatTimestamp(new Date(msg.timestamp)),
+              timestamp: new Date(msg.timestamp),
+              isOwn: String(msg.senderId) === String(user?.id || user?._id),
+              replyTo: msg.replyTo || null,
+              replyToData: null,
+              readBy: msg.readBy || [],
+              deliveredTo: msg.deliveredTo || [],
+            }))
+            setMessages(formattedMessages)
+          }
+        } catch (reloadError) {
+          console.error('Error reloading messages after clear:', reloadError)
+          // Still show empty messages if reload fails
+          setMessages([])
+        }
+        
+        // Update chat list immediately to show "No messages yet"
+        if (onMessageSent) {
+          // Pass null timestamp to indicate cleared state - this will update timestamp to current time
+          onMessageSent(
+            groupId,
+            'No messages yet',
+            null, // null timestamp indicates cleared state
+            false,
+            [],
+            []
+          )
+        }
+      } else {
+        const errorMsg = response?.message || response?.error || 'Failed to clear chat. Please try again.'
+        setClearError(errorMsg)
+      }
+    } catch (error) {
+      console.error('Error clearing group messages:', error)
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Error clearing chat. Please try again.'
+      setClearError(errorMessage)
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  // Update mobile detection on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Handle message click (desktop - for double-click detection)
+  const handleMessageClick = (e, message) => {
+    if (isMobile) return
+    
+    // Prevent default browser behavior
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // If in selection mode, toggle selection
+    if (selectionMode) {
+      handleToggleSelection(message.id)
+      return
+    }
+    
+    const currentTime = Date.now()
+    const timeDiff = currentTime - lastClickTime.current
+    
+    // Check if this is a double-click (within 300ms and same message)
+    if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+      // Double-click detected - show action header
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+      lastClickTime.current = 0
+      lastClickedMessage.current = null
+    } else {
+      // Single click - store for potential double-click
+      lastClickTime.current = currentTime
+      lastClickedMessage.current = message
+      
+      // Clear timer if exists
+      if (doubleClickTimer.current) {
+        clearTimeout(doubleClickTimer.current)
+      }
+      
+      // If no double-click within 300ms, clear selection
+      doubleClickTimer.current = setTimeout(() => {
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+      }, 300)
+    }
+  }
+
+  // Handle right-click on message
+  const handleMessageContextMenu = (e, message) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // On desktop, show action header on right-click as well
+    if (!isMobile) {
+      setSelectedMessage(message)
+      setShowMessageHeader(true)
+    }
+  }
+
+  // Handle action header click (prevent closing)
+  const handleActionHeaderClick = (e) => {
+    e.stopPropagation()
+  }
+
+  // Handle reply button click
+  const handleReplyClick = () => {
+    if (selectedMessage) {
+      setReplyingTo(selectedMessage)
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      // Scroll to input area
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100)
+    }
+  }
+
+  // Handle select button - enter selection mode
+  const handleSelectClick = () => {
+    if (selectedMessage) {
+      setSelectionMode(true)
+      setSelectedItems(new Set([selectedMessage.id]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+    }
+  }
+
+  // Toggle item selection in selection mode
+  const handleToggleSelection = (itemId) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      // Exit selection mode if no items selected
+      if (newSet.size === 0) {
+        setSelectionMode(false)
+      }
+      return newSet
+    })
+  }
+
+  // Exit selection mode
+  const handleExitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelectedItems(new Set())
+  }
+
+  // Copy selected items
+  const handleCopySelected = () => {
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    if (selectedMessages.length === 0) return
+    
+    const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      alert(`Copied ${selectedMessages.length} message(s)`)
+      handleExitSelectionMode()
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+      alert('Failed to copy messages')
+    })
+  }
+
+  // Copy single message
+  const handleCopyMessage = () => {
+    if (selectedMessage) {
+      navigator.clipboard.writeText(selectedMessage.text).then(() => {
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+      }).catch(err => {
+        console.error('Failed to copy:', err)
+      })
+    }
+  }
+
+  // Delete selected items for me (mark as deleted for user only)
+  const handleDeleteSelectedForMe = async () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    
+    try {
+      // Mark all selected messages as deleted for this user only
+      const deletePromises = selectedMessages.map(msg => deleteGroupMessage(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const currentUserId = String(user?.id || user?._id || '')
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          groupId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        onMessageSent(groupId, 'No messages yet', null, false, [], [])
+      }
+    } catch (error) {
+      console.error('Error deleting messages:', error)
+      // Still remove from local state (optimistic update)
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+    }
+  }
+
+  // Delete selected items for all (only own messages)
+  const handleDeleteSelectedForAll = async () => {
+    if (selectedItems.size === 0) return
+    
+    const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+    const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+    
+    if (ownMessages.length === 0) return
+    
+    try {
+      // Delete own messages for all
+      const deletePromises = ownMessages.map(msg => deleteGroupMessageForAll(msg.id))
+      await Promise.all(deletePromises)
+      
+      // Remove messages from local state
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+      
+      // Update chat list
+      if (updatedMessages.length > 0 && onMessageSent) {
+        const lastMessage = updatedMessages[updatedMessages.length - 1]
+        const currentUserId = String(user?.id || user?._id || '')
+        const isOwn = String(lastMessage.senderId) === currentUserId
+        onMessageSent(
+          groupId,
+          lastMessage.text,
+          lastMessage.timestamp,
+          isOwn,
+          lastMessage.deliveredTo || [],
+          lastMessage.readBy || []
+        )
+      } else if (updatedMessages.length === 0 && onMessageSent) {
+        onMessageSent(groupId, 'No messages yet', null, false, [], [])
+      }
+    } catch (error) {
+      console.error('Error deleting messages for all:', error)
+      const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
+      setMessages(updatedMessages)
+      handleExitSelectionMode()
+    }
+  }
+
+  // Handle delete for me (single message)
+  const handleDeleteForMe = () => {
+    if (selectedMessage) {
+      setShowDeleteConfirm(true)
+      setDeleteForAll(false)
+      setShowMessageHeader(false)
+    }
+  }
+
+  // Handle delete for all (single message)
+  const handleDeleteForAll = () => {
+    if (selectedMessage) {
+      setShowDeleteConfirm(true)
+      setDeleteForAll(true)
+      setShowMessageHeader(false)
+    }
+  }
+
+  // Confirm and execute delete (single message)
+  const handleConfirmDelete = async () => {
+    if (!selectedMessage) return
+
+    try {
+      setDeleting(true)
+      const response = deleteForAll 
+        ? await deleteGroupMessageForAll(selectedMessage.id)
+        : await deleteGroupMessage(selectedMessage.id)
+      
+      if (response.success) {
+        // Remove message from local state
+        const updatedMessages = messages.filter(m => m.id !== selectedMessage.id)
+        setMessages(updatedMessages)
+        setShowDeleteConfirm(false)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setDeleteForAll(false)
+        
+        // Update chat list
+        if (updatedMessages.length > 0 && onMessageSent) {
+          const lastMessage = updatedMessages[updatedMessages.length - 1]
+          const currentUserId = String(user?.id || user?._id || '')
+          const isOwn = String(lastMessage.senderId) === currentUserId
+          onMessageSent(
+            groupId,
+            lastMessage.text,
+            lastMessage.timestamp,
+            isOwn,
+            lastMessage.deliveredTo || [],
+            lastMessage.readBy || []
+          )
+        } else if (updatedMessages.length === 0 && onMessageSent) {
+          onMessageSent(groupId, 'No messages yet', null, false, [], [])
+        }
+      } else {
+        alert(response.message || 'Failed to delete message')
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error)
+      alert('Error deleting message. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const groupName = group?.name || chat?.name || 'Group'
+  const groupAvatar = group?.avatar || chat?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&size=50&background=00a8ff&color=fff`
+
   if (!groupId) {
     return (
       <div className="live-chat-view">
         <div className="chat-header-bar">
           <button className="chat-header-back-btn" onClick={onBack}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
@@ -6861,31 +7497,186 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     )
   }
 
-  const groupName = group?.name || chat?.name || 'Group'
-  const groupAvatar = group?.avatar || chat?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(groupName)}&size=50&background=00a8ff&color=fff`
-
   return (
     <div className="live-chat-view">
       <div className="chat-header-bar">
         <button className="chat-header-back-btn" onClick={onBack}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <div className="chat-header-info" onClick={onViewProfile}>
-          <img src={groupAvatar} alt={groupName} className="chat-header-avatar" />
-          <div className="chat-header-text">
-            <div className="chat-header-name">{groupName}</div>
-            <div className="chat-header-status">Group</div>
-          </div>
+        <div 
+          className="chat-header-avatar" 
+          onClick={onViewProfile}
+          style={{ cursor: 'pointer' }}
+        >
+          <img src={groupAvatar} alt={groupName} />
         </div>
+        <div 
+          className="chat-header-info"
+          onClick={onViewProfile}
+          style={{ cursor: 'pointer', flex: 1 }}
+        >
+          <div className="chat-header-name-row">
+            <h3>{groupName}</h3>
+          </div>
+          <span className="chat-status">Group</span>
+        </div>
+        {/* Invite Button */}
+        {onInvite && (
+          <button 
+            className="invite-header-btn animated-invite-btn"
+            onClick={onInvite}
+            title="Invite friends to join this group"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
+            </svg>
+          </button>
+        )}
+        {/* Clear Chat Button */}
+        <button 
+          className="clear-chat-btn"
+          onClick={() => setShowClearConfirm(true)}
+          title="Clear Chat"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
       </div>
 
-      <div className="chat-messages-container">
+      {/* Selection Mode Bar */}
+      {selectionMode && selectedItems.size > 0 && (() => {
+        const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
+        const ownMessages = selectedMessages.filter(msg => msg.isOwn)
+        const otherMessages = selectedMessages.filter(msg => !msg.isOwn)
+        const hasOwnMessages = ownMessages.length > 0
+        const hasOtherMessages = otherMessages.length > 0
+        const isOnlyOwn = hasOwnMessages && !hasOtherMessages
+        const isOnlyOthers = !hasOwnMessages && hasOtherMessages
+        const isHybrid = hasOwnMessages && hasOtherMessages
+        
+        return (
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+              
+            {/* Delete button - only delete for me (user only) */}
+            <button 
+              className="selection-mode-btn"
+              onClick={handleDeleteSelectedForMe}
+              title="Delete for me"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+              <span>Delete</span>
+            </button>
+              
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
+          </div>
+        </div>
+        )
+      })()}
+      {/* Message Action Header (WhatsApp-style) */}
+      {showMessageHeader && selectedMessage && !selectionMode && (
+        <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
+          <button 
+            className="action-header-btn"
+            onClick={handleReplyClick}
+            title="Reply"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn"
+            onClick={handleCopyMessage}
+            title="Copy"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForMe}
+            title="Delete"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+              </button>
+          <button 
+            className="action-header-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
+            title="Select"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+          </button>
+          <button 
+            className="action-header-btn action-header-close"
+            onClick={() => {
+              setShowMessageHeader(false)
+              setSelectedMessage(null)
+            }}
+            title="Close"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      <div className="chat-messages-area">
         {loading ? (
-          <div className="chat-loading">Loading messages...</div>
+          <div className="loading-messages">Loading messages...</div>
         ) : messages.length === 0 ? (
-          <div className="chat-empty">No messages yet. Start the conversation!</div>
+          <div className="no-messages">No messages yet. Start the conversation!</div>
         ) : (
           messages.map((message, index) => {
             const prevMessage = index > 0 ? messages[index - 1] : null
@@ -6896,40 +7687,74 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
 
             return (
-              <div key={message.id} className={`message ${message.isOwn ? 'own' : ''}`} data-message-id={message.id}>
-                {!message.isOwn && showSender && (
-                  <div className="message-sender-avatar">
-                    <img 
-                      src={senderAvatar}
-                      alt={message.sender}
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
-                      }}
+              <div 
+                key={message.id} 
+                className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                data-message-id={message.id}
+                style={{ position: 'relative' }}
+                onClick={(e) => handleMessageClick(e, message)}
+                onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+              >
+                {selectionMode && (
+                  <div className="message-selection-checkbox">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedItems.has(message.id)}
+                      onChange={() => handleToggleSelection(message.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                 )}
-                <div className="message-content-wrapper">
-                  {!message.isOwn && showSender && (
-                    <div className="message-sender-name">{message.sender}</div>
-                  )}
-                  {message.replyTo && (
-                    <div className="message-reply-preview">
-                      <div className="reply-to-name">{messages.find(m => m.id === message.replyTo)?.sender || 'User'}</div>
-                      <div className="reply-to-text">{messages.find(m => m.id === message.replyTo)?.text || 'Message'}</div>
+                {!message.isOwn && (
+                  <div className="message-sender-info">
+                    <div className="message-sender-avatar">
+                      <img 
+                        src={senderAvatar}
+                        alt={message.sender}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
+                        }}
+                      />
                     </div>
-                  )}
-                  <div className="message-content">
-                    <div className="message-text">{message.text}</div>
-                    <div className="message-time">
-                      {formatChatTimestamp(message.timestamp)}
-                      {message.isOwn && (
-                        <span className="message-status sent">
-                          <svg width="16" height="16" viewBox="0 0 16 15" fill="none">
-                            <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
-                          </svg>
-                        </span>
-                      )}
-                    </div>
+                    {showSender && (
+                      <div className="message-sender">{senderProfiles[String(message.senderId || '')]?.displayName || message.sender}</div>
+                    )}
+                  </div>
+                )}
+                <div className="message-content">
+                  {message.replyTo && (() => {
+                    const repliedMsg = messages.find(m => m.id === message.replyTo)
+                    if (repliedMsg) {
+                      return (
+                        <div className="message-reply-info">
+                          <div className="message-reply-line"></div>
+                          <div className="message-reply-content">
+                            <span className="message-reply-name">
+                              {repliedMsg.isOwn ? 'You' : (senderProfiles[String(repliedMsg.senderId || '')]?.displayName || repliedMsg.sender || 'User')}
+                            </span>
+                            <span className="message-reply-text">{repliedMsg.text}</span>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                  <p>{message.text}</p>
+                  <div className="message-footer">
+                    <span className="message-time">
+                      {new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                      })}
+                    </span>
+                    {message.isOwn && (
+                      <span className="message-status sent">
+                        <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                        </svg>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -6940,30 +7765,154 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       </div>
 
       {replyingTo && (
-        <div className="reply-preview-bar">
+        <div className="reply-preview">
           <div className="reply-preview-content">
-            <div className="reply-preview-label">Replying to {replyingTo.sender}</div>
+            <div className="reply-preview-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 10 4 15 9 20"></polyline>
+                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+              </svg>
+              <span className="reply-preview-name">
+                {replyingTo.isOwn ? 'You' : (senderProfiles[replyingTo.senderId]?.displayName || replyingTo.sender || 'User')}
+              </span>
+            </div>
             <div className="reply-preview-text">{replyingTo.text}</div>
           </div>
-          <button className="reply-preview-close" onClick={() => setReplyingTo(null)}>×</button>
+          <button className="reply-preview-close" onClick={() => setReplyingTo(null)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
       )}
 
       <form className="chat-input-area" onSubmit={handleSendMessage}>
-        <textarea
-          className="chat-input"
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Type a message..."
-          rows="1"
-        />
-        <button type="submit" className="chat-send-btn" disabled={!messageInput.trim()}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        <button
+          type="button"
+          className="emoji-picker-btn"
+          onClick={() => {}}
+          title="Add emoji"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
           </svg>
         </button>
+        <textarea
+          className="chat-input"
+          placeholder="Type a message"
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              handleSendMessage(e)
+            }
+          }}
+          rows={1}
+        />
+        <button type="submit" className="send-btn" disabled={!messageInput.trim()}>Send</button>
       </form>
+
+      {/* Delete Message Confirmation Modal */}
+      {showDeleteConfirm && selectedMessage && (
+        <div className="modal-overlay" onClick={() => {
+          if (!deleting) {
+            setShowDeleteConfirm(false)
+            setDeleteForAll(false)
+          }
+        }}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Message</h3>
+              <button className="modal-close-btn" onClick={() => {
+                if (!deleting) {
+                  setShowDeleteConfirm(false)
+                  setDeleteForAll(false)
+                }
+              }}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="modal-description">
+                {deleteForAll 
+                  ? 'Are you sure you want to delete this message for everyone? This action cannot be undone.'
+                  : 'Are you sure you want to delete this message? This will only delete it for you. Other members will still see it. This action cannot be undone.'}
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="modal-cancel-btn"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteForAll(false)
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Chat Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="modal-overlay" onClick={() => {
+          if (!clearing) {
+            setShowClearConfirm(false)
+            setClearError(null)
+          }
+        }}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Clear Chat</h3>
+              <button className="modal-close-btn" onClick={() => {
+                if (!clearing) {
+                  setShowClearConfirm(false)
+                  setClearError(null)
+                }
+              }}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="modal-description">Are you sure you want to delete all your messages in {groupName}? This will only delete messages for you. Other members will still see the messages. This action cannot be undone.</p>
+              {clearError && (
+                <div className="upload-error" style={{ marginTop: '12px', padding: '8px', backgroundColor: 'rgba(255, 0, 0, 0.1)', borderRadius: '4px', color: '#ff4444', fontSize: '14px' }}>
+                  {clearError}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="modal-cancel-btn"
+                onClick={() => {
+                  setShowClearConfirm(false)
+                  setClearError(null)
+                }}
+                disabled={clearing}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleClearChat}
+                disabled={clearing}
+              >
+                {clearing ? 'Clearing...' : 'Clear Chat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -10013,3 +10962,4 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
 }
 
 export default Chat
+

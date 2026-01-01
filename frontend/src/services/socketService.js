@@ -377,3 +377,97 @@ export const onCollegeActiveCountUpdate = (callback) => {
   }
 };
 
+/**
+ * Join group room
+ * @param {string} groupId - Group ID
+ */
+export const joinGroupRoom = (groupId) => {
+  if (socket?.connected && groupId) {
+    const groupIdStr = String(groupId);
+    console.log('Joining group room:', groupIdStr);
+    socket.emit('joinGroupRoom', { groupId: groupIdStr });
+  } else {
+    console.warn('Cannot join group room - socket not connected or groupId missing', { 
+      connected: socket?.connected, 
+      groupId 
+    });
+  }
+};
+
+/**
+ * Leave group room
+ * @param {string} groupId - Group ID
+ */
+export const leaveGroupRoom = (groupId) => {
+  if (socket?.connected && groupId) {
+    socket.emit('leaveGroupRoom', { groupId });
+  }
+};
+
+/**
+ * Emit typing indicator for group messages
+ * @param {string} groupId - Group ID
+ * @param {boolean} isTyping - Whether user is typing
+ */
+export const emitTypingGroup = (groupId, isTyping) => {
+  if (socket?.connected && groupId) {
+    socket.emit('typingGroup', { groupId, isTyping });
+  }
+};
+
+/**
+ * Listen for typing indicators in group messages
+ * @param {Function} callback - Callback function
+ */
+export const onUserTypingGroup = (callback) => {
+  if (socket) {
+    socket.on('userTypingGroup', callback);
+  }
+};
+
+/**
+ * Listen for group messages
+ * @param {Function} callback - Callback function
+ */
+export const onGroupMessage = (callback) => {
+  if (socket) {
+    socket.on('groupMessage', callback);
+  }
+};
+
+/**
+ * Mark group message as read
+ * @param {string} messageId - Message ID
+ * @param {string} groupId - Group ID
+ */
+export const markGroupMessageRead = (messageId, groupId) => {
+  if (socket?.connected && messageId && groupId) {
+    socket.emit('markGroupMessageRead', { messageId, groupId });
+  }
+};
+
+/**
+ * Mark group message as delivered
+ * @param {string} messageId - Message ID
+ * @param {string} groupId - Group ID
+ */
+export const markGroupMessageDelivered = (messageId, groupId) => {
+  if (socket?.connected && messageId && groupId) {
+    socket.emit('markGroupMessageDelivered', { messageId, groupId });
+  }
+};
+
+/**
+ * Send group message via Socket.IO
+ * @param {string} groupId - Group ID
+ * @param {string} text - Message text
+ * @param {string|null} replyToId - Optional message ID to reply to
+ */
+export const sendGroupMessageSocket = (groupId, text, replyToId = null) => {
+  if (socket?.connected && groupId && text) {
+    socket.emit('sendGroupMessage', { groupId, text, replyToId });
+    return true;
+  }
+  return false;
+};
+

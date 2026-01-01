@@ -59,7 +59,18 @@ const Navbar = ({ isScrolled }) => {
   // Get user avatar/initials
   const getUserAvatar = () => {
     if (user?.profile?.profilePicture) {
-      return user.profile.profilePicture
+      // If it's a relative path, prepend the backend URL
+      if (user.profile.profilePicture.startsWith('/uploads/')) {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        return `${backendUrl}${user.profile.profilePicture}`
+      }
+      // If it's already a full URL, use it as is
+      if (user.profile.profilePicture.startsWith('http://') || user.profile.profilePicture.startsWith('https://')) {
+        return user.profile.profilePicture
+      }
+      // Otherwise, treat as relative path
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+      return `${backendUrl}${user.profile.profilePicture}`
     }
     const name = user?.profile?.displayName || user?.email || 'U'
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -118,13 +129,31 @@ const Navbar = ({ isScrolled }) => {
                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                     onMouseEnter={() => setIsProfileMenuOpen(true)}
                   >
-                    <img src={getUserAvatar()} alt="Profile" />
+                    <img 
+                      src={getUserAvatar()} 
+                      alt="Profile"
+                      onError={(e) => {
+                        // Fallback to ui-avatars if image fails to load
+                        const name = user?.profile?.displayName || user?.email || 'U'
+                        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                      }}
+                    />
                   </div>
                   {isProfileMenuOpen && (
                     <div className="profile-dropdown" onMouseLeave={() => setIsProfileMenuOpen(false)}>
                       <div className="profile-dropdown-header">
                         <div className="profile-dropdown-avatar">
-                          <img src={getUserAvatar()} alt="Profile" />
+                          <img 
+                            src={getUserAvatar()} 
+                            alt="Profile"
+                            onError={(e) => {
+                              // Fallback to ui-avatars if image fails to load
+                              const name = user?.profile?.displayName || user?.email || 'U'
+                              const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                            }}
+                          />
                         </div>
                         <div className="profile-dropdown-info">
                           <div className="profile-dropdown-name">
@@ -197,7 +226,16 @@ const Navbar = ({ isScrolled }) => {
             <>
               <div className="mobile-profile-section">
                 <div className="mobile-profile-avatar">
-                  <img src={getUserAvatar()} alt="Profile" />
+                  <img 
+                    src={getUserAvatar()} 
+                    alt="Profile"
+                    onError={(e) => {
+                      // Fallback to ui-avatars if image fails to load
+                      const name = user?.profile?.displayName || user?.email || 'U'
+                      const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                    }}
+                  />
                 </div>
                 <div className="mobile-profile-info">
                   <div className="mobile-profile-name">{user.profile?.displayName || user.email}</div>

@@ -12,10 +12,10 @@ const deletedMessageSchema = new mongoose.Schema(
       ref: 'Message',
       required: true,
     },
-    // Track if it's a college message or direct message
+    // Track if it's a college message, direct message, or group message
     messageType: {
       type: String,
-      enum: ['college', 'direct'],
+      enum: ['college', 'direct', 'group'],
       required: true,
     },
     // For college messages
@@ -26,6 +26,11 @@ const deletedMessageSchema = new mongoose.Schema(
     otherUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+    },
+    // For group messages
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
     },
     deletedAt: {
       type: Date,
@@ -41,6 +46,7 @@ const deletedMessageSchema = new mongoose.Schema(
 deletedMessageSchema.index({ userId: 1, messageId: 1 }, { unique: true });
 deletedMessageSchema.index({ userId: 1, collegeId: 1 });
 deletedMessageSchema.index({ userId: 1, otherUserId: 1 });
+deletedMessageSchema.index({ userId: 1, groupId: 1 });
 
 const DeletedMessage = mongoose.models.DeletedMessage || mongoose.model('DeletedMessage', deletedMessageSchema);
 

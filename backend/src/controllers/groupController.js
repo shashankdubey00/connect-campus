@@ -118,26 +118,99 @@ export const getMyGroups = async (req, res) => {
       .sort({ updatedAt: -1 })
       .lean();
 
-    const formattedGroups = groups.map(group => ({
-      id: group._id,
-      name: group.name,
-      description: group.description,
-      avatar: group.avatar,
-      memberCount: group.members.length,
-      createdBy: {
-        id: group.createdBy._id,
-        name: group.createdBy.profile?.displayName || group.createdBy.email?.split('@')[0] || 'User',
-      },
-      members: group.members.map(m => ({
-        userId: m.userId._id,
-        name: m.userId.profile?.displayName || m.userId.email?.split('@')[0] || 'User',
-        avatar: m.userId.profile?.profilePicture || null,
-        role: m.role,
-      })),
-      isAdmin: group.members.find(m => String(m.userId._id) === String(userId))?.role === 'admin',
-      createdAt: group.createdAt,
-      updatedAt: group.updatedAt,
-    }));
+    // Get all group IDs
+    const groupIds = groups.map(g => g._id);
+
+    // Get all messages for these groups
+    const allMessages = await GroupMessage.find({
+      groupId: { $in: groupIds }
+    })
+      .sort({ timestamp: -1 })
+      .lean();
+
+    // Get list of message IDs that are marked as deleted for this user
+    const messageIds = allMessages.map(msg => msg._id);
+    const deletedMessages = await DeletedMessage.find({
+      userId: userId,
+      messageId: { $in: messageIds },
+      messageType: 'group'
+    }).select('messageId').lean();
+    
+    const deletedMessageIds = new Set(deletedMessages.map(d => d.messageId.toString()));
+
+    // Filter out deleted messages
+    const visibleMessages = allMessages.filter(msg => 
+      !deletedMessageIds.has(msg._id.toString())
+    );
+
+    // Group by groupId and get the most recent visible message for each
+    const lastMessageMap = new Map();
+    visibleMessages.forEach(msg => {
+      const groupId = msg.groupId.toString();
+      if (!lastMessageMap.has(groupId)) {
+        lastMessageMap.set(groupId, msg);
+      }
+    });
+
+    // Calculate unread counts for each group
+    const unreadCountsMap = new Map();
+    const userIdStr = String(userId);
+    
+    visibleMessages.forEach(msg => {
+      // Only count messages not from the user
+      const senderIdStr = msg.senderId ? (typeof msg.senderId === 'object' ? msg.senderId.toString() : String(msg.senderId)) : String(msg.senderId);
+      if (senderIdStr !== userIdStr) {
+        const groupId = msg.groupId.toString();
+        const readBy = msg.readBy || [];
+        const isRead = readBy.some(r => {
+          const readUserId = r.userId ? (typeof r.userId === 'object' ? r.userId.toString() : String(r.userId)) : String(r.userId);
+          return readUserId === userIdStr;
+        });
+        if (!isRead) {
+          unreadCountsMap.set(groupId, (unreadCountsMap.get(groupId) || 0) + 1);
+        }
+      }
+    });
+
+    const formattedGroups = groups.map(group => {
+      const groupIdStr = group._id.toString();
+      const lastMessage = lastMessageMap.get(groupIdStr);
+      const isLastMessageOwn = lastMessage && String(lastMessage.senderId) === String(userId);
+
+      return {
+        id: group._id,
+        name: group.name,
+        description: group.description,
+        avatar: group.avatar,
+        memberCount: group.members.length,
+        createdBy: {
+          id: group.createdBy._id,
+          name: group.createdBy.profile?.displayName || group.createdBy.email?.split('@')[0] || 'User',
+        },
+        members: group.members.map(m => ({
+          userId: m.userId._id,
+          name: m.userId.profile?.displayName || m.userId.email?.split('@')[0] || 'User',
+          avatar: m.userId.profile?.profilePicture || null,
+          role: m.role,
+        })),
+        isAdmin: group.members.find(m => String(m.userId._id) === String(userId))?.role === 'admin',
+        createdAt: group.createdAt,
+        updatedAt: group.updatedAt,
+        lastMessage: lastMessage?.text || 'No messages yet',
+        lastMessageTime: lastMessage?.timestamp || null,
+        lastMessageIsOwn: isLastMessageOwn || false,
+        lastMessageDeliveredTo: lastMessage?.deliveredTo || [],
+        lastMessageReadBy: lastMessage?.readBy || [],
+        unreadCount: unreadCountsMap.get(groupIdStr) || 0, // Add unread count
+      };
+    });
+
+    // Sort by last message time (most recent first)
+    formattedGroups.sort((a, b) => {
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return new Date(b.lastMessageTime) - new Date(a.lastMessageTime);
+    });
 
     res.json({
       success: true,
@@ -905,6 +978,39 @@ export const sendGroupMessage = async (req, res) => {
     }));
 
     await message.save();
+
+    // Emit socket event for real-time updates
+    try {
+      const { getIO } = await import('../socket/socketServer.js');
+      const io = getIO();
+      
+      if (io) {
+        const messageToSend = {
+          groupId: groupId.toString(),
+          message: {
+            id: message._id.toString(),
+            senderId: message.senderId.toString(),
+            senderName: message.senderName,
+            text: message.text,
+            timestamp: message.timestamp,
+            replyTo: message.replyTo ? message.replyTo.toString() : null,
+            readBy: message.readBy || [],
+            deliveredTo: message.deliveredTo || [],
+          },
+        };
+
+        // Broadcast to all users in the group room
+        const roomName = `group:${groupId}`;
+        const room = io.sockets.adapter.rooms.get(roomName);
+        const roomSize = room ? room.size : 0;
+        console.log(`📢 Broadcasting group message to room: ${roomName}, members in room: ${roomSize}`);
+        io.to(roomName).emit('groupMessage', messageToSend);
+        console.log(`✅ Group message broadcasted:`, { groupId: groupId.toString(), messageId: message._id.toString() });
+      }
+    } catch (socketError) {
+      // Log but don't fail the request if socket emission fails
+      console.error('Error emitting socket event for group message:', socketError);
+    }
 
     res.json({
       success: true,

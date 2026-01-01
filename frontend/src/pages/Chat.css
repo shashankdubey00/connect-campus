@@ -5548,6 +5548,43 @@
   height: 18px;
 }
 
+/* Mobile Responsive Styles for Selection Mode Bar */
+@media (max-width: 768px) {
+  .selection-mode-bar {
+    padding: 10px 12px;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .selection-mode-info {
+    font-size: 14px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .selection-mode-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .selection-mode-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    gap: 4px;
+  }
+
+  .selection-mode-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .selection-mode-btn span {
+    display: inline;
+  }
+}
+
 /* Message Selection Checkbox */
 .message-selection-checkbox {
   position: absolute;
