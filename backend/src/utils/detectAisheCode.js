@@ -28,3 +28,4 @@ export function isAisheCode(input) {
          patternNoDash.test(trimmed);
 }
 
+

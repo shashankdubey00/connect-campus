@@ -144,3 +144,4 @@ const PrivacySettingsModal = ({ onClose, user }) => {
 
 export default PrivacySettingsModal;
 
+

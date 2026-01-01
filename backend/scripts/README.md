@@ -32,3 +32,4 @@ node scripts/migrateNormalizedSearchText.js
 - Only adds the new `normalizedSearchText` field
 - Safe to run multiple times (idempotent)
 
+
