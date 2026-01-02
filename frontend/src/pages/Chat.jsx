@@ -3375,12 +3375,18 @@ const Chat = () => {
           console.log('[Chat] Top header visibility check:', {
             isMobileView,
             view,
+            selectedChat: !!selectedChat,
+            showChatList,
             isInChatView,
             shouldHide: isInChatView
           });
         }
+        // Don't render at all if in chat view on mobile
+        if (isInChatView) {
+          return null;
+        }
         return (
-          <div className={`chat-top-header ${isInChatView ? 'hidden' : ''}`}>
+          <div className="chat-top-header">
         <div className="header-left-section">
           <button 
             className="navbar-back-to-home-btn"
