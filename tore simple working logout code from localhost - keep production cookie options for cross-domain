@@ -1,0 +1,20 @@
+[33me20b472[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Improve logout - set cookie to empty with expired date, add delay before reload
+[33mcc1d112[m Fix syntax error in api.js - escape apostrophe in string
+[33m4c74ea0[m Fix logout - use same cookie options to clear cookie properly, force page reload
+[33m93f5e38[m Increase login redirect delay and improve cookie debugging messages
+[33mea0d1f8[m Fix login - remove Set-Cookie header check (browsers don't expose it)
+[33m9669353[m Fix cookie SameSite attribute - use 'none' for cross-domain in production
+[33m6876422[m Add detailed cookie debugging
+[33m5db64be[m Add retry logic and debugging for auth detection
+[33m7f05ad8[m Update documentation and utility functions
+[33m0a03f66[m Fix production cookie settings - use sameSite none for cross-domain, increase auth check delay
+[33md56180a[m Fix college search and auth detection - use VITE_API_URL for Hero API calls, add delay for cookie detection
+[33m773a3ad[m Fix auth detection - use window.location for full page reload
+[33m6809739[m Fix redirect loop - always redirect to landing page after login
+[33mc3e26b4[m Fix redirect after signup - redirect to /chat instead of home page, add eslint disable for useEffect dependencies
+[33m4012711[m Fix redirect after login - redirect to /chat instead of home page
+[33m433058b[m Add comprehensive step-by-step verification logging for deployment debugging
+[33m3a80778[m Move request logging before routes and add route registration logs - Request logging now catches all requests before route matching - Added logs for /api/health and /api/auth/test route registration - This will help identify if requests are reaching Express
+[33mca0de36[m Add version check to health endpoint for deployment verification
+[33mbf76744[m Fix CORS to allow all Vercel preview URLs - Updated CORS to allow any *.vercel.app domain for preview deployments - Fixes CORS errors when accessing from Vercel preview URLs - Maintains security by only allowing Vercel domains in production
+[33m8eaac59[m Add enhanced request logging and route verification - Added request logging middleware to track all incoming requests - Added router stack inspection to verify routes are registered - Enhanced 404 handler to log available routes when 404 occurs - This will help identify if routes are registered but not matching
