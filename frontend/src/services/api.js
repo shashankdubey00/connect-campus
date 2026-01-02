@@ -23,7 +23,7 @@ const api = async (endpoint, options = {}) => {
       console.log(`[API] Making request to: ${url}`, {
         method: config.method,
         credentials: config.credentials,
-        currentDomainCookies: document.cookie || 'No cookies (this is normal - Render cookies won't show here)'
+        currentDomainCookies: document.cookie || 'No cookies (this is normal - Render cookies will not show here)'
       });
     }
     
