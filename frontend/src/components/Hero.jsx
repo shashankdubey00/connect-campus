@@ -37,25 +37,41 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
 
   // Check authentication status - only show CTA for logged-in users
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuth = async (retryCount = 0) => {
       try {
-        // Delay to ensure cookie is available after page reload
-        // Increased delay for production cookie propagation
-        await new Promise(resolve => setTimeout(resolve, 300))
+        // Delay increases with retry count (300ms, 800ms, 1500ms)
+        const delay = 300 + (retryCount * 500)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        
+        console.log(`[Hero] Checking auth (attempt ${retryCount + 1})...`)
         const data = await verifyAuth()
+        
         if (data.success && data.user) {
-          // Only set user if authentication is successful and user exists
+          console.log('[Hero] ✅ Auth successful, user:', data.user?.email)
           setUser(data.user)
+          setCheckingAuth(false)
         } else {
-          // Not logged in - clear user
-          setUser(null)
+          console.log('[Hero] ❌ Auth failed:', data.message)
+          // Retry up to 2 times if auth fails (might be cookie timing issue)
+          if (retryCount < 2) {
+            console.log(`[Hero] Retrying auth check in ${delay + 500}ms...`)
+            checkAuth(retryCount + 1)
+          } else {
+            setUser(null)
+            setCheckingAuth(false)
+          }
         }
       } catch (error) {
-        console.error('Hero auth check error:', error)
-        // Error or not authenticated - clear user
-        setUser(null)
-      } finally {
-        setCheckingAuth(false)
+        console.error('[Hero] Auth check error:', error)
+        // Retry up to 2 times on error (might be network/cookie timing issue)
+        if (retryCount < 2) {
+          const delay = 300 + (retryCount * 500)
+          console.log(`[Hero] Retrying auth check after error in ${delay + 500}ms...`)
+          checkAuth(retryCount + 1)
+        } else {
+          setUser(null)
+          setCheckingAuth(false)
+        }
       }
     }
     checkAuth()

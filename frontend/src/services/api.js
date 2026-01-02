@@ -16,7 +16,25 @@ const api = async (endpoint, options = {}) => {
   };
 
   try {
+    // Debug logging for auth endpoints
+    if (endpoint.includes('/auth/')) {
+      console.log(`[API] Making request to: ${url}`, {
+        method: config.method,
+        credentials: config.credentials,
+        hasCookies: document.cookie ? 'Yes' : 'No'
+      });
+    }
+    
     const response = await fetch(url, config);
+    
+    // Debug logging for auth responses
+    if (endpoint.includes('/auth/')) {
+      console.log(`[API] Response from ${url}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        hasSetCookie: response.headers.get('set-cookie') ? 'Yes' : 'No'
+      });
+    }
     
     // Check if response is JSON
     const contentType = response.headers.get('content-type');

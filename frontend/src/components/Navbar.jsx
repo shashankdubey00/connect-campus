@@ -12,24 +12,42 @@ const Navbar = ({ isScrolled }) => {
   const profileMenuRef = useRef(null)
 
   useEffect(() => {
-    // Check authentication status
-    // Add delay to ensure cookie is available after page reload
-    const checkAuth = async () => {
+    // Check authentication status with retry logic
+    const checkAuth = async (retryCount = 0) => {
       try {
-        // Delay to ensure cookie is available after window.location redirect
-        // Increased delay for production cookie propagation
-        await new Promise(resolve => setTimeout(resolve, 300))
+        // Delay increases with retry count (300ms, 800ms, 1500ms)
+        const delay = 300 + (retryCount * 500)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        
+        console.log(`[Navbar] Checking auth (attempt ${retryCount + 1})...`)
         const data = await verifyAuth()
+        
         if (data.success) {
+          console.log('[Navbar] ✅ Auth successful, user:', data.user?.email)
           setUser(data.user)
+          setLoading(false)
         } else {
-          setUser(null)
+          console.log('[Navbar] ❌ Auth failed:', data.message)
+          // Retry up to 2 times if auth fails (might be cookie timing issue)
+          if (retryCount < 2) {
+            console.log(`[Navbar] Retrying auth check in ${delay + 500}ms...`)
+            checkAuth(retryCount + 1)
+          } else {
+            setUser(null)
+            setLoading(false)
+          }
         }
       } catch (error) {
-        console.error('Navbar auth check error:', error)
-        setUser(null)
-      } finally {
-        setLoading(false)
+        console.error('[Navbar] Auth check error:', error)
+        // Retry up to 2 times on error (might be network/cookie timing issue)
+        if (retryCount < 2) {
+          const delay = 300 + (retryCount * 500)
+          console.log(`[Navbar] Retrying auth check after error in ${delay + 500}ms...`)
+          checkAuth(retryCount + 1)
+        } else {
+          setUser(null)
+          setLoading(false)
+        }
       }
     }
     checkAuth()

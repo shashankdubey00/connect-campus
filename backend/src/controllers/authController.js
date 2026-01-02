@@ -192,13 +192,23 @@ export const login = async (req, res) => {
     const token = generateToken(user._id, user.role);
 
     // Set httpOnly cookie
-    res.cookie('token', token, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' required for cross-domain in production
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+    
+    console.log('[Auth] Setting login cookie:', {
+      userId: user._id,
+      email: user.email,
+      options: cookieOptions,
+      origin: req.headers.origin,
+      isProduction: process.env.NODE_ENV === 'production'
     });
+    
+    res.cookie('token', token, cookieOptions);
 
     res.json({
       success: true,
@@ -231,6 +241,14 @@ export const logout = async (req, res) => {
 export const verifyAuth = async (req, res) => {
   try {
     const token = req.cookies?.token;
+    
+    console.log('[Auth] verifyAuth called:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      origin: req.headers.origin,
+      cookies: Object.keys(req.cookies || {}),
+      cookieHeader: req.headers.cookie ? 'Present' : 'Missing'
+    });
 
     if (!token) {
       return res.status(401).json({
