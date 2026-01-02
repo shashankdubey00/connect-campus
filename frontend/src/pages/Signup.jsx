@@ -70,7 +70,8 @@ const Signup = () => {
     try {
       const data = await signup(email, password);
       if (data.success) {
-        handleRedirect();
+        // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
+        window.location.href = '/';
       }
     } catch (error) {
       setError(error.message || 'Signup failed. Please try again.');

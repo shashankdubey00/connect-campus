@@ -71,7 +71,12 @@ const Login = () => {
     try {
       const data = await login(email, password);
       if (data.success) {
-        handleRedirect();
+        // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
+        if (collegeContext) {
+          window.location.href = '/';
+        } else {
+          window.location.href = '/';
+        }
       }
     } catch (error) {
       setError(error.message || 'Login failed. Please try again.');

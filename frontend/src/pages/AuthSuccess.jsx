@@ -15,20 +15,9 @@ const AuthSuccess = () => {
     sessionStorage.removeItem('returnPath');
 
     // Redirect after a short delay to allow cookie to be set
+    // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
     const timer = setTimeout(() => {
-      if (collegeContextStr) {
-        const collegeContext = JSON.parse(collegeContextStr);
-        // Always redirect to landing page after Google OAuth (profile will show, login/signup buttons hidden)
-        navigate('/', {
-          state: {
-            openCollegeModal: true,
-            college: collegeContext,
-          },
-        });
-      } else {
-        // Always redirect to landing page
-        navigate('/');
-      }
+      window.location.href = '/';
     }, 1000);
 
     return () => clearTimeout(timer);
