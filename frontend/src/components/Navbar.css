@@ -308,6 +308,9 @@
   cursor: pointer;
   padding: 0.5rem;
   z-index: 1001;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .hamburger {
@@ -427,6 +430,7 @@
     min-width: auto;
     max-width: none;
     gap: 0.5rem;
+    flex: 0 0 auto; /* Don't grow, don't shrink */
   }
 
   .user-actions-container {
@@ -456,7 +460,9 @@
   }
 
   .mobile-menu-toggle {
-    display: flex;
+    display: flex !important; /* Force display on mobile */
+    flex-shrink: 0; /* Prevent shrinking */
+    order: 999; /* Ensure it's at the end */
   }
 
   .mobile-menu {
