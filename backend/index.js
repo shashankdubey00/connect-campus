@@ -92,6 +92,13 @@ if (!fs.existsSync(profilePicturesDir)) {
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
+// Request logging middleware - MUST be before routes to catch all requests
+app.use((req, res, next) => {
+  console.log(`📥 INCOMING REQUEST: ${req.method} ${req.originalUrl}`);
+  console.log(`📥 Request path: ${req.path}, Base URL: ${req.baseUrl}`);
+  next();
+});
+
 // Routes - MUST be registered before server.listen()
 console.log("🟢 REGISTERING AUTH ROUTES");
 console.log("🟢 authRoutes type:", typeof authRoutes);
@@ -109,8 +116,10 @@ app.use('/api/groups', groupRoutes);
 app.use('/auth', authRoutes); // Also support /auth routes for OAuth
 console.log("🟢 /auth route mounted");
 
-// Health check
+// Health check - MUST be before 404 handler
+console.log("🟢 REGISTERING /api/health route");
 app.get('/api/health', (req, res) => {
+  console.log("🟢 /api/health route HIT - SUCCESS");
   res.json({ 
     status: 'OK', 
     message: 'Server is running',
@@ -118,19 +127,15 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+console.log("🟢 /api/health route registered");
 
 // Debug route to verify auth routes are working
+console.log("🟢 REGISTERING /api/auth/test route");
 app.get('/api/auth/test', (req, res) => {
-  console.log("🟢 /api/auth/test route hit - SUCCESS");
+  console.log("🟢 /api/auth/test route HIT - SUCCESS");
   res.json({ status: 'OK', message: 'AUTH ROUTES WORKING' });
 });
-
-// Add request logging middleware to see ALL incoming requests
-app.use((req, res, next) => {
-  console.log(`📥 INCOMING REQUEST: ${req.method} ${req.originalUrl}`);
-  console.log(`📥 Route stack length: ${app._router?.stack?.length || 'unknown'}`);
-  next();
-});
+console.log("🟢 /api/auth/test route registered");
 
 console.log("🟢 ALL ROUTES REGISTERED - Ready to start server");
 console.log("🟢 Total middleware stack:", app._router?.stack?.length || 'unknown');
