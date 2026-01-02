@@ -118,6 +118,8 @@
   gap: 1rem;
   align-items: center;
   transition: opacity 0.4s ease-out;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .navbar-buttons-visible {
@@ -135,6 +137,8 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0; /* Prevent buttons from being compressed */
+  white-space: nowrap; /* Prevent text wrapping */
 }
 
 .login-btn {
