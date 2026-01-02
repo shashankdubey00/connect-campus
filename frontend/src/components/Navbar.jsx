@@ -106,9 +106,13 @@ const Navbar = ({ isScrolled }) => {
         imageUrl = `${backendUrl}${imageUrl}`
       }
       
-      // Add cache-busting query parameter to ensure fresh image loads
-      const separator = imageUrl.includes('?') ? '&' : '?'
-      return `${imageUrl}${separator}_t=${Date.now()}`
+      // Add cache-busting query parameter only for uploaded images (not external URLs)
+      // This ensures fresh loads without breaking external image URLs
+      if (imageUrl.includes(import.meta.env.VITE_API_URL || 'localhost:5000')) {
+        const separator = imageUrl.includes('?') ? '&' : '?'
+        return `${imageUrl}${separator}_t=${Date.now()}`
+      }
+      return imageUrl
     }
     const name = user?.profile?.displayName || user?.email || 'U'
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
