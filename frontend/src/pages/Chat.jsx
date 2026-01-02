@@ -5687,16 +5687,23 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchMove = (e) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-    
     // Track swipe for reply gesture
-    if (swipeStartX !== null && isMobile) {
+    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
       const clientX = touch ? touch.clientX : e.clientX
+      const clientY = touch ? touch.clientY : e.clientY
       const deltaX = clientX - swipeStartX
+      const deltaY = Math.abs(clientY - swipeStartY)
+      const totalMovement = Math.abs(deltaX) + deltaY
+      
+      // Only cancel long press if there's significant movement (swipe gesture)
+      // Allow small movements (up to 10px) without cancelling long press
+      if (totalMovement > 10) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+        }
+      }
       
       // Swipe RIGHT to reply (opposite of WhatsApp)
       // Swipe RIGHT means your finger moves to a larger X coordinate
@@ -9071,16 +9078,23 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchMove = (e) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-    
     // Track swipe for reply gesture
-    if (swipeStartX !== null && isMobile) {
+    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
       const clientX = touch ? touch.clientX : e.clientX
+      const clientY = touch ? touch.clientY : e.clientY
       const deltaX = clientX - swipeStartX
+      const deltaY = Math.abs(clientY - swipeStartY)
+      const totalMovement = Math.abs(deltaX) + deltaY
+      
+      // Only cancel long press if there's significant movement (swipe gesture)
+      // Allow small movements (up to 10px) without cancelling long press
+      if (totalMovement > 10) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+        }
+      }
       
       // Swipe RIGHT to reply (opposite of WhatsApp)
       // Swipe RIGHT means your finger moves to a larger X coordinate
