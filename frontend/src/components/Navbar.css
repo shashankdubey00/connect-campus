@@ -171,6 +171,13 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.user-actions-spacer {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Chat Icon Button - Compact Style */

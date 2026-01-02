@@ -150,8 +150,9 @@ const Navbar = ({ isScrolled }) => {
               <button className="nav-btn get-started-btn">Get Started</button>
             </div>
           ) : user ? (
-              // Logged in - show integrated chat button with profile
+              // Logged in - show integrated chat button with profile (with spacer to match buttons width)
               <div className="user-actions-container">
+                <div className="user-actions-spacer"></div>
                 <button 
                   className="chat-icon-btn animated-chat-btn"
                   onClick={() => navigate('/chat')}
