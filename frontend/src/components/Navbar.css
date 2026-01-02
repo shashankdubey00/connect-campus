@@ -424,34 +424,21 @@
     display: none;
   }
 
-  /* Override fixed width for mobile - make it flexible */
+  /* Hide navbar-right completely on mobile - everything goes in hamburger menu */
   .navbar-right {
-    width: auto;
-    min-width: auto;
-    max-width: none;
-    gap: 0.5rem;
-    flex: 0 0 auto; /* Don't grow, don't shrink */
+    display: none !important;
   }
 
   .user-actions-container {
-    width: auto;
-    min-width: auto;
-    max-width: none;
-    gap: 0.5rem;
+    display: none;
   }
 
   .user-actions-spacer {
-    display: none; /* Hide spacer on mobile */
+    display: none;
   }
 
   .chat-icon-btn {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .chat-icon-btn .chat-icon-svg {
-    width: 18px;
-    height: 18px;
+    display: none;
   }
   
   /* Hide profile avatar in mobile navbar - keep only in hamburger menu */
@@ -463,6 +450,7 @@
     display: flex !important; /* Force display on mobile */
     flex-shrink: 0; /* Prevent shrinking */
     order: 999; /* Ensure it's at the end */
+    margin-left: auto; /* Push to the right */
   }
 
   .mobile-menu {
