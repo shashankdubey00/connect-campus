@@ -336,6 +336,15 @@
   }
 }
 
+@keyframes navbarButtonsFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .mobile-nav-link {
   color: #e0e0e0;
   text-decoration: none;
