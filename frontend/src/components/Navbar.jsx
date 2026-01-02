@@ -134,8 +134,8 @@ const Navbar = ({ isScrolled }) => {
 
         <div className="navbar-right">
           {loading ? (
-            // Placeholder to prevent layout shift while loading
-            <div style={{ width: '200px', height: '40px' }}></div>
+            // Placeholder to prevent layout shift while loading - matches actual content width
+            <div className="navbar-right-placeholder"></div>
           ) : user ? (
               // Logged in - show integrated chat button with profile
               <div className="user-actions-container">

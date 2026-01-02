@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 120px 2rem 4rem;
+  padding: 140px 2rem 4rem;
   overflow: visible;
   z-index: 1;
 }
@@ -713,7 +713,8 @@
 
 @media (max-width: 768px) {
   .hero {
-    padding: 100px 1rem 3rem;
+    padding: 120px 1rem 3rem;
+    padding-top: 120px;
   }
 
   .hero-heading {
