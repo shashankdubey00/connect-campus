@@ -2521,6 +2521,42 @@
   .message-content {
     touch-action: pan-y;
   }
+
+  /* Make live-chat-view full height on mobile when in chat view */
+  .live-chat-view {
+    height: 100vh;
+    position: relative;
+  }
+
+  /* Fix chat header to top on mobile when in chat view (top header is hidden) */
+  .live-chat-view .chat-header-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: var(--right-header-bg);
+    height: 60px; /* Fixed height for consistent spacing */
+  }
+
+  /* Fix input area to bottom on mobile when in chat view (bottom nav is hidden) */
+  .live-chat-view .chat-input-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background-color: var(--right-header-bg);
+    min-height: 70px; /* Minimum height for input area */
+  }
+
+  /* Add padding to messages area to account for fixed header and input */
+  .live-chat-view .chat-messages-area {
+    padding-top: 60px; /* Height of chat-header-bar */
+    padding-bottom: 70px; /* Height of chat-input-area */
+    height: 100vh;
+    overflow-y: auto;
+  }
 }
 
 .action-btn {
