@@ -28,6 +28,11 @@ const Navbar = ({ isScrolled }) => {
           setLoading(false)
         } else {
           console.log('[Navbar] ❌ Auth failed:', data.message)
+          // If auth fails on first attempt, show buttons immediately (user is not logged in)
+          if (retryCount === 0) {
+            setUser(null)
+            setLoading(false) // Show buttons immediately
+          }
           // Retry up to 2 times if auth fails (might be cookie timing issue)
           if (retryCount < 2) {
             console.log(`[Navbar] Retrying auth check in ${delay + 500}ms...`)
@@ -39,6 +44,11 @@ const Navbar = ({ isScrolled }) => {
         }
       } catch (error) {
         console.error('[Navbar] Auth check error:', error)
+        // If error on first attempt, show buttons immediately (likely not logged in)
+        if (retryCount === 0) {
+          setUser(null)
+          setLoading(false) // Show buttons immediately
+        }
         // Retry up to 2 times on error (might be network/cookie timing issue)
         if (retryCount < 2) {
           const delay = 300 + (retryCount * 500)
