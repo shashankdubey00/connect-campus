@@ -118,29 +118,19 @@ export const signup = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
-    // Determine if we're in production (check multiple indicators)
-    const isProduction = process.env.NODE_ENV === 'production' || 
-                         process.env.CLIENT_URL?.includes('vercel.app') ||
-                         process.env.CLIENT_URL?.includes('onrender.com') ||
-                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+    // Get cookie options (handles custom domain vs cross-domain)
+    const cookieOptions = getCookieOptions();
     
     // Set httpOnly cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: isProduction, // Must be true for sameSite: 'none'
-      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('token', token, cookieOptions);
     
     console.log('[Auth] Setting signup cookie:', {
       userId: user._id,
       email: user.email,
       NODE_ENV: process.env.NODE_ENV,
       CLIENT_URL: process.env.CLIENT_URL,
-      isProduction: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      secure: isProduction
+      cookieOptions: cookieOptions,
+      isCustomDomain: !process.env.CLIENT_URL?.includes('vercel.app') && !process.env.CLIENT_URL?.includes('onrender.com')
     });
 
     res.status(201).json({
@@ -207,20 +197,8 @@ export const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
-    // Determine if we're in production (check multiple indicators)
-    const isProduction = process.env.NODE_ENV === 'production' || 
-                         process.env.CLIENT_URL?.includes('vercel.app') ||
-                         process.env.CLIENT_URL?.includes('onrender.com') ||
-                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
-    
-    // Set httpOnly cookie
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction, // Must be true for sameSite: 'none'
-      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    };
+    // Get cookie options (handles custom domain vs cross-domain)
+    const cookieOptions = getCookieOptions();
     
     console.log('[Auth] Setting login cookie:', {
       userId: user._id,
@@ -229,9 +207,7 @@ export const login = async (req, res) => {
       origin: req.headers.origin,
       NODE_ENV: process.env.NODE_ENV,
       CLIENT_URL: process.env.CLIENT_URL,
-      isProduction: isProduction,
-      cookieSameSite: cookieOptions.sameSite,
-      cookieSecure: cookieOptions.secure
+      isCustomDomain: !process.env.CLIENT_URL?.includes('vercel.app') && !process.env.CLIENT_URL?.includes('onrender.com')
     });
     
     res.cookie('token', token, cookieOptions);
@@ -256,36 +232,32 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  // Use EXACT same isProduction check as login/signup/googleCallback
-  const isProduction = process.env.NODE_ENV === 'production' || 
-                       process.env.CLIENT_URL?.includes('vercel.app') ||
-                       process.env.CLIENT_URL?.includes('onrender.com') ||
-                       !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
-  
   // Use EXACT same cookie options as when setting the cookie
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction, // Must match the value used when setting
-    sameSite: isProduction ? 'none' : 'lax', // Must match exactly
-    path: '/',
+  const cookieOptions = getCookieOptions();
+  
+  // Remove maxAge for clearCookie (not needed)
+  const clearCookieOptions = {
+    httpOnly: cookieOptions.httpOnly,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    path: cookieOptions.path,
   };
   
   // Clear cookie with same options (critical for cross-domain)
-  res.clearCookie('token', cookieOptions);
+  res.clearCookie('token', clearCookieOptions);
   
   // Also set cookie to empty with expired date as backup (ensures deletion)
   res.cookie('token', '', {
-    ...cookieOptions,
+    ...clearCookieOptions,
     maxAge: 0, // Expire immediately
     expires: new Date(0), // Set to epoch time (already expired)
   });
   
   console.log('[Auth] Logout - cookie cleared:', {
-    isProduction,
-    sameSite: cookieOptions.sameSite,
-    secure: cookieOptions.secure,
+    cookieOptions: clearCookieOptions,
     origin: req.headers.origin,
-    cookiePresent: req.cookies?.token ? 'Yes' : 'No'
+    cookiePresent: req.cookies?.token ? 'Yes' : 'No',
+    isCustomDomain: !process.env.CLIENT_URL?.includes('vercel.app') && !process.env.CLIENT_URL?.includes('onrender.com')
   });
   
   res.json({
@@ -369,29 +341,19 @@ export const googleCallback = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
-    // Determine if we're in production (check multiple indicators)
-    const isProduction = process.env.NODE_ENV === 'production' || 
-                         process.env.CLIENT_URL?.includes('vercel.app') ||
-                         process.env.CLIENT_URL?.includes('onrender.com') ||
-                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+    // Get cookie options (handles custom domain vs cross-domain)
+    const cookieOptions = getCookieOptions();
     
     // Set httpOnly cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: isProduction, // Must be true for sameSite: 'none'
-      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('token', token, cookieOptions);
     
     console.log('[Auth] Setting Google OAuth cookie:', {
       userId: user._id,
       email: user.email,
       NODE_ENV: process.env.NODE_ENV,
       CLIENT_URL: process.env.CLIENT_URL,
-      isProduction: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      secure: isProduction
+      cookieOptions: cookieOptions,
+      isCustomDomain: !process.env.CLIENT_URL?.includes('vercel.app') && !process.env.CLIENT_URL?.includes('onrender.com')
     });
 
     // Redirect to frontend with success
