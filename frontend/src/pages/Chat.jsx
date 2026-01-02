@@ -3364,11 +3364,12 @@ const Chat = () => {
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
       {(() => {
+        // Check if we're in a chat view on mobile
         const isInChatView = isMobileView && (
           view === 'direct-chat' || 
           view === 'group-chat' || 
           view === 'live-chat' ||
-          (selectedChat && (selectedChat.type === 'direct' || selectedChat.type === 'group' || selectedChat.type === 'college'))
+          (selectedChat !== null && selectedChat !== undefined)
         );
         return (
           <div className={`chat-top-header ${isInChatView ? 'hidden' : ''}`}>
@@ -3622,12 +3623,14 @@ const Chat = () => {
 
       {/* Mobile Bottom Navigation - Hide when in chat view */}
       {(() => {
+        // Check if we're in a chat view on mobile
         const isInChatView = isMobileView && (
           view === 'direct-chat' || 
           view === 'group-chat' || 
           view === 'live-chat' ||
-          (selectedChat && (selectedChat.type === 'direct' || selectedChat.type === 'group' || selectedChat.type === 'college'))
+          (selectedChat !== null && selectedChat !== undefined)
         );
+        // Only show bottom nav if NOT in chat view and on mobile
         return !isInChatView && isMobileView;
       })() && (
         <div className="mobile-bottom-nav">
