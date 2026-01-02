@@ -3363,7 +3363,15 @@ const Chat = () => {
   return (
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
-      <div className={`chat-top-header ${isMobileView && (view === 'direct-chat' || view === 'group-chat' || view === 'live-chat' || (view === 'live-chat' && selectedChat)) ? 'hidden' : ''}`}>
+      {(() => {
+        const isInChatView = isMobileView && (
+          view === 'direct-chat' || 
+          view === 'group-chat' || 
+          view === 'live-chat' ||
+          (selectedChat && (selectedChat.type === 'direct' || selectedChat.type === 'group' || selectedChat.type === 'college'))
+        );
+        return (
+          <div className={`chat-top-header ${isInChatView ? 'hidden' : ''}`}>
         <div className="header-left-section">
           <button 
             className="navbar-back-to-home-btn"
@@ -3462,7 +3470,9 @@ const Chat = () => {
             )}
           </div>
         )}
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Left Sidebar - Fixed Navigation */}
       <div className="chat-sidebar">
@@ -3611,7 +3621,15 @@ const Chat = () => {
       </div>
 
       {/* Mobile Bottom Navigation - Hide when in chat view */}
-      {isMobileView && (view !== 'direct-chat' && view !== 'group-chat' && view !== 'live-chat') && (
+      {(() => {
+        const isInChatView = isMobileView && (
+          view === 'direct-chat' || 
+          view === 'group-chat' || 
+          view === 'live-chat' ||
+          (selectedChat && (selectedChat.type === 'direct' || selectedChat.type === 'group' || selectedChat.type === 'college'))
+        );
+        return !isInChatView && isMobileView;
+      })() && (
         <div className="mobile-bottom-nav">
           <button
             className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
