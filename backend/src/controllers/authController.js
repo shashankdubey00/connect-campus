@@ -118,13 +118,29 @@ export const signup = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
+    // Determine if we're in production (check multiple indicators)
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                         process.env.CLIENT_URL?.includes('vercel.app') ||
+                         process.env.CLIENT_URL?.includes('onrender.com') ||
+                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+    
     // Set httpOnly cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' required for cross-domain in production
+      secure: isProduction, // Must be true for sameSite: 'none'
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    
+    console.log('[Auth] Setting signup cookie:', {
+      userId: user._id,
+      email: user.email,
+      NODE_ENV: process.env.NODE_ENV,
+      CLIENT_URL: process.env.CLIENT_URL,
+      isProduction: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction
     });
 
     res.status(201).json({
@@ -191,11 +207,17 @@ export const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
+    // Determine if we're in production (check multiple indicators)
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                         process.env.CLIENT_URL?.includes('vercel.app') ||
+                         process.env.CLIENT_URL?.includes('onrender.com') ||
+                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+    
     // Set httpOnly cookie
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' required for cross-domain in production
+      secure: isProduction, // Must be true for sameSite: 'none'
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
@@ -205,7 +227,11 @@ export const login = async (req, res) => {
       email: user.email,
       options: cookieOptions,
       origin: req.headers.origin,
-      isProduction: process.env.NODE_ENV === 'production'
+      NODE_ENV: process.env.NODE_ENV,
+      CLIENT_URL: process.env.CLIENT_URL,
+      isProduction: isProduction,
+      cookieSameSite: cookieOptions.sameSite,
+      cookieSecure: cookieOptions.secure
     });
     
     res.cookie('token', token, cookieOptions);
@@ -312,13 +338,29 @@ export const googleCallback = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
+    // Determine if we're in production (check multiple indicators)
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                         process.env.CLIENT_URL?.includes('vercel.app') ||
+                         process.env.CLIENT_URL?.includes('onrender.com') ||
+                         !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+    
     // Set httpOnly cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' required for cross-domain in production
+      secure: isProduction, // Must be true for sameSite: 'none'
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-domain in production
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    
+    console.log('[Auth] Setting Google OAuth cookie:', {
+      userId: user._id,
+      email: user.email,
+      NODE_ENV: process.env.NODE_ENV,
+      CLIENT_URL: process.env.CLIENT_URL,
+      isProduction: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction
     });
 
     // Redirect to frontend with success
