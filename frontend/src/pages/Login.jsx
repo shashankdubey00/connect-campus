@@ -70,36 +70,14 @@ const Login = () => {
 
     try {
       console.log('[Login] Attempting login...');
-      
-      // Make the login request manually to check response headers
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Important for cookies
-        body: JSON.stringify({ email, password }),
-      });
-      
-      const data = await response.json();
+      const data = await login(email, password);
       console.log('[Login] Login response:', data);
       
-      // Check if Set-Cookie header is present
-      const setCookieHeader = response.headers.get('set-cookie');
-      console.log('[Login] Set-Cookie header:', setCookieHeader || 'NOT SET');
-      console.log('[Login] All response headers:', Object.fromEntries(response.headers.entries()));
-      
       if (data.success) {
-        if (!setCookieHeader) {
-          console.error('[Login] ⚠️ WARNING: Cookie was NOT set by backend!');
-          setError('Login successful but cookie was not set. Please check backend configuration.');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('[Login] ✅ Cookie was set, redirecting...');
-        // Add a small delay to ensure cookie is set before redirect
+        console.log('[Login] ✅ Login successful, redirecting...');
+        // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
+        // Note: We can't check Set-Cookie header from JavaScript (browser security),
+        // but if login is successful, the cookie was set by the backend
         setTimeout(() => {
           window.location.href = '/';
         }, 200);
