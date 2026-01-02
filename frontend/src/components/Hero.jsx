@@ -246,8 +246,8 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
       </div>
       
       <div className="hero-content">
-        {/* Only show CTA section for authenticated logged-in users, not visitors */}
-        {!checkingAuth && user && user.email && (
+        {/* CTA Section Container - Always present to prevent layout shift */}
+        <div className={`hero-cta-wrapper ${!checkingAuth && user && user.email ? 'visible' : 'hidden'}`}>
           <div className="hero-cta-section">
             <div className="cta-content">
               <div className="cta-icon-wrapper">
@@ -255,7 +255,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
                 <div className="pulse-ring"></div>
               </div>
               <div className="cta-text">
-                <h2 className="cta-title">Welcome back, {user.profile?.displayName || user.email?.split('@')[0] || 'Student'}!</h2>
+                <h2 className="cta-title">Welcome back, {user?.profile?.displayName || user?.email?.split('@')[0] || 'Student'}!</h2>
                 <p className="cta-subtitle">Continue your conversations and connect with your college community</p>
               </div>
               <button 
@@ -269,7 +269,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
               </button>
             </div>
           </div>
-        )}
+        </div>
         
         <div className="hero-text">
           <h1 className="hero-heading">
