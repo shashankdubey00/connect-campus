@@ -18,11 +18,12 @@ const api = async (endpoint, options = {}) => {
   try {
     // Debug logging for auth endpoints
     if (endpoint.includes('/auth/')) {
+      // Note: document.cookie only shows cookies for current domain (Vercel)
+      // Cookies for Render domain won't show here, but will be sent automatically
       console.log(`[API] Making request to: ${url}`, {
         method: config.method,
         credentials: config.credentials,
-        hasCookies: document.cookie ? 'Yes' : 'No',
-        cookieValue: document.cookie || 'No cookies'
+        currentDomainCookies: document.cookie || 'No cookies (this is normal - Render cookies won't show here)'
       });
     }
     

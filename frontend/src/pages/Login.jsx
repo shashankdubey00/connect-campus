@@ -74,13 +74,13 @@ const Login = () => {
       console.log('[Login] Login response:', data);
       
       if (data.success) {
-        console.log('[Login] ✅ Login successful, redirecting...');
-        // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
-        // Note: We can't check Set-Cookie header from JavaScript (browser security),
-        // but if login is successful, the cookie was set by the backend
+        console.log('[Login] ✅ Login successful, waiting for cookie to be set...');
+        // Wait a bit longer to ensure cookie is set before redirect
+        // This is especially important for cross-domain cookies
         setTimeout(() => {
+          console.log('[Login] Redirecting to landing page...');
           window.location.href = '/';
-        }, 200);
+        }, 500);
       } else {
         setError(data.message || 'Login failed. Please try again.');
         setLoading(false);
