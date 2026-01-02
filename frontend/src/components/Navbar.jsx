@@ -178,13 +178,21 @@ const Navbar = ({ isScrolled }) => {
                     onMouseEnter={() => setIsProfileMenuOpen(true)}
                   >
                     <img 
-                      src={getUserAvatar()} 
+                      key={`avatar-${user?.id || user?._id || 'default'}-${user?.profile?.profilePicture || 'no-pic'}`}
+                      src={getUserAvatar} 
                       alt="Profile"
+                      loading="eager"
                       onError={(e) => {
-                        // Fallback to ui-avatars if image fails to load
-                        const name = user?.profile?.displayName || user?.email || 'U'
-                        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                        // Only set fallback if not already set to prevent infinite loop
+                        if (!e.target.src.includes('ui-avatars.com')) {
+                          const name = user?.profile?.displayName || user?.email || 'U'
+                          const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                        }
+                      }}
+                      onLoad={() => {
+                        // Image loaded successfully
+                        console.log('Profile image loaded successfully')
                       }}
                     />
                   </div>
