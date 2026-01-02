@@ -300,10 +300,8 @@
   opacity: 0;
   height: 0;
   overflow: hidden;
-}
-
-.chat-top-header.hidden {
-  display: none;
+  padding: 0;
+  margin: 0;
 }
   padding: 0 20px;
   z-index: 999;
