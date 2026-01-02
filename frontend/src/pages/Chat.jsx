@@ -10420,6 +10420,18 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
       const response = await uploadProfilePicture(croppedFile)
       
       if (response.success) {
+        // Always refresh user data to get updated profile picture
+        try {
+          const authData = await verifyAuth()
+          if (authData.success) {
+            setUser(authData.user)
+            console.log('✅ Profile picture uploaded and user data refreshed')
+          }
+        } catch (authError) {
+          console.error('Error refreshing user data after upload:', authError)
+        }
+        
+        // Also call the callback if provided
         if (onProfileUpdate) {
           await onProfileUpdate()
         }

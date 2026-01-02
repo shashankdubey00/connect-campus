@@ -106,11 +106,12 @@ const Navbar = ({ isScrolled }) => {
         imageUrl = `${backendUrl}${imageUrl}`
       }
       
-      // Add cache-busting query parameter only for uploaded images (not external URLs)
-      // This ensures fresh loads without breaking external image URLs
+      // For uploaded images, add a version parameter based on the file path
+      // This ensures fresh loads when the image changes, but stable URLs for the same image
       if (imageUrl.includes(import.meta.env.VITE_API_URL || 'localhost:5000')) {
-        const separator = imageUrl.includes('?') ? '&' : '?'
-        return `${imageUrl}${separator}_t=${Date.now()}`
+        // Use the imageUrl itself as the cache key (it changes when a new image is uploaded)
+        // This way, React will re-render when the URL changes, but won't force reload on every render
+        return imageUrl
       }
       return imageUrl
     }
