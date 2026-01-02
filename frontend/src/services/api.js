@@ -21,7 +21,8 @@ const api = async (endpoint, options = {}) => {
       console.log(`[API] Making request to: ${url}`, {
         method: config.method,
         credentials: config.credentials,
-        hasCookies: document.cookie ? 'Yes' : 'No'
+        hasCookies: document.cookie ? 'Yes' : 'No',
+        cookieValue: document.cookie || 'No cookies'
       });
     }
     
@@ -29,10 +30,13 @@ const api = async (endpoint, options = {}) => {
     
     // Debug logging for auth responses
     if (endpoint.includes('/auth/')) {
+      const setCookieHeader = response.headers.get('set-cookie');
       console.log(`[API] Response from ${url}:`, {
         status: response.status,
         statusText: response.statusText,
-        hasSetCookie: response.headers.get('set-cookie') ? 'Yes' : 'No'
+        hasSetCookie: setCookieHeader ? 'Yes' : 'No',
+        setCookieHeader: setCookieHeader || 'None',
+        allHeaders: Object.fromEntries(response.headers.entries())
       });
     }
     

@@ -69,18 +69,47 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const data = await login(email, password);
+      console.log('[Login] Attempting login...');
+      
+      // Make the login request manually to check response headers
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for cookies
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const data = await response.json();
+      console.log('[Login] Login response:', data);
+      
+      // Check if Set-Cookie header is present
+      const setCookieHeader = response.headers.get('set-cookie');
+      console.log('[Login] Set-Cookie header:', setCookieHeader || 'NOT SET');
+      console.log('[Login] All response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (data.success) {
-        // Use window.location to force full page reload so Navbar/Hero can detect auth cookie
-        if (collegeContext) {
-          window.location.href = '/';
-        } else {
-          window.location.href = '/';
+        if (!setCookieHeader) {
+          console.error('[Login] ⚠️ WARNING: Cookie was NOT set by backend!');
+          setError('Login successful but cookie was not set. Please check backend configuration.');
+          setLoading(false);
+          return;
         }
+        
+        console.log('[Login] ✅ Cookie was set, redirecting...');
+        // Add a small delay to ensure cookie is set before redirect
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 200);
+      } else {
+        setError(data.message || 'Login failed. Please try again.');
+        setLoading(false);
       }
     } catch (error) {
+      console.error('[Login] Login error:', error);
       setError(error.message || 'Login failed. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
