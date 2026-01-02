@@ -21,28 +21,6 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB and start server
-const startServer = async () => {
-  try {
-    // Wait for MongoDB connection before starting server
-    await connectDB();
-    
-    // Start server only after MongoDB is connected
-    server.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`🔌 Socket.IO is ready for real-time messaging`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer();
-
 // Compression middleware (should be early in the middleware stack)
 app.use(compression());
 
@@ -84,7 +62,7 @@ if (!fs.existsSync(profilePicturesDir)) {
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
-// Routes
+// Routes - MUST be registered before server.listen()
 app.use('/api/colleges', collegeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
@@ -98,6 +76,33 @@ app.use('/auth', authRoutes); // Also support /auth routes for OAuth
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// Debug route to verify auth routes are working
+app.get('/api/auth/test', (req, res) => {
+  res.json({ status: 'OK', message: 'AUTH ROUTES WORKING' });
+});
+
+// Connect to MongoDB and start server
+const startServer = async () => {
+  try {
+    // Wait for MongoDB connection before starting server
+    await connectDB();
+    
+    // Start server only after MongoDB is connected AND all routes are registered
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`🔌 Socket.IO is ready for real-time messaging`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start the server (after all routes are registered)
+startServer();
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
