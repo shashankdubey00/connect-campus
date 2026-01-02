@@ -173,11 +173,15 @@
   gap: 0.75rem;
   width: 100%;
   justify-content: flex-end;
+  min-width: 200px; /* Match navbar-right min-width */
 }
 
 .user-actions-spacer {
   flex: 1;
   min-width: 0;
+  /* Calculate: buttons width (~240px) - chat icon (44px) - gap (12px) - profile (40px) = ~144px */
+  min-width: 144px;
+  max-width: 144px;
 }
 
 /* Chat Icon Button - Compact Style */
