@@ -256,23 +256,37 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  // For production cross-domain, need same options as when setting cookie
+  // Use EXACT same isProduction check as login/signup/googleCallback
   const isProduction = process.env.NODE_ENV === 'production' || 
                        process.env.CLIENT_URL?.includes('vercel.app') ||
-                       process.env.CLIENT_URL?.includes('onrender.com');
+                       process.env.CLIENT_URL?.includes('onrender.com') ||
+                       !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
   
-  if (isProduction) {
-    // Cross-domain: need same options as when setting cookie
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      path: '/',
-    });
-  } else {
-    // Localhost: simple clearCookie works
-    res.clearCookie('token');
-  }
+  // Use EXACT same cookie options as when setting the cookie
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction, // Must match the value used when setting
+    sameSite: isProduction ? 'none' : 'lax', // Must match exactly
+    path: '/',
+  };
+  
+  // Clear cookie with same options (critical for cross-domain)
+  res.clearCookie('token', cookieOptions);
+  
+  // Also set cookie to empty with expired date as backup (ensures deletion)
+  res.cookie('token', '', {
+    ...cookieOptions,
+    maxAge: 0, // Expire immediately
+    expires: new Date(0), // Set to epoch time (already expired)
+  });
+  
+  console.log('[Auth] Logout - cookie cleared:', {
+    isProduction,
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
+    origin: req.headers.origin,
+    cookiePresent: req.cookies?.token ? 'Yes' : 'No'
+  });
   
   res.json({
     success: true,
