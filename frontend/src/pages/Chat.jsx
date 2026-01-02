@@ -574,7 +574,7 @@ const Chat = () => {
           const userName = conversation.name || 'User'
           const userAvatar = conversation.profilePicture 
             ? (conversation.profilePicture.startsWith('/uploads/') 
-                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${conversation.profilePicture}`
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${conversation.profilePicture}`
                 : conversation.profilePicture)
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
           
@@ -1419,7 +1419,7 @@ const Chat = () => {
     if (user?.profile?.profilePicture) {
       // If it's a relative path, prepend the backend URL
       if (user.profile.profilePicture.startsWith('/uploads/')) {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
         return `${backendUrl}${user.profile.profilePicture}`
       }
       // If it's already a full URL, use it as is
@@ -1427,7 +1427,7 @@ const Chat = () => {
         return user.profile.profilePicture
       }
       // Otherwise, treat as relative path
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       return `${backendUrl}${user.profile.profilePicture}`
     }
     const name = user?.profile?.displayName || user?.email || 'User'
@@ -3754,7 +3754,7 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
   const getUserAvatar = () => {
     if (user?.profile?.profilePicture) {
       if (user.profile.profilePicture.startsWith('/uploads/')) {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
         return `${backendUrl}${user.profile.profilePicture}`
       }
       return user.profile.profilePicture
@@ -6364,14 +6364,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                               if (profilePic) {
                                 // If it's a relative path, prepend the backend URL
                                 if (profilePic.startsWith('/uploads/')) {
-                                  return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${profilePic}`
+                                  return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
                                 }
                                 // If it's already a full URL, use it as is
                                 if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
                                   return profilePic
                                 }
                                 // Otherwise, treat as relative path
-                                return `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${profilePic}`
+                                return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
                               }
                               // Fallback to ui-avatars
                               const displayName = senderProfile?.displayName || message.sender || 'User'
@@ -6993,7 +6993,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             if (profileResponse.success && profileResponse.profile) {
               let profilePicture = profileResponse.profile.profilePicture
               if (profilePicture && profilePicture.startsWith('/uploads/')) {
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+                const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
                 profilePicture = `${backendUrl}${profilePicture}`
               }
               return {
@@ -8255,7 +8255,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
               const userAvatar = otherUser.profile?.profilePicture 
                 ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                    ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                    ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                     : otherUser.profile.profilePicture)
                 : null
               onMessageSent(otherUserId, userName, userAvatar, lastMessage.text, lastMessage.timestamp, true, lastMessage.deliveredTo || [], lastMessage.readBy || [])
@@ -8502,7 +8502,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
             const userAvatar = otherUser.profile?.profilePicture 
               ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                   : otherUser.profile.profilePicture)
               : null
             onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
@@ -8539,7 +8539,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
             const userAvatar = otherUser.profile?.profilePicture 
               ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                   : otherUser.profile.profilePicture)
               : null
             onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
@@ -8576,7 +8576,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
                   const userAvatar = otherUser.profile?.profilePicture 
                     ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                        ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                         : otherUser.profile.profilePicture)
                     : null
                   onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy || [])
@@ -8599,7 +8599,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
                   const userAvatar = otherUser.profile?.profilePicture 
                     ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                        ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                         : otherUser.profile.profilePicture)
                     : null
                   onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo || [], updatedMsg.readBy)
@@ -8782,7 +8782,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
           const userAvatar = otherUser.profile?.profilePicture 
             ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                 : otherUser.profile.profilePicture)
             : null
           onMessageSent(otherUserId, userName, userAvatar, messageText, new Date(), true, [], [])
@@ -8833,7 +8833,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
           const userAvatar = otherUser.profile?.profilePicture 
             ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                 : otherUser.profile.profilePicture)
             : null
           // Pass null timestamp to indicate cleared state - this will update timestamp to current time
@@ -9123,7 +9123,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9142,7 +9142,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9171,7 +9171,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9189,7 +9189,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9234,7 +9234,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9253,7 +9253,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9282,7 +9282,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9300,7 +9300,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
         const userAvatar = otherUser?.profile?.profilePicture 
           ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-              ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
               : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
         
@@ -9396,7 +9396,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User';
             const userAvatar = otherUser?.profile?.profilePicture 
               ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                   : otherUser.profile.profilePicture)
               : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`;
             
@@ -9417,7 +9417,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User';
             const userAvatar = otherUser?.profile?.profilePicture 
               ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-                  ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
                   : otherUser.profile.profilePicture)
               : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`;
             
@@ -9522,7 +9522,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const displayName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
   const displayAvatar = otherUser?.profile?.profilePicture 
     ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
-        ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
         : otherUser.profile.profilePicture)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=50&background=00a8ff&color=fff`
 
@@ -10370,7 +10370,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
       if (user?.profile?.profilePicture) {
         // If it's a relative path, prepend the backend URL
         if (user.profile.profilePicture.startsWith('/uploads/')) {
-          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+          const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
           return `${backendUrl}${user.profile.profilePicture}`
         }
         return user.profile.profilePicture

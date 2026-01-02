@@ -61,7 +61,7 @@ const Navbar = ({ isScrolled }) => {
     if (user?.profile?.profilePicture) {
       // If it's a relative path, prepend the backend URL
       if (user.profile.profilePicture.startsWith('/uploads/')) {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
         return `${backendUrl}${user.profile.profilePicture}`
       }
       // If it's already a full URL, use it as is
@@ -69,7 +69,7 @@ const Navbar = ({ isScrolled }) => {
         return user.profile.profilePicture
       }
       // Otherwise, treat as relative path
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       return `${backendUrl}${user.profile.profilePicture}`
     }
     const name = user?.profile?.displayName || user?.email || 'U'

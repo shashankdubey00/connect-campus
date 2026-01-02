@@ -142,7 +142,7 @@ const CreateGroupModal = ({ onClose, onGroupCreated, user, availableUsers = [] }
                       const userName = userItem.profile?.displayName || userItem.email?.split('@')[0] || 'User';
                       const userAvatar = userItem.profile?.profilePicture 
                         ? (userItem.profile.profilePicture.startsWith('/uploads/') 
-                            ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}${userItem.profile.profilePicture}`
+                            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${userItem.profile.profilePicture}`
                             : userItem.profile.profilePicture)
                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`;
                       const isSelected = selectedMembers.has(String(userId));

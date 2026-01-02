@@ -3,12 +3,22 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import User from '../models/User.js';
 import UserProfile from '../models/UserProfile.js';
 
+// Construct callback URL: use env var if set (production), otherwise construct for local dev
+const getGoogleCallbackURL = () => {
+  if (process.env.GOOGLE_CALLBACK_URL) {
+    return process.env.GOOGLE_CALLBACK_URL;
+  }
+  // Local development fallback - using /api/auth/google/callback to match route mount
+  const port = process.env.PORT || 5000;
+  return `http://localhost:${port}/api/auth/google/callback`;
+};
+
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
+      callbackURL: getGoogleCallbackURL(),
     },
     async (accessToken, refreshToken, profile, done) => {
       try {

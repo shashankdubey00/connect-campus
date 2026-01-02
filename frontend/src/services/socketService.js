@@ -18,7 +18,7 @@ export const connectSocket = (token = null) => {
     socket = null;
   }
 
-  const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   // Socket.IO will automatically send cookies with withCredentials: true
   // The backend will read the token from cookies (httpOnly cookie)
