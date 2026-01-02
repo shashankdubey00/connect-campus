@@ -245,7 +245,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
         <div className="hero-image-overlay"></div>
       </div>
       
-      <div className="hero-content">
+      <div className={`hero-content ${!checkingAuth && user && user.email ? 'has-cta' : 'no-cta'}`}>
         {/* CTA Section Container - Always present to prevent layout shift */}
         <div className={`hero-cta-wrapper ${!checkingAuth && user && user.email ? 'visible' : 'hidden'}`}>
           <div className="hero-cta-section">
