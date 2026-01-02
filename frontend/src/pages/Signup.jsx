@@ -32,6 +32,7 @@ const Signup = () => {
       }
     };
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRedirect = () => {
@@ -52,7 +53,8 @@ const Signup = () => {
         } 
       });
     } else {
-      navigate(returnPath);
+      // Default: redirect to chat page after signup (instead of home)
+      navigate('/chat');
     }
   };
 
