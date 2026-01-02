@@ -49,15 +49,8 @@ const Login = () => {
       return;
     }
     
-    if (returnPath === '/chat' && collegeContext) {
-      // Redirect to chat with college context
-      navigate('/chat', {
-        state: {
-          college: collegeContext,
-          openCollegeChat: true,
-        }
-      });
-    } else if (collegeContext) {
+    // Always redirect to landing page after login (profile will show, login/signup buttons hidden)
+    if (collegeContext) {
       // Redirect back to college modal on home page
       navigate('/', { 
         state: { 
@@ -66,8 +59,7 @@ const Login = () => {
         }
       });
     } else {
-      // Default: redirect to chat page after login (instead of home)
-      navigate('/chat');
+      navigate('/');
     }
   };
 

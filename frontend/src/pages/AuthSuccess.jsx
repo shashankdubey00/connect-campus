@@ -14,31 +14,20 @@ const AuthSuccess = () => {
     sessionStorage.removeItem('collegeContext');
     sessionStorage.removeItem('returnPath');
 
-    // Redirect after a short delay
+    // Redirect after a short delay to allow cookie to be set
     const timer = setTimeout(() => {
       if (collegeContextStr) {
         const collegeContext = JSON.parse(collegeContextStr);
-        if (returnPath === '/chat') {
-          // Redirect to chat page - this will open the college profile first
-          // User can then join the chat or join the college from the profile
-          navigate('/chat', {
-            state: {
-              college: collegeContext,
-              openCollegeChat: true, // This triggers handleOpenCollegeChat which opens college profile
-            },
-          });
-        } else {
-          // Redirect back to college modal on home page
-          navigate('/', {
-            state: {
-              openCollegeModal: true,
-              college: collegeContext,
-            },
-          });
-        }
+        // Always redirect to landing page after Google OAuth (profile will show, login/signup buttons hidden)
+        navigate('/', {
+          state: {
+            openCollegeModal: true,
+            college: collegeContext,
+          },
+        });
       } else {
-        // Default: redirect to chat page after Google OAuth (instead of home)
-        navigate('/chat');
+        // Always redirect to landing page
+        navigate('/');
       }
     }, 1000);
 
