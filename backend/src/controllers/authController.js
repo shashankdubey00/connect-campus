@@ -57,6 +57,43 @@ const generateToken = (userId, role = 'student') => {
 };
 
 /**
+ * Get cookie options based on environment
+ * 
+ * Determines if we're using cross-domain (vercel.app/onrender.com) 
+ * or same-domain (custom domain) setup.
+ * 
+ * Cross-domain requires sameSite: 'none' (blocked by Brave)
+ * Same-domain can use sameSite: 'lax' (works in Brave)
+ * 
+ * @returns {Object} Cookie options
+ */
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production' || 
+                       process.env.CLIENT_URL?.includes('vercel.app') ||
+                       process.env.CLIENT_URL?.includes('onrender.com') ||
+                       !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+  
+  // Check if using custom domain (not vercel.app or onrender.com)
+  const isCustomDomain = isProduction && 
+                         process.env.CLIENT_URL && 
+                         !process.env.CLIENT_URL.includes('vercel.app') && 
+                         !process.env.CLIENT_URL.includes('onrender.com');
+  
+  // Cross-domain (vercel.app/onrender.com) = 'none' (blocked by Brave)
+  // Same-domain (custom domain) = 'lax' (works in Brave)
+  // Localhost = 'lax'
+  const sameSite = isCustomDomain ? 'lax' : (isProduction ? 'none' : 'lax');
+  
+  return {
+    httpOnly: true,
+    secure: isProduction, // Must be true for sameSite: 'none', but also good for 'lax' in production
+    sameSite: sameSite,
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+};
+
+/**
  * Register a new user
  * 
  * Creates a new user account with email and password.
