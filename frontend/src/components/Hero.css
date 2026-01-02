@@ -54,18 +54,21 @@
   animation: heroContentFadeIn 0.8s ease-out;
 }
 
-/* Hero CTA Wrapper - Always reserves space to prevent layout shift */
+/* Hero CTA Wrapper - Smoothly expands/collapses */
 .hero-cta-wrapper {
-  min-height: 140px; /* Always reserve space to prevent layout shift */
-  transition: opacity 0.8s ease-out, transform 0.8s ease-out, margin-bottom 0.8s ease-out;
+  min-height: 0;
+  max-height: 0;
+  transition: max-height 0.8s ease-out, opacity 0.8s ease-out, transform 0.8s ease-out, margin-bottom 0.8s ease-out;
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-20px);
   margin-bottom: 0;
   overflow: hidden;
   visibility: hidden;
 }
 
 .hero-cta-wrapper.visible {
+  min-height: auto;
+  max-height: 200px;
   opacity: 1;
   transform: translateY(0);
   margin-bottom: 3rem;
@@ -74,11 +77,12 @@
 }
 
 .hero-cta-wrapper.hidden {
+  min-height: 0;
+  max-height: 0;
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-20px);
   margin-bottom: 0;
   visibility: hidden;
-  /* Keep min-height to prevent layout shift */
 }
 
 /* Hero CTA Section for Logged-in Users */
@@ -321,6 +325,19 @@
   margin-bottom: 3rem;
   animation: heroTextFadeIn 0.8s ease-out 0.2s both;
   opacity: 1;
+  transform: translateY(0);
+  transition: transform 0.8s ease-out, margin-top 0.8s ease-out;
+}
+
+/* When CTA is visible, smoothly push heading down */
+.hero-content:has(.hero-cta-wrapper.visible) .hero-text {
+  margin-top: 0;
+  transform: translateY(0);
+}
+
+/* When CTA is hidden, heading stays at top */
+.hero-content:has(.hero-cta-wrapper.hidden) .hero-text {
+  margin-top: 0;
   transform: translateY(0);
 }
 
