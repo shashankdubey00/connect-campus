@@ -173,13 +173,16 @@
   gap: 0.75rem;
   width: 100%;
   justify-content: flex-end;
-  min-width: 200px; /* Match navbar-right min-width */
+  /* Fixed width to match navbar-right */
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
 }
 
 .user-actions-spacer {
   flex: 1;
   min-width: 0;
-  /* Calculate: buttons width (~240px) - chat icon (44px) - gap (12px) - profile (40px) = ~144px */
+  /* Calculate: buttons width (240px) - chat icon (44px) - gap (12px) - profile (40px) = 144px */
   min-width: 144px;
   max-width: 144px;
 }
@@ -473,7 +476,9 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  min-width: 200px;
+  width: 240px; /* Fixed width to match buttons (Login + Get Started + gap) */
+  min-width: 240px;
+  max-width: 240px;
   justify-content: flex-end;
   flex-shrink: 0;
 }
