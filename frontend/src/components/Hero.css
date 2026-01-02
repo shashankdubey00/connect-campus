@@ -62,7 +62,7 @@
   opacity: 0;
   transform: translateY(-20px);
   margin-bottom: 0;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to visible for mobile button */
   visibility: hidden;
 }
 
@@ -273,10 +273,17 @@
 }
 
 @media (max-width: 768px) {
+  .hero-cta-wrapper.visible {
+    max-height: 350px; /* More space for mobile CTA */
+    margin-bottom: 2rem;
+    overflow: visible; /* Ensure button is visible */
+  }
+
   .cta-content {
     flex-direction: column;
     text-align: center;
     padding: 1.5rem;
+    display: flex; /* Ensure flex display */
   }
 
   .cta-text {
@@ -294,6 +301,9 @@
   .cta-button {
     width: 100%;
     justify-content: center;
+    display: flex; /* Ensure button is visible */
+    visibility: visible; /* Force visibility */
+    opacity: 1; /* Force opacity */
   }
 
   .cta-icon {

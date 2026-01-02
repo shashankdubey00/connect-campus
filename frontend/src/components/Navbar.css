@@ -401,10 +401,16 @@
 @media (max-width: 768px) {
   .navbar {
     padding: 0.75rem 1rem;
+    min-height: auto; /* Override desktop min-height */
   }
 
   .navbar-scrolled {
     padding: 0.6rem 1rem;
+    min-height: auto; /* Override desktop min-height */
+  }
+
+  .navbar-container {
+    min-height: auto; /* Override desktop min-height */
   }
 
   .navbar-links {
@@ -415,6 +421,25 @@
     display: none;
   }
 
+  /* Override fixed width for mobile - make it flexible */
+  .navbar-right {
+    width: auto;
+    min-width: auto;
+    max-width: none;
+    gap: 0.5rem;
+  }
+
+  .user-actions-container {
+    width: auto;
+    min-width: auto;
+    max-width: none;
+    gap: 0.5rem;
+  }
+
+  .user-actions-spacer {
+    display: none; /* Hide spacer on mobile */
+  }
+
   .chat-icon-btn {
     width: 40px;
     height: 40px;
@@ -423,10 +448,6 @@
   .chat-icon-btn .chat-icon-svg {
     width: 18px;
     height: 18px;
-  }
-  
-  .user-actions-container {
-    gap: 0.5rem;
   }
   
   /* Hide profile avatar in mobile navbar - keep only in hamburger menu */
@@ -458,10 +479,16 @@
 @media (max-width: 480px) {
   .navbar {
     padding: 0.75rem;
+    min-height: auto; /* Override desktop min-height */
   }
 
   .navbar-scrolled {
     padding: 0.6rem 0.75rem;
+    min-height: auto; /* Override desktop min-height */
+  }
+
+  .navbar-container {
+    min-height: auto; /* Override desktop min-height */
   }
 
   .logo-text {
