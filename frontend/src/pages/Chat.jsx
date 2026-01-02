@@ -4531,6 +4531,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [swipeStartX, setSwipeStartX] = useState(null)
   const [swipeStartY, setSwipeStartY] = useState(null)
   const [swipeOffset, setSwipeOffset] = useState(0)
+  const [swipedMessageId, setSwipedMessageId] = useState(null) // Track which message is being swiped
   const [typingUsers, setTypingUsers] = useState(new Map()) // Map of userId -> { name, timestamp }
   const [onlineUsers, setOnlineUsers] = useState(new Set()) // Set of online user IDs
   const [isTyping, setIsTyping] = useState(false) // Track if current user is typing
@@ -5611,10 +5612,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     const clientX = touch ? touch.clientX : e.clientX
     const clientY = touch ? touch.clientY : e.clientY
     
-    // Store swipe start position
+    // Store swipe start position and track which message is being swiped
     setSwipeStartX(clientX)
     setSwipeStartY(clientY)
     setSwipeOffset(0)
+    setSwipedMessageId(message.id) // Track which message is being swiped
     
     // Start long-press timer (1 second for mobile)
     longPressTimer.current = setTimeout(() => {
@@ -5681,6 +5683,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeStartX(null)
     setSwipeStartY(null)
     setSwipeOffset(0)
+    setSwipedMessageId(null) // Reset swiped message
   }
 
   const handleMessageTouchMove = (e) => {
@@ -6463,8 +6466,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         </div>
                       </div>
                     )}
-                    {/* Reply indicator when swiping right (mobile) */}
-                    {isMobile && swipeOffset > 20 && (
+                    {/* Reply indicator when swiping right (mobile) - only for this message */}
+                    {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                       <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
@@ -6479,8 +6482,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       </div>
                     )}
                     <div 
-                      className={`message-content ${swipeOffset > 0 ? 'swiping' : ''}`}
-                      style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
                       onTouchEnd={handleMessageTouchEnd}
                       onTouchMove={handleMessageTouchMove}
@@ -8988,10 +8991,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const clientX = touch ? touch.clientX : e.clientX
     const clientY = touch ? touch.clientY : e.clientY
     
-    // Store swipe start position
+    // Store swipe start position and track which message is being swiped
     setSwipeStartX(clientX)
     setSwipeStartY(clientY)
     setSwipeOffset(0)
+    setSwipedMessageId(message.id) // Track which message is being swiped
     
     // Start long-press timer (1 second for mobile)
     longPressTimer.current = setTimeout(() => {
@@ -9058,6 +9062,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeStartX(null)
     setSwipeStartY(null)
     setSwipeOffset(0)
+    setSwipedMessageId(null) // Reset swiped message
   }
 
   const handleMessageTouchMove = (e) => {
@@ -9857,8 +9862,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         />
                       </div>
                     )}
-                    {/* Reply indicator when swiping right (mobile) */}
-                    {isMobile && swipeOffset > 20 && (
+                    {/* Reply indicator when swiping right (mobile) - only for this message */}
+                    {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                       <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
@@ -9873,8 +9878,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       </div>
                     )}
                     <div 
-                      className={`message-content ${swipeOffset > 0 ? 'swiping' : ''}`}
-                      style={swipeOffset > 0 ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
                       onTouchEnd={handleMessageTouchEnd}
                       onTouchMove={handleMessageTouchMove}
