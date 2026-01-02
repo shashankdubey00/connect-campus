@@ -3363,7 +3363,7 @@ const Chat = () => {
   return (
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
-      <div className={`chat-top-header ${isMobileView && (view === 'direct-chat' || view === 'group-chat' || view === 'live-chat') ? 'hidden' : ''}`}>
+      <div className={`chat-top-header ${isMobileView && (view === 'direct-chat' || view === 'group-chat' || view === 'live-chat' || (view === 'live-chat' && selectedChat)) ? 'hidden' : ''}`}>
         <div className="header-left-section">
           <button 
             className="navbar-back-to-home-btn"
