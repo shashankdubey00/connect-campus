@@ -282,21 +282,24 @@
   border: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
   font-weight: 600;
   animation: chatButtonPulse 2s ease-in-out infinite;
+  box-shadow: 0 4px 15px rgba(0, 168, 255, 0.3);
 }
 
 .chat-btn-mobile .chat-icon-svg {
   width: 20px;
   height: 20px;
   color: #0a0e1a;
+  flex-shrink: 0;
 }
 
 .chat-btn-mobile:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 168, 255, 0.4);
+  animation: none;
 }
 
 
