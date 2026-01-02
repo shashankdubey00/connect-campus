@@ -5486,9 +5486,16 @@
 }
 
 .message.selected-message .message-content {
-  background-color: var(--message-own, #005c4b);
-  opacity: 0.85;
-  box-shadow: 0 2px 8px rgba(0, 168, 132, 0.3);
+  background-color: rgba(0, 168, 255, 0.15) !important; /* Light blue transparent like WhatsApp */
+  transition: background-color 0.2s ease;
+}
+
+.message.selected-message.own-message .message-content {
+  background-color: rgba(0, 168, 255, 0.2) !important; /* Slightly more opaque for own messages */
+}
+
+.message.selected-message.other-message .message-content {
+  background-color: rgba(0, 168, 255, 0.12) !important; /* Slightly less opaque for other messages */
 }
 
 .message-content.swiping {

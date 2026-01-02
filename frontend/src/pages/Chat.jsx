@@ -5641,7 +5641,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       if (navigator.vibrate && isMobile) {
         navigator.vibrate(50)
       }
-    }, 1000) // 1 second for mobile long-press
+    }, 500) // 0.5 second for mobile long-press
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -9032,7 +9032,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       if (navigator.vibrate && isMobile) {
         navigator.vibrate(50)
       }
-    }, 1000) // 1 second for mobile long-press
+    }, 500) // 0.5 second for mobile long-press
   }
 
   const handleMessageTouchEnd = (e) => {
