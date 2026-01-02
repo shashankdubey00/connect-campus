@@ -70,6 +70,7 @@ console.log("🟢 authRoutes value:", authRoutes);
 app.use('/api/colleges', collegeRoutes);
 app.use('/api/auth', authRoutes);
 console.log("🟢 /api/auth route mounted");
+console.log("🟢 authRoutes router stack:", authRoutes?.stack?.length || 'unknown');
 app.use('/api/messages', messageRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
@@ -85,10 +86,19 @@ app.get('/api/health', (req, res) => {
 
 // Debug route to verify auth routes are working
 app.get('/api/auth/test', (req, res) => {
-  console.log("🟢 /api/auth/test route hit");
+  console.log("🟢 /api/auth/test route hit - SUCCESS");
   res.json({ status: 'OK', message: 'AUTH ROUTES WORKING' });
 });
+
+// Add request logging middleware to see ALL incoming requests
+app.use((req, res, next) => {
+  console.log(`📥 INCOMING REQUEST: ${req.method} ${req.originalUrl}`);
+  console.log(`📥 Route stack length: ${app._router?.stack?.length || 'unknown'}`);
+  next();
+});
+
 console.log("🟢 ALL ROUTES REGISTERED - Ready to start server");
+console.log("🟢 Total middleware stack:", app._router?.stack?.length || 'unknown');
 
 // Connect to MongoDB and start server
 const startServer = async () => {
@@ -118,6 +128,13 @@ startServer();
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
+  console.log(`❌ 404 HANDLER TRIGGERED: ${req.method} ${req.originalUrl}`);
+  console.log(`❌ Available routes:`, app._router?.stack?.map(layer => {
+    if (layer.route) {
+      return `${Object.keys(layer.route.methods).join(',').toUpperCase()} ${layer.route.path}`;
+    }
+    return null;
+  }).filter(Boolean));
   res.status(404).json({
     success: false,
     message: `API route not found: ${req.method} ${req.originalUrl}`,
