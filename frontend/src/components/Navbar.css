@@ -5,6 +5,9 @@
   right: 0;
   z-index: 1000;
   padding: 1rem 2rem;
+  min-height: 80px; /* Fixed min-height to prevent height change */
+  display: flex;
+  align-items: center;
   transition: all 0.3s ease;
   background: rgba(10, 14, 26, 0.3);
   backdrop-filter: blur(10px);
@@ -17,6 +20,7 @@
   -webkit-backdrop-filter: blur(15px);
   box-shadow: 0 4px 20px rgba(0, 100, 200, 0.1);
   padding: 0.75rem 2rem;
+  min-height: 70px; /* Fixed min-height when scrolled */
 }
 
 .navbar-container {
@@ -27,6 +31,7 @@
   align-items: center;
   gap: 2rem;
   width: 100%;
+  min-height: 48px; /* Ensure consistent height for container */
 }
 
 @media (min-width: 769px) {
