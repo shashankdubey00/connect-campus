@@ -3362,8 +3362,8 @@ const Chat = () => {
 
   return (
     <div className={`chat-container theme-${theme}`}>
-      {/* Top Header with Logo and Search */}
-      <div className="chat-top-header">
+      {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
+      <div className={`chat-top-header ${isMobileView && (view === 'direct-chat' || view === 'group-chat' || view === 'live-chat') ? 'hidden' : ''}`}>
         <div className="header-left-section">
           <button 
             className="navbar-back-to-home-btn"
@@ -3610,8 +3610,8 @@ const Chat = () => {
         {renderRightPanel()}
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobileView && (
+      {/* Mobile Bottom Navigation - Hide when in chat view */}
+      {isMobileView && (view !== 'direct-chat' && view !== 'group-chat' && view !== 'live-chat') && (
         <div className="mobile-bottom-nav">
           <button
             className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
