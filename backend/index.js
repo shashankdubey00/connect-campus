@@ -36,9 +36,39 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// CORS configuration - allow Vercel preview URLs (they have dynamic subdomains)
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'https://connect-campus-ashen.vercel.app',
+  'http://localhost:5173'
+].filter(Boolean);
+
+// Function to check if origin matches allowed patterns
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Allow requests with no origin
+  
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Check if it's a Vercel preview URL (pattern: *.vercel.app)
+  if (origin.includes('.vercel.app')) return true;
+  
+  // Development mode - allow all
+  if (process.env.NODE_ENV !== 'production') return true;
+  
+  return false;
+};
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        console.log(`❌ CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
