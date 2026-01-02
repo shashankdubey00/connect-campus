@@ -89,26 +89,31 @@ const Navbar = ({ isScrolled }) => {
     }
   }
 
-  // Get user avatar/initials
-  const getUserAvatar = () => {
+  // Get user avatar/initials with cache-busting and better error handling
+  const getUserAvatar = useMemo(() => {
     if (user?.profile?.profilePicture) {
+      let imageUrl = user.profile.profilePicture
+      
       // If it's a relative path, prepend the backend URL
-      if (user.profile.profilePicture.startsWith('/uploads/')) {
+      if (imageUrl.startsWith('/uploads/')) {
         const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-        return `${backendUrl}${user.profile.profilePicture}`
+        imageUrl = `${backendUrl}${imageUrl}`
       }
       // If it's already a full URL, use it as is
-      if (user.profile.profilePicture.startsWith('http://') || user.profile.profilePicture.startsWith('https://')) {
-        return user.profile.profilePicture
+      else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+        // Otherwise, treat as relative path
+        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+        imageUrl = `${backendUrl}${imageUrl}`
       }
-      // Otherwise, treat as relative path
-      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-      return `${backendUrl}${user.profile.profilePicture}`
+      
+      // Add cache-busting query parameter to ensure fresh image loads
+      const separator = imageUrl.includes('?') ? '&' : '?'
+      return `${imageUrl}${separator}_t=${Date.now()}`
     }
     const name = user?.profile?.displayName || user?.email || 'U'
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
-  }
+  }, [user?.profile?.profilePicture, user?.profile?.displayName, user?.email])
 
   // Check if user is Google user without password set
   // Show "Set Password" if: has googleId AND no password
@@ -184,13 +189,17 @@ const Navbar = ({ isScrolled }) => {
                       <div className="profile-dropdown-header">
                         <div className="profile-dropdown-avatar">
                           <img 
-                            src={getUserAvatar()} 
+                            key={`dropdown-avatar-${user?.id || user?._id || 'default'}-${user?.profile?.profilePicture || 'no-pic'}`}
+                            src={getUserAvatar} 
                             alt="Profile"
+                            loading="eager"
                             onError={(e) => {
-                              // Fallback to ui-avatars if image fails to load
-                              const name = user?.profile?.displayName || user?.email || 'U'
-                              const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                              // Only set fallback if not already set to prevent infinite loop
+                              if (!e.target.src.includes('ui-avatars.com')) {
+                                const name = user?.profile?.displayName || user?.email || 'U'
+                                const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                              }
                             }}
                           />
                         </div>
@@ -265,13 +274,17 @@ const Navbar = ({ isScrolled }) => {
               <div className="mobile-profile-section">
                 <div className="mobile-profile-avatar">
                   <img 
-                    src={getUserAvatar()} 
+                    key={`mobile-avatar-${user?.id || user?._id || 'default'}-${user?.profile?.profilePicture || 'no-pic'}`}
+                    src={getUserAvatar} 
                     alt="Profile"
+                    loading="eager"
                     onError={(e) => {
-                      // Fallback to ui-avatars if image fails to load
-                      const name = user?.profile?.displayName || user?.email || 'U'
-                      const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                      // Only set fallback if not already set to prevent infinite loop
+                      if (!e.target.src.includes('ui-avatars.com')) {
+                        const name = user?.profile?.displayName || user?.email || 'U'
+                        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=40&background=00a8ff&color=fff&bold=true`
+                      }
                     }}
                   />
                 </div>
