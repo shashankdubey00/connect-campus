@@ -3,6 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifyAuth } from '../services/authService';
 import './Auth.css';
 
+// Detect Brave browser
+const isBraveBrowser = () => {
+  // Brave browser detection
+  return (navigator.brave && navigator.brave.isBrave) || 
+         (window.navigator.brave && window.navigator.brave.isBrave) ||
+         false;
+};
+
 const AuthSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,12 +41,20 @@ const AuthSuccess = () => {
           window.location.href = '/';
         } else {
           console.error('[AuthSuccess] ❌ Authentication failed - cookie may be blocked');
-          setError('Authentication failed. This is likely due to third-party cookie blocking in incognito/private mode or Brave browser. Please try: 1) Use a normal browser window (not incognito), 2) Enable third-party cookies in your browser settings, or 3) Use email/password login instead.');
+          const isBrave = isBraveBrowser();
+          const errorMessage = isBrave
+            ? 'Google OAuth requires third-party cookies, which Brave browser blocks by default. To fix this: 1) Click the Brave icon (🦁) in your address bar → Settings → Shields → Turn OFF "Block cross-site cookies" for this site, OR 2) Use email/password login instead (works without cookies).'
+            : 'Authentication failed. This is likely due to third-party cookie blocking. Please try: 1) Use a normal browser window (not incognito), 2) Enable third-party cookies in your browser settings, or 3) Use email/password login instead.';
+          setError(errorMessage);
           setChecking(false);
         }
       } catch (error) {
         console.error('[AuthSuccess] Error verifying auth:', error);
-        setError('Authentication verification failed. Please try logging in again.');
+        const isBrave = isBraveBrowser();
+        const errorMessage = isBrave
+          ? 'Google OAuth requires third-party cookies, which Brave browser blocks by default. To fix this: 1) Click the Brave icon (🦁) in your address bar → Settings → Shields → Turn OFF "Block cross-site cookies" for this site, OR 2) Use email/password login instead (works without cookies).'
+          : 'Authentication verification failed. This may be due to cookie blocking. Please try: 1) Use a normal browser window, 2) Enable third-party cookies, or 3) Use email/password login instead.';
+        setError(errorMessage);
         setChecking(false);
       }
     };

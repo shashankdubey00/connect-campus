@@ -3,11 +3,19 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { login, getGoogleAuthUrl } from '../services/authService';
 import './Auth.css';
 
+// Detect Brave browser
+const isBraveBrowser = () => {
+  return (navigator.brave && navigator.brave.isBrave) || 
+         (window.navigator.brave && window.navigator.brave.isBrave) ||
+         false;
+};
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showBraveWarning, setShowBraveWarning] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,11 +27,19 @@ const Login = () => {
   const groupInviteToken = location.state?.groupInviteToken || null;
 
   useEffect(() => {
+    // Check if Brave browser
+    if (isBraveBrowser()) {
+      setShowBraveWarning(true);
+    }
+
     // Check for error in URL params
     const urlParams = new URLSearchParams(location.search);
     const errorParam = urlParams.get('error');
     if (errorParam === 'google_auth_failed') {
-      setError('Google authentication failed. If you\'re using incognito/private mode or Brave browser, third-party cookies may be blocked. Please try a normal browser window or use email/password login.');
+      const braveMessage = isBraveBrowser()
+        ? 'Google OAuth requires third-party cookies, which Brave browser blocks by default. Click the Brave icon (🦁) in your address bar → Settings → Shields → Turn OFF "Block cross-site cookies" for this site, OR use email/password login instead.'
+        : 'Google authentication failed. If you\'re using incognito/private mode, third-party cookies may be blocked. Please try a normal browser window or use email/password login.';
+      setError(braveMessage);
     }
 
     // Check if already logged in
@@ -150,6 +166,20 @@ const Login = () => {
         <div className="auth-divider">
           <span>OR</span>
         </div>
+
+        {showBraveWarning && (
+          <div style={{ 
+            padding: '0.75rem', 
+            marginBottom: '1rem', 
+            backgroundColor: 'rgba(255, 193, 7, 0.1)', 
+            border: '1px solid rgba(255, 193, 7, 0.3)', 
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            color: '#ffc107'
+          }}>
+            <strong>⚠️ Brave Browser Notice:</strong> Google OAuth requires third-party cookies. Click the Brave icon (🦁) in your address bar → Shields → Turn OFF "Block cross-site cookies" for this site, or use email/password login below.
+          </div>
+        )}
 
         <button
           type="button"
