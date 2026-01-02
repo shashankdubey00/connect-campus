@@ -262,18 +262,29 @@ export const logout = async (req, res) => {
                        process.env.CLIENT_URL?.includes('onrender.com') ||
                        !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
   
-  // Clear cookie with same options used to set it (important for cross-domain)
-  res.clearCookie('token', {
+  const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
     path: '/',
+  };
+  
+  // Clear cookie with same options used to set it (important for cross-domain)
+  res.clearCookie('token', cookieOptions);
+  
+  // Also set cookie to empty with expired date as backup (ensures it's cleared)
+  res.cookie('token', '', {
+    ...cookieOptions,
+    maxAge: 0, // Expire immediately
+    expires: new Date(0), // Set to epoch time (already expired)
   });
   
   console.log('[Auth] Logout - cookie cleared:', {
     isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    secure: isProduction
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
+    origin: req.headers.origin,
+    cookiePresent: req.cookies?.token ? 'Yes' : 'No'
   });
   
   res.json({

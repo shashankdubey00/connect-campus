@@ -1409,13 +1409,19 @@ const Chat = () => {
     try {
       console.log('[Chat] Logging out...')
       await logout()
-      console.log('[Chat] Logout successful, reloading page...')
-      // Force full page reload to ensure cookie is cleared and auth state is reset
-      window.location.href = '/'
+      console.log('[Chat] Logout successful, waiting before reload...')
+      // Small delay to ensure cookie is cleared before reload
+      setTimeout(() => {
+        console.log('[Chat] Reloading page...')
+        // Force full page reload to ensure cookie is cleared and auth state is reset
+        window.location.href = '/'
+      }, 300)
     } catch (error) {
       console.error('[Chat] Logout error:', error)
       // Even if logout fails, force reload to clear state
-      window.location.href = '/'
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 300)
     }
   }
 
