@@ -37,7 +37,8 @@ const AuthSuccess = () => {
           });
         }
       } else {
-        navigate(returnPath);
+        // Default: redirect to chat page after Google OAuth (instead of home)
+        navigate('/chat');
       }
     }, 1000);
 

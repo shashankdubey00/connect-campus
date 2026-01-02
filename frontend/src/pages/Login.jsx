@@ -65,7 +65,8 @@ const Login = () => {
         }
       });
     } else {
-      navigate(returnPath);
+      // Default: redirect to chat page after login (instead of home)
+      navigate('/chat');
     }
   };
 
