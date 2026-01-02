@@ -5618,23 +5618,15 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
     
-    // Start long-press timer (1 second for mobile)
+    // Start long-press timer (0.5 second for mobile)
     longPressTimer.current = setTimeout(() => {
       setSelectedMessage(message)
       
-      // Calculate position for menu (near the message)
-      const rect = e.currentTarget.getBoundingClientRect()
-      const messagesArea = e.currentTarget.closest('.chat-messages-area')
-      if (messagesArea) {
-        const messagesAreaRect = messagesArea.getBoundingClientRect()
-        
-        if (isMobile) {
-          // On mobile, show action menu with all options (1 second)
-          const x = rect.left - messagesAreaRect.left + (rect.width / 2)
-          const y = rect.top - messagesAreaRect.top - 60
-          setQuickEmojiPosition({ x, y })
-          setShowQuickEmojis(true)
-        }
+      if (isMobile) {
+        // On mobile, show action header (same as double-tap) after 0.5 second long press
+        setShowMessageHeader(true)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
       }
       
       // Add haptic feedback if available (mobile)
@@ -9075,23 +9067,15 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
     
-    // Start long-press timer (1 second for mobile)
+    // Start long-press timer (0.5 second for mobile)
     longPressTimer.current = setTimeout(() => {
       setSelectedMessage(message)
       
-      // Calculate position for menu (near the message)
-      const rect = e.currentTarget.getBoundingClientRect()
-      const messagesArea = e.currentTarget.closest('.chat-messages-area')
-      if (messagesArea) {
-        const messagesAreaRect = messagesArea.getBoundingClientRect()
-        
-        if (isMobile) {
-          // On mobile, show action menu with all options (1 second)
-          const x = rect.left - messagesAreaRect.left + (rect.width / 2)
-          const y = rect.top - messagesAreaRect.top - 60
-          setQuickEmojiPosition({ x, y })
-          setShowQuickEmojis(true)
-        }
+      if (isMobile) {
+        // On mobile, show action header (same as double-tap) after 0.5 second long press
+        setShowMessageHeader(true)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
       }
       
       // Add haptic feedback if available (mobile)
