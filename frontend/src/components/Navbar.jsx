@@ -13,11 +13,12 @@ const Navbar = ({ isScrolled }) => {
 
   useEffect(() => {
     // Check authentication status
-    // Add small delay to ensure cookie is available after page reload
+    // Add delay to ensure cookie is available after page reload
     const checkAuth = async () => {
       try {
-        // Small delay to ensure cookie is available after window.location redirect
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Delay to ensure cookie is available after window.location redirect
+        // Increased delay for production cookie propagation
+        await new Promise(resolve => setTimeout(resolve, 300))
         const data = await verifyAuth()
         if (data.success) {
           setUser(data.user)
@@ -25,6 +26,7 @@ const Navbar = ({ isScrolled }) => {
           setUser(null)
         }
       } catch (error) {
+        console.error('Navbar auth check error:', error)
         setUser(null)
       } finally {
         setLoading(false)

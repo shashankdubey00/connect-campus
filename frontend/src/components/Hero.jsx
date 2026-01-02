@@ -39,8 +39,9 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Small delay to ensure cookie is available after page reload
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Delay to ensure cookie is available after page reload
+        // Increased delay for production cookie propagation
+        await new Promise(resolve => setTimeout(resolve, 300))
         const data = await verifyAuth()
         if (data.success && data.user) {
           // Only set user if authentication is successful and user exists
@@ -50,6 +51,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
           setUser(null)
         }
       } catch (error) {
+        console.error('Hero auth check error:', error)
         // Error or not authenticated - clear user
         setUser(null)
       } finally {
