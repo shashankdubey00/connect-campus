@@ -48,16 +48,16 @@
   max-width: 900px;
   width: 100%;
   text-align: center;
-  /* Remove animation to prevent layout shift - content appears instantly in correct position */
+  /* Start in final position to prevent layout shift */
   opacity: 1;
   transform: translateY(0);
-  will-change: auto;
+  animation: heroContentFadeIn 0.8s ease-out;
 }
 
 /* Hero CTA Section for Logged-in Users */
 .hero-cta-section {
   margin-bottom: 3rem;
-  /* Remove animation to prevent layout shift */
+  animation: heroCTAFadeIn 0.8s ease-out 0.1s both;
   opacity: 1;
   transform: translateY(0);
 }
@@ -282,8 +282,20 @@
   }
 }
 
+@keyframes heroContentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .hero-text {
   margin-bottom: 3rem;
+  animation: heroTextFadeIn 0.8s ease-out 0.2s both;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .hero-heading {
@@ -295,7 +307,9 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: textShine 3s ease-in-out infinite;
+  animation: heroHeadingFadeIn 1s ease-out 0.3s both, textShine 3s ease-in-out infinite 1.3s;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes textShine {
@@ -313,8 +327,9 @@
   color: #b0b0b0;
   max-width: 800px;
   margin: 0 auto;
-  /* Remove animation to prevent layout shift */
+  animation: heroSubheadingFadeIn 1s ease-out 0.5s both;
   opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes fadeIn {
@@ -326,11 +341,77 @@
   }
 }
 
+/* Professional smooth fade-in animations - no layout shift */
+@keyframes heroContentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes heroTextFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroHeadingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroSubheadingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroCTAFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes searchContainerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .search-container {
-  /* Remove animation to prevent layout shift */
   position: relative;
   z-index: 10;
+  animation: searchContainerFadeIn 1s ease-out 0.7s both;
   opacity: 1;
+  transform: translateY(0);
 }
 
 .search-filters {
