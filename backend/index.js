@@ -63,14 +63,20 @@ if (!fs.existsSync(profilePicturesDir)) {
 app.use('/uploads', express.static('uploads'));
 
 // Routes - MUST be registered before server.listen()
+console.log("🟢 REGISTERING AUTH ROUTES");
+console.log("🟢 authRoutes type:", typeof authRoutes);
+console.log("🟢 authRoutes value:", authRoutes);
+
 app.use('/api/colleges', collegeRoutes);
 app.use('/api/auth', authRoutes);
+console.log("🟢 /api/auth route mounted");
 app.use('/api/messages', messageRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/auth', authRoutes); // Also support /auth routes for OAuth
+console.log("🟢 /auth route mounted");
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -79,14 +85,18 @@ app.get('/api/health', (req, res) => {
 
 // Debug route to verify auth routes are working
 app.get('/api/auth/test', (req, res) => {
+  console.log("🟢 /api/auth/test route hit");
   res.json({ status: 'OK', message: 'AUTH ROUTES WORKING' });
 });
+console.log("🟢 ALL ROUTES REGISTERED - Ready to start server");
 
 // Connect to MongoDB and start server
 const startServer = async () => {
+  console.log("🟡 STARTING SERVER - Connecting to MongoDB...");
   try {
     // Wait for MongoDB connection before starting server
     await connectDB();
+    console.log("🟡 MongoDB connected - Starting HTTP server...");
     
     // Start server only after MongoDB is connected AND all routes are registered
     server.listen(PORT, () => {
@@ -94,6 +104,7 @@ const startServer = async () => {
       console.log(`🔌 Socket.IO is ready for real-time messaging`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📡 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+      console.log("🟢 SERVER LISTENING - All routes should be active");
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -102,6 +113,7 @@ const startServer = async () => {
 };
 
 // Start the server (after all routes are registered)
+console.log("🟡 CALLING startServer() - Routes are already registered");
 startServer();
 
 // 404 handler for API routes

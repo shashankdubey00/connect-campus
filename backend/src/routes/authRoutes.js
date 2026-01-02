@@ -1,3 +1,5 @@
+console.log("🔵 AUTH ROUTES FILE LOADED");
+
 import express from 'express';
 import passport from '../config/passport.js';
 import {
@@ -15,6 +17,7 @@ import { protect } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
+console.log("🔵 AUTH ROUTER CREATED");
 
 // Public routes
 router.post('/signup', authLimiter, signup);
@@ -31,12 +34,14 @@ router.post('/reset-password', authLimiter, resetPassword);
 router.post('/set-password', protect, authLimiter, setPassword);
 
 // Google OAuth routes
+console.log("🔵 REGISTERING /google route");
 router.get(
   '/google',
   passport.authenticate('google', {
     scope: ['profile', 'email'],
   })
 );
+console.log("🔵 /google route registered");
 
 router.get(
   '/google/callback',
@@ -73,6 +78,7 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+console.log("🔵 AUTH ROUTES EXPORTED - Total routes registered");
 export default router;
 
 
