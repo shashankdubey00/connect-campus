@@ -134,8 +134,11 @@ const Navbar = ({ isScrolled }) => {
 
         <div className="navbar-right">
           {loading ? (
-            // Placeholder to prevent layout shift while loading - matches actual content width
-            <div className="navbar-right-placeholder"></div>
+            // Show buttons but invisible to reserve exact space
+            <div className="navbar-buttons" style={{ opacity: 0, pointerEvents: 'none' }}>
+              <button className="nav-btn login-btn">Login</button>
+              <button className="nav-btn get-started-btn">Get Started</button>
+            </div>
           ) : user ? (
               // Logged in - show integrated chat button with profile
               <div className="user-actions-container">
@@ -221,8 +224,8 @@ const Navbar = ({ isScrolled }) => {
                 </div>
               </div>
             ) : (
-              // Not logged in - show auth buttons
-              <div className="navbar-buttons">
+              // Not logged in - show auth buttons with fade-in animation
+              <div className="navbar-buttons navbar-buttons-visible">
                 <button className="nav-btn login-btn" onClick={() => navigate('/login')}>Login</button>
                 <button className="nav-btn get-started-btn" onClick={() => navigate('/signup')}>Get Started</button>
               </div>
