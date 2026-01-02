@@ -76,6 +76,14 @@
   animation: heroCTAFadeIn 0.8s ease-out 0.1s both;
 }
 
+@media (max-width: 768px) {
+  .hero-cta-wrapper.visible {
+    max-height: 350px; /* More space for mobile CTA */
+    margin-bottom: 2rem;
+    overflow: visible; /* Ensure button is visible */
+  }
+}
+
 .hero-cta-wrapper.hidden {
   min-height: 0;
   max-height: 0;
