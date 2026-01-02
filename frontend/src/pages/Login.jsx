@@ -19,6 +19,13 @@ const Login = () => {
   const groupInviteToken = location.state?.groupInviteToken || null;
 
   useEffect(() => {
+    // Check for error in URL params
+    const urlParams = new URLSearchParams(location.search);
+    const errorParam = urlParams.get('error');
+    if (errorParam === 'google_auth_failed') {
+      setError('Google authentication failed. If you\'re using incognito/private mode or Brave browser, third-party cookies may be blocked. Please try a normal browser window or use email/password login.');
+    }
+
     // Check if already logged in
     const checkAuth = async () => {
       try {
