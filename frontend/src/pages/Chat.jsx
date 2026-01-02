@@ -237,6 +237,18 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Debug: Log view changes on mobile
+  useEffect(() => {
+    if (isMobileView) {
+      console.log('[Chat] View state changed:', {
+        view,
+        selectedChat: !!selectedChat,
+        showChatList,
+        isInChatView: view === 'direct-chat' || view === 'group-chat' || view === 'live-chat'
+      });
+    }
+  }, [view, selectedChat, showChatList, isMobileView])
+
   // Use ref to track if navigation state has been handled for current location
   const navigationStateHandled = useRef(null)
 
