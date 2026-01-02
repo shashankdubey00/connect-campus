@@ -132,9 +132,11 @@ const Navbar = ({ isScrolled }) => {
           <a href="#blog" className="nav-link">Blog</a>
         </div>
 
-        {!loading && (
-          <div className="navbar-right">
-            {user ? (
+        <div className="navbar-right">
+          {loading ? (
+            // Placeholder to prevent layout shift while loading
+            <div style={{ width: '200px', height: '40px' }}></div>
+          ) : user ? (
               // Logged in - show integrated chat button with profile
               <div className="user-actions-container">
                 <button 
@@ -225,8 +227,7 @@ const Navbar = ({ isScrolled }) => {
                 <button className="nav-btn get-started-btn" onClick={() => navigate('/signup')}>Get Started</button>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         <button 
           className="mobile-menu-toggle"
