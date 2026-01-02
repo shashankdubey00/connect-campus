@@ -3364,20 +3364,19 @@ const Chat = () => {
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
       {(() => {
-        // Check if we're in a chat view on mobile - check both view state and selectedChat
+        // Check if we're in a chat view on mobile - use view state as primary indicator
         const isInChatView = isMobileView && (
           view === 'direct-chat' || 
           view === 'group-chat' || 
-          view === 'live-chat' ||
-          (selectedChat !== null && selectedChat !== undefined && !showChatList)
+          view === 'live-chat'
         );
         // Debug logging
         if (isMobileView) {
-          console.log('[Chat] Top header visibility:', {
+          console.log('[Chat] Top header visibility check:', {
+            isMobileView,
             view,
-            selectedChat: !!selectedChat,
-            showChatList,
-            isInChatView
+            isInChatView,
+            shouldHide: isInChatView
           });
         }
         return (
@@ -3632,13 +3631,21 @@ const Chat = () => {
 
       {/* Mobile Bottom Navigation - Hide when in chat view */}
       {(() => {
-        // Check if we're in a chat view on mobile - check both view state and selectedChat
+        // Check if we're in a chat view on mobile - use view state as primary indicator
         const isInChatView = isMobileView && (
           view === 'direct-chat' || 
           view === 'group-chat' || 
-          view === 'live-chat' ||
-          (selectedChat !== null && selectedChat !== undefined && !showChatList)
+          view === 'live-chat'
         );
+        // Debug logging
+        if (isMobileView) {
+          console.log('[Chat] Bottom nav visibility check:', {
+            isMobileView,
+            view,
+            isInChatView,
+            shouldShow: !isInChatView && isMobileView
+          });
+        }
         // Only show bottom nav if NOT in chat view and on mobile
         return !isInChatView && isMobileView;
       })() && (
