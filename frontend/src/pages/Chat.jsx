@@ -5650,32 +5650,98 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       longPressTimer.current = null
     }
     
+    // Get the message element
+    const messageElement = e.currentTarget.closest('.message')
+    if (!messageElement) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    const messageId = messageElement.dataset.messageId
+    const message = messages.find(m => m.id === messageId)
+    if (!message) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
     // Check if swipe was significant enough for reply (mobile only)
     // Swipe RIGHT to reply (opposite of WhatsApp)
     // swipeOffset > 0 means right swipe
     if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
-      // Swipe left detected - reply to message
-      const messageElement = e.currentTarget.closest('.message')
-      if (messageElement) {
-        const messageId = messageElement.dataset.messageId
-        const message = messages.find(m => m.id === messageId)
-        if (message) {
-          setReplyingTo(message)
+      // Swipe right detected - reply to message
+      setReplyingTo(message)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+      setSelectedMessage(null)
+      // Add haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+      // Scroll to input area to show reply preview
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100)
+      
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // Double-tap detection for mobile (similar to desktop double-click)
+    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
+      const currentTime = Date.now()
+      const timeDiff = currentTime - lastClickTime.current
+      
+      // Check if this is a double-tap (within 300ms and same message)
+      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+        // Double-tap detected - show action header (same as desktop)
+        setSelectedMessage(message)
+        setShowMessageHeader(true)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-          setSelectedMessage(null)
-          // Add haptic feedback
-          if (navigator.vibrate) {
-            navigator.vibrate(50)
-          }
-          // Scroll to input area to show reply preview
-          setTimeout(() => {
-            const inputArea = document.querySelector('.chat-input-area')
-            if (inputArea) {
-              inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-            }
-          }, 100)
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+        
+        // Add haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
         }
+        
+        // Reset swipe
+        setSwipeStartX(null)
+        setSwipeStartY(null)
+        setSwipeOffset(0)
+        setSwipedMessageId(null)
+        return
+      } else {
+        // Single tap - store for potential double-tap
+        lastClickTime.current = currentTime
+        lastClickedMessage.current = message
+        
+        // Clear timer if exists
+        if (doubleClickTimer.current) {
+          clearTimeout(doubleClickTimer.current)
+        }
+        
+        // If no double-tap within 300ms, clear selection
+        doubleClickTimer.current = setTimeout(() => {
+          lastClickTime.current = 0
+          lastClickedMessage.current = null
+        }, 300)
       }
     }
     
@@ -9041,32 +9107,98 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       longPressTimer.current = null
     }
     
+    // Get the message element
+    const messageElement = e.currentTarget.closest('.message')
+    if (!messageElement) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    const messageId = messageElement.dataset.messageId
+    const message = messages.find(m => m.id === messageId)
+    if (!message) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
     // Check if swipe was significant enough for reply (mobile only)
     // Swipe RIGHT to reply (opposite of WhatsApp)
     // swipeOffset > 0 means right swipe
     if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
-      // Swipe left detected - reply to message
-      const messageElement = e.currentTarget.closest('.message')
-      if (messageElement) {
-        const messageId = messageElement.dataset.messageId
-        const message = messages.find(m => m.id === messageId)
-        if (message) {
-          setReplyingTo(message)
-          setShowQuickEmojis(false)
-          setShowActionMenu(false)
-          setSelectedMessage(null)
-          // Add haptic feedback
-          if (navigator.vibrate) {
-            navigator.vibrate(50)
-          }
-          // Scroll to input area to show reply preview
-          setTimeout(() => {
-            const inputArea = document.querySelector('.chat-input-area')
-            if (inputArea) {
-              inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-            }
-          }, 100)
+      // Swipe right detected - reply to message
+      setReplyingTo(message)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+      setSelectedMessage(null)
+      // Add haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+      // Scroll to input area to show reply preview
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
         }
+      }, 100)
+      
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // Double-tap detection for mobile (similar to desktop double-click)
+    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
+      const currentTime = Date.now()
+      const timeDiff = currentTime - lastClickTime.current
+      
+      // Check if this is a double-tap (within 300ms and same message)
+      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+        // Double-tap detected - show action header (same as desktop)
+        setSelectedMessage(message)
+        setShowMessageHeader(true)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+        
+        // Add haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+        
+        // Reset swipe
+        setSwipeStartX(null)
+        setSwipeStartY(null)
+        setSwipeOffset(0)
+        setSwipedMessageId(null)
+        return
+      } else {
+        // Single tap - store for potential double-tap
+        lastClickTime.current = currentTime
+        lastClickedMessage.current = message
+        
+        // Clear timer if exists
+        if (doubleClickTimer.current) {
+          clearTimeout(doubleClickTimer.current)
+        }
+        
+        // If no double-tap within 300ms, clear selection
+        doubleClickTimer.current = setTimeout(() => {
+          lastClickTime.current = 0
+          lastClickedMessage.current = null
+        }, 300)
       }
     }
     
