@@ -39,6 +39,8 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Small delay to ensure cookie is available after page reload
+        await new Promise(resolve => setTimeout(resolve, 100))
         const data = await verifyAuth()
         if (data.success && data.user) {
           // Only set user if authentication is successful and user exists
@@ -107,7 +109,8 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const fetchStates = async () => {
     try {
       setLoadingStates(true)
-      const response = await fetch('/api/colleges/states')
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${API_BASE_URL}/api/colleges/states`)
       const data = await response.json()
       if (data.success) {
         setStates(data.states)
@@ -122,7 +125,8 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const fetchDistricts = async (state) => {
     try {
       setLoadingDistricts(true)
-      const response = await fetch(`/api/colleges/districts?state=${encodeURIComponent(state)}`)
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const response = await fetch(`${API_BASE_URL}/api/colleges/districts?state=${encodeURIComponent(state)}`)
       const data = await response.json()
       if (data.success) {
         setDistricts(data.districts)
@@ -137,6 +141,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const searchColleges = async (query) => {
     try {
       setLoading(true)
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const params = new URLSearchParams({ query, limit: '10' })
       
       if (selectedState) {
@@ -147,7 +152,7 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
         params.append('district', selectedDistrict)
       }
 
-      const response = await fetch(`/api/colleges/search?${params}`)
+      const response = await fetch(`${API_BASE_URL}/api/colleges/search?${params}`)
       const data = await response.json()
       
       if (data.success) {
