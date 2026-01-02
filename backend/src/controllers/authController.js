@@ -256,7 +256,26 @@ export const login = async (req, res) => {
 
 // Logout user
 export const logout = async (req, res) => {
-  res.clearCookie('token');
+  // Determine if we're in production (same logic as login)
+  const isProduction = process.env.NODE_ENV === 'production' || 
+                       process.env.CLIENT_URL?.includes('vercel.app') ||
+                       process.env.CLIENT_URL?.includes('onrender.com') ||
+                       !process.env.NODE_ENV || process.env.NODE_ENV === 'production';
+  
+  // Clear cookie with same options used to set it (important for cross-domain)
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
+  });
+  
+  console.log('[Auth] Logout - cookie cleared:', {
+    isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction
+  });
+  
   res.json({
     success: true,
     message: 'Logout successful',

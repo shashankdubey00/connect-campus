@@ -1407,10 +1407,15 @@ const Chat = () => {
   // Handle logout
   const handleLogout = async () => {
     try {
+      console.log('[Chat] Logging out...')
       await logout()
-      navigate('/')
+      console.log('[Chat] Logout successful, reloading page...')
+      // Force full page reload to ensure cookie is cleared and auth state is reset
+      window.location.href = '/'
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('[Chat] Logout error:', error)
+      // Even if logout fails, force reload to clear state
+      window.location.href = '/'
     }
   }
 

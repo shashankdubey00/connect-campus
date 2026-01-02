@@ -70,12 +70,18 @@ const Navbar = ({ isScrolled }) => {
 
   const handleLogout = async () => {
     try {
+      console.log('[Navbar] Logging out...')
       await logout()
+      console.log('[Navbar] Logout successful, clearing user state and reloading...')
       setUser(null)
       setIsProfileMenuOpen(false)
-      navigate('/')
+      // Force full page reload to ensure cookie is cleared and auth state is reset
+      window.location.href = '/'
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('[Navbar] Logout error:', error)
+      // Even if logout fails, clear local state and reload
+      setUser(null)
+      window.location.href = '/'
     }
   }
 
