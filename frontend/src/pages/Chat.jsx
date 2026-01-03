@@ -5613,6 +5613,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchStart = (e, message) => {
+    // Prevent default to avoid scrolling issues
+    e.preventDefault()
+    
     const touch = e.touches ? e.touches[0] : null
     const clientX = touch ? touch.clientX : e.clientX
     const clientY = touch ? touch.clientY : e.clientY
@@ -5653,20 +5656,21 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       longPressTimer.current = null
     }
     
-    // Get the message element
-    const messageElement = e.currentTarget.closest('.message')
-    if (!messageElement) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
+    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
+    let message = null
+    if (swipedMessageId) {
+      message = messages.find(m => m.id === swipedMessageId)
     }
     
-    const messageId = messageElement.dataset.messageId
-    const message = messages.find(m => m.id === messageId)
+    // Fallback: try to get from DOM if swipedMessageId is not available
+    if (!message) {
+      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
+      if (messageElement) {
+        const messageId = messageElement.dataset.messageId
+        message = messages.find(m => m.id === messageId)
+      }
+    }
+    
     if (!message) {
       // Reset swipe
       setSwipeStartX(null)
@@ -7446,20 +7450,21 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       longPressTimer.current = null
     }
     
-    // Get the message element
-    const messageElement = e.currentTarget.closest('.message')
-    if (!messageElement) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
+    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
+    let message = null
+    if (swipedMessageId) {
+      message = messages.find(m => m.id === swipedMessageId)
     }
     
-    const messageId = messageElement.dataset.messageId
-    const message = messages.find(m => m.id === messageId)
+    // Fallback: try to get from DOM if swipedMessageId is not available
+    if (!message) {
+      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
+      if (messageElement) {
+        const messageId = messageElement.dataset.messageId
+        message = messages.find(m => m.id === messageId)
+      }
+    }
+    
     if (!message) {
       // Reset swipe
       setSwipeStartX(null)
@@ -9318,6 +9323,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchStart = (e, message) => {
+    // Prevent default to avoid scrolling issues
+    e.preventDefault()
+    
     const touch = e.touches ? e.touches[0] : null
     const clientX = touch ? touch.clientX : e.clientX
     const clientY = touch ? touch.clientY : e.clientY
@@ -9358,20 +9366,21 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       longPressTimer.current = null
     }
     
-    // Get the message element
-    const messageElement = e.currentTarget.closest('.message')
-    if (!messageElement) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
+    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
+    let message = null
+    if (swipedMessageId) {
+      message = messages.find(m => m.id === swipedMessageId)
     }
     
-    const messageId = messageElement.dataset.messageId
-    const message = messages.find(m => m.id === messageId)
+    // Fallback: try to get from DOM if swipedMessageId is not available
+    if (!message) {
+      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
+      if (messageElement) {
+        const messageId = messageElement.dataset.messageId
+        message = messages.find(m => m.id === messageId)
+      }
+    }
+    
     if (!message) {
       // Reset swipe
       setSwipeStartX(null)
