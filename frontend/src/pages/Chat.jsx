@@ -7453,26 +7453,34 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch end on message (mobile)
   const handleMessageTouchEnd = (e) => {
-    // Check if long-press successfully activated selection mode
+    // Check if long-press successfully activated selection mode FIRST (before clearing timer)
     const wasLongPressActivated = longPressActivated.current
     
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-    
-    // If long-press already activated selection mode, handle it first (before any message lookup)
+    // If long-press already activated selection mode, handle it immediately (before clearing timer)
     if (wasLongPressActivated) {
       // Selection mode was already activated by long-press, just reset and return
       // The selection mode is already active, so user can now tap other messages
       e.preventDefault()
       e.stopPropagation()
+      
+      // Clear timer if it still exists
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+      
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
       longPressActivated.current = false // Reset flag
       return
+    }
+    
+    // Clear timer only if long-press didn't activate
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
     }
     
     // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
@@ -7570,28 +7578,35 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         return
       } else {
         // Single tap - store for potential double-tap
-        lastClickTime.current = currentTime
-        lastClickedMessage.current = message
-        
-        // Clear timer if exists
-        if (doubleClickTimer.current) {
-          clearTimeout(doubleClickTimer.current)
+        // BUT: Don't do this if we're already in selection mode (from long-press)
+        // This prevents single-tap from interfering with long-press selection mode
+        if (!selectionMode) {
+          lastClickTime.current = currentTime
+          lastClickedMessage.current = message
+          
+          // Clear timer if exists
+          if (doubleClickTimer.current) {
+            clearTimeout(doubleClickTimer.current)
+          }
+          
+          // If no double-tap within 300ms, clear selection
+          doubleClickTimer.current = setTimeout(() => {
+            lastClickTime.current = 0
+            lastClickedMessage.current = null
+          }, 300)
         }
-        
-        // If no double-tap within 300ms, clear selection
-        doubleClickTimer.current = setTimeout(() => {
-          lastClickTime.current = 0
-          lastClickedMessage.current = null
-        }, 300)
       }
     }
     
-    // Reset swipe
+    // Reset swipe (but don't clear selection mode if it was activated by long-press)
     setSwipeStartX(null)
     setSwipeStartY(null)
     setSwipeOffset(0)
     setSwipedMessageId(null) // Reset swiped message
-    longPressActivated.current = false // Reset flag
+    // Only reset longPressActivated if selection mode wasn't activated
+    if (!selectionMode) {
+      longPressActivated.current = false // Reset flag
+    }
   }
 
   // Handle touch move on message (mobile)
