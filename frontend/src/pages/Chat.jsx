@@ -7010,6 +7010,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   const doubleClickTimer = useRef(null)
   const lastClickTime = useRef(0)
   const lastClickedMessage = useRef(null)
+  const longPressTimer = useRef(null)
   const socket = getSocket()
   const groupId = group?.id || chat?.groupId || group?._id || chat?.groupId
 
@@ -7378,6 +7379,172 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     if (!isMobile) {
       setSelectedMessage(message)
       setShowMessageHeader(true)
+    }
+  }
+
+  // Handle touch start on message (mobile)
+  const handleMessageTouchStart = (e, message) => {
+    const touch = e.touches ? e.touches[0] : null
+    const clientX = touch ? touch.clientX : e.clientX
+    const clientY = touch ? touch.clientY : e.clientY
+    
+    // Store swipe start position and track which message is being swiped
+    setSwipeStartX(clientX)
+    setSwipeStartY(clientY)
+    setSwipeOffset(0)
+    setSwipedMessageId(message.id) // Track which message is being swiped
+    
+    // Start long-press timer (0.5 second for mobile)
+    longPressTimer.current = setTimeout(() => {
+      setSelectedMessage(message)
+      
+      if (isMobile) {
+        // On mobile, show action header (same as double-tap) after 0.5 second long press
+        setShowMessageHeader(true)
+      }
+      
+      // Add haptic feedback if available (mobile)
+      if (navigator.vibrate && isMobile) {
+        navigator.vibrate(50)
+      }
+    }, 500) // 0.5 second for mobile long-press
+  }
+
+  // Handle touch end on message (mobile)
+  const handleMessageTouchEnd = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    
+    // Get the message element
+    const messageElement = e.currentTarget.closest('.message')
+    if (!messageElement) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    const messageId = messageElement.dataset.messageId
+    const message = messages.find(m => m.id === messageId)
+    if (!message) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // Check if swipe was significant enough for reply (mobile only)
+    // Swipe RIGHT to reply (opposite of WhatsApp)
+    // swipeOffset > 0 means right swipe
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
+      // Swipe right detected - reply to message
+      setReplyingTo(message)
+      setSelectedMessage(null)
+      // Add haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+      // Scroll to input area to show reply preview
+      setTimeout(() => {
+        const inputArea = document.querySelector('.chat-input-area')
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100)
+      
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // Double-tap detection for mobile (similar to desktop double-click)
+    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
+      const currentTime = Date.now()
+      const timeDiff = currentTime - lastClickTime.current
+      
+      // Check if this is a double-tap (within 300ms and same message)
+      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
+        // Double-tap detected - show action header (same as desktop)
+        setSelectedMessage(message)
+        setShowMessageHeader(true)
+        lastClickTime.current = 0
+        lastClickedMessage.current = null
+        
+        // Add haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+        
+        // Reset swipe
+        setSwipeStartX(null)
+        setSwipeStartY(null)
+        setSwipeOffset(0)
+        setSwipedMessageId(null)
+        return
+      } else {
+        // Single tap - store for potential double-tap
+        lastClickTime.current = currentTime
+        lastClickedMessage.current = message
+        
+        // Clear timer if exists
+        if (doubleClickTimer.current) {
+          clearTimeout(doubleClickTimer.current)
+        }
+        
+        // If no double-tap within 300ms, clear selection
+        doubleClickTimer.current = setTimeout(() => {
+          lastClickTime.current = 0
+          lastClickedMessage.current = null
+        }, 300)
+      }
+    }
+    
+    // Reset swipe
+    setSwipeStartX(null)
+    setSwipeStartY(null)
+    setSwipeOffset(0)
+    setSwipedMessageId(null) // Reset swiped message
+  }
+
+  // Handle touch move on message (mobile)
+  const handleMessageTouchMove = (e) => {
+    // Track swipe for reply gesture
+    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
+      const touch = e.touches ? e.touches[0] : null
+      const clientX = touch ? touch.clientX : e.clientX
+      const clientY = touch ? touch.clientY : e.clientY
+      const deltaX = clientX - swipeStartX
+      const deltaY = Math.abs(clientY - swipeStartY)
+      const totalMovement = Math.abs(deltaX) + deltaY
+      
+      // Only cancel long press if there's significant movement (swipe gesture)
+      // Allow small movements (up to 10px) without cancelling long press
+      if (totalMovement > 10) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+        }
+      }
+      
+      // Swipe RIGHT to reply (opposite of WhatsApp)
+      // Swipe RIGHT means your finger moves to a larger X coordinate
+      // deltaX = currentX - startX will be positive when swiping right
+      if (deltaX > 0) {
+        // Swipe right detected - allow reply gesture
+        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
+      } else {
+        // Reset if swiping left (negative deltaX)
+        setSwipeOffset(0)
+      }
     }
   }
 
@@ -7824,9 +7991,16 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 key={message.id} 
                 className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
                 data-message-id={message.id}
-                style={{ position: 'relative' }}
+                style={{ 
+                  position: 'relative',
+                  transform: swipedMessageId === message.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
+                  transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
+                }}
                 onClick={(e) => handleMessageClick(e, message)}
                 onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+                onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                onTouchEnd={handleMessageTouchEnd}
+                onTouchMove={handleMessageTouchMove}
               >
                 {selectionMode && (
                   <div className="message-selection-checkbox">
