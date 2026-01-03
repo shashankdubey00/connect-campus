@@ -6158,6 +6158,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Close action menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
+      // Don't interfere if we're in selection mode (from long-press or double-tap)
+      if (selectionMode) {
+        return
+      }
+      
       if (showActionMenu && actionMenuRef.current && !actionMenuRef.current.contains(e.target) && !e.target.closest('.message-content')) {
         setShowActionMenu(false)
         setSelectedMessage(null)
@@ -6183,7 +6188,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       document.removeEventListener('click', handleClickOutside)
       document.removeEventListener('touchstart', handleClickOutside)
     }
-  }, [showActionMenu, showEmojiPicker, showMessageHeader, showQuickEmojis])
+  }, [showActionMenu, showEmojiPicker, showMessageHeader, showQuickEmojis, selectionMode])
 
   // Handle emoji selection
   const onEmojiClick = (emojiData) => {
@@ -7493,14 +7498,19 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         clickEvent.preventDefault()
         clickEvent.stopPropagation()
         clickEvent.stopImmediatePropagation()
+        return false
       }
       const messageElement = e.currentTarget || e.target.closest('.message')
       if (messageElement) {
-        messageElement.addEventListener('click', preventClick, { once: true, capture: true })
-        // Also prevent click on the parent container
+        // Add listener with capture phase to catch it early
+        messageElement.addEventListener('click', preventClick, { once: true, capture: true, passive: false })
+        // Also add to document to catch any bubbling clicks
+        document.addEventListener('click', preventClick, { once: true, capture: true, passive: false })
+        // Clean up after a short delay
         setTimeout(() => {
           messageElement.removeEventListener('click', preventClick, { capture: true })
-        }, 300)
+          document.removeEventListener('click', preventClick, { capture: true })
+        }, 500)
       }
       
       longPressActivated.current = false // Reset flag
