@@ -3174,7 +3174,7 @@ const Chat = () => {
       if (!selectedChat && !college) {
         console.error('LiveChatView: Missing chat or college data', { selectedChat, college })
         return (
-          <div className="live-chat-view">
+          <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
             <div className="chat-header-bar">
               <button className="chat-header-back-btn" onClick={() => { setView('list'); if (isMobileView) setShowChatList(true) }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4605,7 +4605,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Safety check: if no collegeId, show error message
   if (!collegeId && chat?.type === 'college') {
     return (
-      <div className="live-chat-view">
+      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
         <div className="chat-header-bar">
           <button className="chat-header-back-btn" onClick={onBack}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -7798,7 +7798,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   }
 
   return (
-    <div className="live-chat-view">
+    <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
       <div className="chat-header-bar">
         <button className="chat-header-back-btn" onClick={onBack}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -10124,7 +10124,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           </button>
         </div>
       )}
-      <div className="chat-header-bar">
+      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
+        <div className="chat-header-bar">
         <button className="chat-header-back-btn" onClick={onBack}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -10601,6 +10602,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

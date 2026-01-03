@@ -2550,12 +2550,43 @@
     min-height: 70px; /* Minimum height for input area */
   }
 
+  /* Fix action header to appear below chat header on mobile */
+  .live-chat-view .message-action-header {
+    position: fixed;
+    top: 60px; /* Below chat-header-bar */
+    left: 0;
+    right: 0;
+    z-index: 1001; /* Above chat-header-bar (z-index: 1000) */
+    width: 100%;
+  }
+
+  /* Fix selection mode bar to appear below chat header on mobile */
+  .live-chat-view .selection-mode-bar {
+    position: fixed;
+    top: 60px; /* Below chat-header-bar */
+    left: 0;
+    right: 0;
+    z-index: 1001; /* Above chat-header-bar (z-index: 1000) */
+    width: 100%;
+  }
+
   /* Add padding to messages area to account for fixed header and input */
   .live-chat-view .chat-messages-area {
     padding-top: 60px; /* Height of chat-header-bar */
     padding-bottom: 70px; /* Height of chat-input-area */
     height: 100vh;
     overflow-y: auto;
+    transition: padding-top 0.2s ease;
+  }
+
+  /* Adjust messages area padding when action header or selection bar is visible */
+  .live-chat-view.has-action-header .chat-messages-area {
+    padding-top: 108px; /* 60px (header) + 48px (action header) */
+  }
+
+  /* When selection bar is visible (taller), use more padding */
+  .live-chat-view.has-action-header:has(.selection-mode-bar) .chat-messages-area {
+    padding-top: 116px; /* 60px (header) + 56px (selection bar) */
   }
 }
 
