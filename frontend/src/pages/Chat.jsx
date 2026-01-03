@@ -4543,6 +4543,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [selectedItems, setSelectedItems] = useState(new Set()) // Set of selected message/chat IDs
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
+  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
   const actionMenuRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const quickEmojiRef = useRef(null)
@@ -5623,6 +5624,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipedMessageId(message.id) // Track which message is being swiped
     
     // Start long-press timer (0.5 second for mobile)
+    longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
       if (isMobile) {
         // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
@@ -5632,6 +5634,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
+        longPressActivated.current = true // Mark that long-press activated selection mode
         
         // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
@@ -5642,6 +5645,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchEnd = (e) => {
+    // Check if long-press successfully activated selection mode
+    const wasLongPressActivated = longPressActivated.current
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -5655,6 +5661,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -5666,10 +5673,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
-    // If in selection mode, toggle selection (WhatsApp-like)
+    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
     if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
       handleToggleSelection(message.id)
       // Reset swipe
@@ -5677,6 +5685,18 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
+      return
+    }
+    
+    // If long-press already activated selection mode, don't process other gestures (single-tap, double-tap)
+    if (wasLongPressActivated) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -5760,6 +5780,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeStartY(null)
     setSwipeOffset(0)
     setSwipedMessageId(null) // Reset swiped message
+    longPressActivated.current = false // Reset flag
   }
 
   const handleMessageTouchMove = (e) => {
@@ -7417,6 +7438,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch end on message (mobile)
   const handleMessageTouchEnd = (e) => {
+    // Check if long-press successfully activated selection mode
+    const wasLongPressActivated = longPressActivated.current
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -7430,6 +7454,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -7441,10 +7466,11 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
-    // If in selection mode, toggle selection (WhatsApp-like)
+    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
     if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
       handleToggleSelection(message.id)
       // Reset swipe
@@ -7452,6 +7478,18 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
+      return
+    }
+    
+    // If long-press already activated selection mode, don't process other gestures (single-tap, double-tap)
+    if (wasLongPressActivated) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -7529,6 +7567,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipeStartY(null)
     setSwipeOffset(0)
     setSwipedMessageId(null) // Reset swiped message
+    longPressActivated.current = false // Reset flag
   }
 
   // Handle touch move on message (mobile)
@@ -9290,6 +9329,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipedMessageId(message.id) // Track which message is being swiped
     
     // Start long-press timer (0.5 second for mobile)
+    longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
       if (isMobile) {
         // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
@@ -9299,6 +9339,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
+        longPressActivated.current = true // Mark that long-press activated selection mode
         
         // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
@@ -9309,6 +9350,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchEnd = (e) => {
+    // Check if long-press successfully activated selection mode
+    const wasLongPressActivated = longPressActivated.current
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -9322,6 +9366,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -9333,10 +9378,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
-    // If in selection mode, toggle selection (WhatsApp-like)
+    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
     if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
       handleToggleSelection(message.id)
       // Reset swipe
@@ -9344,6 +9390,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
+      return
+    }
+    
+    // If long-press already activated selection mode, don't process other gestures (single-tap, double-tap)
+    if (wasLongPressActivated) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
       return
     }
     
@@ -9427,6 +9485,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeStartY(null)
     setSwipeOffset(0)
     setSwipedMessageId(null) // Reset swiped message
+    longPressActivated.current = false // Reset flag
   }
 
   const handleMessageTouchMove = (e) => {
