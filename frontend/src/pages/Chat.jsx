@@ -5571,9 +5571,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // Check if this is a double-click (within 300ms and same message)
     if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-      // Double-click detected - show action header
-      setSelectedMessage(message)
-      setShowMessageHeader(true)
+      // Double-click detected - automatically enter selection mode (WhatsApp-like)
+      setSelectionMode(true)
+      setSelectedItems(new Set([message.id]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
       setShowActionMenu(false)
       lastClickTime.current = 0
       lastClickedMessage.current = null
@@ -5599,10 +5601,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const handleMessageContextMenu = (e, message) => {
     e.preventDefault()
     e.stopPropagation()
-    // On desktop, show action header on right-click as well
+    // On desktop, automatically enter selection mode on right-click (WhatsApp-like)
     if (!isMobile) {
-      setSelectedMessage(message)
-      setShowMessageHeader(true)
+      setSelectionMode(true)
+      setSelectedItems(new Set([message.id]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
       setShowActionMenu(false)
     }
   }
@@ -5620,18 +5624,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // Start long-press timer (0.5 second for mobile)
     longPressTimer.current = setTimeout(() => {
-      setSelectedMessage(message)
-      
       if (isMobile) {
-        // On mobile, show action header (same as double-tap) after 0.5 second long press
-        setShowMessageHeader(true)
+        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-      }
-      
-      // Add haptic feedback if available (mobile)
-      if (navigator.vibrate && isMobile) {
-        navigator.vibrate(50)
+        
+        // Add haptic feedback if available (mobile)
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
       }
     }, 500) // 0.5 second for mobile long-press
   }
@@ -5656,6 +5661,17 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     const messageId = messageElement.dataset.messageId
     const message = messages.find(m => m.id === messageId)
     if (!message) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // If in selection mode, toggle selection (WhatsApp-like)
+    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
+      handleToggleSelection(message.id)
       // Reset swipe
       setSwipeStartX(null)
       setSwipeStartY(null)
@@ -5700,9 +5716,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       
       // Check if this is a double-tap (within 300ms and same message)
       if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - show action header (same as desktop)
-        setSelectedMessage(message)
-        setShowMessageHeader(true)
+        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
         lastClickTime.current = 0
@@ -6288,19 +6306,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 </svg>
               </button>
           )}
-          <button 
-            className="action-header-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleSelectClick()
-            }}
-            title="Select"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 11 12 14 22 4"></polyline>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-          </button>
           <button 
             className="action-header-btn action-header-close"
             onClick={() => {
@@ -7439,6 +7444,17 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       return
     }
     
+    // If in selection mode, toggle selection (WhatsApp-like)
+    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
+      handleToggleSelection(message.id)
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
     // Check if swipe was significant enough for reply (mobile only)
     // Swipe RIGHT to reply (opposite of WhatsApp)
     // swipeOffset > 0 means right swipe
@@ -7984,19 +8000,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 </svg>
               </button>
           )}
-          <button 
-            className="action-header-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleSelectClick()
-            }}
-            title="Select"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 11 12 14 22 4"></polyline>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-          </button>
           <button 
             className="action-header-btn action-header-close"
             onClick={() => {
@@ -9235,9 +9238,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Check if this is a double-click (within 300ms and same message)
     if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-      // Double-click detected - show action header
-      setSelectedMessage(message)
-      setShowMessageHeader(true)
+      // Double-click detected - automatically enter selection mode (WhatsApp-like)
+      setSelectionMode(true)
+      setSelectedItems(new Set([message.id]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
       setShowActionMenu(false)
       lastClickTime.current = 0
       lastClickedMessage.current = null
@@ -9263,10 +9268,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const handleMessageContextMenu = (e, message) => {
     e.preventDefault()
     e.stopPropagation()
-    // On desktop, show action header on right-click as well
+    // On desktop, automatically enter selection mode on right-click (WhatsApp-like)
     if (!isMobile) {
-      setSelectedMessage(message)
-      setShowMessageHeader(true)
+      setSelectionMode(true)
+      setSelectedItems(new Set([message.id]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
       setShowActionMenu(false)
     }
   }
@@ -9284,18 +9291,19 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Start long-press timer (0.5 second for mobile)
     longPressTimer.current = setTimeout(() => {
-      setSelectedMessage(message)
-      
       if (isMobile) {
-        // On mobile, show action header (same as double-tap) after 0.5 second long press
-        setShowMessageHeader(true)
+        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-      }
-      
-      // Add haptic feedback if available (mobile)
-      if (navigator.vibrate && isMobile) {
-        navigator.vibrate(50)
+        
+        // Add haptic feedback if available (mobile)
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
       }
     }, 500) // 0.5 second for mobile long-press
   }
@@ -9320,6 +9328,17 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const messageId = messageElement.dataset.messageId
     const message = messages.find(m => m.id === messageId)
     if (!message) {
+      // Reset swipe
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      return
+    }
+    
+    // If in selection mode, toggle selection (WhatsApp-like)
+    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
+      handleToggleSelection(message.id)
       // Reset swipe
       setSwipeStartX(null)
       setSwipeStartY(null)
@@ -9364,9 +9383,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       
       // Check if this is a double-tap (within 300ms and same message)
       if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - show action header (same as desktop)
-        setSelectedMessage(message)
-        setShowMessageHeader(true)
+        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
         lastClickTime.current = 0
@@ -10096,19 +10117,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               </svg>
             </button>
           )}
-          <button 
-            className="action-header-btn"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleSelectClick()
-            }}
-            title="Select"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 11 12 14 22 4"></polyline>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-          </button>
           <button 
             className="action-header-btn action-header-close"
             onClick={() => {
