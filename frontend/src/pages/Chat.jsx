@@ -7882,18 +7882,47 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               <span>Copy</span>
             </button>
               
-            {/* Delete button - only delete for me (user only) */}
-            <button 
-              className="selection-mode-btn"
-              onClick={handleDeleteSelectedForMe}
-              title="Delete for me"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-              </svg>
-              <span>Delete</span>
-            </button>
+            {/* Delete buttons based on selection type */}
+            {isOnlyOwn && (
+              <>
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForMe}
+                  title="Delete for me"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for me</span>
+                </button>
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForAll}
+                  title="Delete for all"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for all</span>
+                </button>
+              </>
+            )}
+              
+            {(isOnlyOthers || isHybrid) && (
+              <button 
+                className="selection-mode-btn"
+                onClick={handleDeleteSelectedForMe}
+                title="Delete for me"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+                <span>Delete</span>
+              </button>
+            )}
               
             <button 
               className="selection-mode-btn"
@@ -7943,6 +7972,18 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                 </svg>
               </button>
+          {selectedMessage?.isOwn && (
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForAll}
+                title="Delete for all"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+              </button>
+          )}
           <button 
             className="action-header-btn"
             onClick={(e) => {
