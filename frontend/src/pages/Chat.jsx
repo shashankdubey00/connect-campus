@@ -423,7 +423,7 @@ const Chat = () => {
         setSelectedChat(existingChat)
         if (justJoined) {
           // Show profile for invited students
-          setView('college-profile')
+        setView('college-profile')
         } else {
           // Go directly to chat
           setView('live-chat')
@@ -474,7 +474,7 @@ const Chat = () => {
       setSelectedChat(newChat)
       if (justJoined) {
         // Show profile for invited students
-        setView('college-profile')
+      setView('college-profile')
       } else {
         // Go directly to chat
         setView('live-chat')
@@ -1436,7 +1436,7 @@ const Chat = () => {
       }
       // If it's already a full URL, use it as is
       if (user.profile.profilePicture.startsWith('http://') || user.profile.profilePicture.startsWith('https://')) {
-        return user.profile.profilePicture
+      return user.profile.profilePicture
       }
       // Otherwise, treat as relative path
       const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -2550,7 +2550,7 @@ const Chat = () => {
                             return (
                               <span style={{ fontStyle: 'italic', color: '#8696A0' }}>
                                 {typingInfo.userName} is typing...
-                              </span>
+                      </span>
                             )
                           }
                           return truncateMessage(chat.lastMessage) || 'No messages yet'
@@ -2641,20 +2641,20 @@ const Chat = () => {
                         setShowChatList(false)
                       }
                     }}
-                  >
-                    <div className="panel-item-avatar">
+              >
+                <div className="panel-item-avatar">
                       <img src={groupAvatar} alt={group.name} />
-                    </div>
-                    <div className="panel-item-info">
-                      <div className="panel-item-header">
+                </div>
+                <div className="panel-item-info">
+                  <div className="panel-item-header">
                         <span className="panel-item-name">{group.name}</span>
                         <span className="panel-item-time">
                           {group.lastMessageTime 
                             ? formatChatTimestamp(group.lastMessageTime)
                             : ''}
                         </span>
-                      </div>
-                      <div className="panel-item-preview">
+                  </div>
+                  <div className="panel-item-preview">
                         <span className="panel-item-message">
                           {group.lastMessageIsOwn && (
                             <>
@@ -2667,9 +2667,9 @@ const Chat = () => {
                         {group.unreadCount > 0 && (
                           <span className="panel-item-unread">{group.unreadCount > 99 ? '99+' : group.unreadCount}</span>
                         )}
-                      </div>
-                    </div>
                   </div>
+                </div>
+              </div>
                 )
               })
             )}
@@ -3398,7 +3398,7 @@ const Chat = () => {
           return null;
         }
         return (
-          <div className="chat-top-header">
+      <div className="chat-top-header">
         <div className="header-left-section">
           <button 
             className="navbar-back-to-home-btn"
@@ -3497,7 +3497,7 @@ const Chat = () => {
             )}
           </div>
         )}
-          </div>
+      </div>
         );
       })()}
 
@@ -3587,9 +3587,9 @@ const Chat = () => {
             title="Toggle Theme"
           >
             {theme === 'dark' ? (
-              <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            </svg>
             ) : (
               <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -5628,7 +5628,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Start long-press timer (0.5 second for mobile)
     longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
-      if (isMobile) {
+        if (isMobile) {
         // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
@@ -5637,11 +5637,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         setShowQuickEmojis(false)
         setShowActionMenu(false)
         longPressActivated.current = true // Mark that long-press activated selection mode
-        
-        // Add haptic feedback if available (mobile)
+      
+      // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
+        navigator.vibrate(50)
+      }
       }
     }, 500) // 0.5 second for mobile long-press
   }
@@ -5709,10 +5709,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // swipeOffset > 0 means right swipe
     if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
       // Swipe right detected - reply to message
-      setReplyingTo(message)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
-      setSelectedMessage(null)
+          setReplyingTo(message)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+          setSelectedMessage(null)
       // Add haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate(50)
@@ -5753,12 +5753,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         // Add haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
-        }
-        
-        // Reset swipe
-        setSwipeStartX(null)
-        setSwipeStartY(null)
-        setSwipeOffset(0)
+    }
+    
+    // Reset swipe
+    setSwipeStartX(null)
+    setSwipeStartY(null)
+    setSwipeOffset(0)
         setSwipedMessageId(null)
         return
       } else {
@@ -6566,7 +6566,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     )}
                     {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
-                      <div 
+                    <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
                           opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
@@ -6651,8 +6651,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                               const currentUserId = String(user?.id || user?._id || '')
                               
                               // Check if message is read by the other user (for direct chats)
-                              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
-                              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
+              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
+              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
                               
                               if (isRead) {
                                 // Blue double checkmark (read)
@@ -7044,6 +7044,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   const lastClickTime = useRef(0)
   const lastClickedMessage = useRef(null)
   const longPressTimer = useRef(null)
+  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
   const socket = getSocket()
   const groupId = group?.id || chat?.groupId || group?._id || chat?.groupId
 
@@ -7418,8 +7419,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Handle touch start on message (mobile)
   const handleMessageTouchStart = (e, message) => {
     const touch = e.touches ? e.touches[0] : null
-    const clientX = touch ? touch.clientX : e.clientX
-    const clientY = touch ? touch.clientY : e.clientY
+    if (!touch) return
+    
+    const clientX = touch.clientX
+    const clientY = touch.clientY
     
     // Store swipe start position and track which message is being swiped
     setSwipeStartX(clientX)
@@ -7428,17 +7431,22 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipedMessageId(message.id) // Track which message is being swiped
     
     // Start long-press timer (0.5 second for mobile)
+    longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
-      setSelectedMessage(message)
-      
-      if (isMobile) {
-        // On mobile, show action header (same as double-tap) after 0.5 second long press
-        setShowMessageHeader(true)
-      }
+        if (isMobile) {
+        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        longPressActivated.current = true // Mark that long-press activated selection mode
       
       // Add haptic feedback if available (mobile)
-      if (navigator.vibrate && isMobile) {
+        if (navigator.vibrate) {
         navigator.vibrate(50)
+      }
       }
     }, 500) // 0.5 second for mobile long-press
   }
@@ -7536,9 +7544,13 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       
       // Check if this is a double-tap (within 300ms and same message)
       if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - show action header (same as desktop)
-        setSelectedMessage(message)
-        setShowMessageHeader(true)
+        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
         lastClickTime.current = 0
         lastClickedMessage.current = null
         
@@ -7552,6 +7564,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         setSwipeStartY(null)
         setSwipeOffset(0)
         setSwipedMessageId(null)
+        longPressActivated.current = false // Reset flag
         return
       } else {
         // Single tap - store for potential double-tap
@@ -8359,6 +8372,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
   const typingTimeoutRef = useRef(null) // Store typing timeout
   const longPressTimer = useRef(null)
+  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
   const actionMenuRef = useRef(null)
   const quickEmojiRef = useRef(null)
   const doubleClickTimer = useRef(null)
@@ -9022,7 +9036,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Update last seen display every minute for real-time "X minutes ago" updates
     const lastSeenInterval = setInterval(updateLastSeenDisplay, 60000)
-    
+
     return () => {
       if (socketInstance) {
         socketInstance.off('userTypingDirect', handleUserTypingDirect)
@@ -9345,7 +9359,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Start long-press timer (0.5 second for mobile)
     longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
-      if (isMobile) {
+        if (isMobile) {
         // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
@@ -9354,11 +9368,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setShowQuickEmojis(false)
         setShowActionMenu(false)
         longPressActivated.current = true // Mark that long-press activated selection mode
-        
-        // Add haptic feedback if available (mobile)
+      
+      // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
+        navigator.vibrate(50)
+      }
       }
     }, 500) // 0.5 second for mobile long-press
   }
@@ -9426,10 +9440,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // swipeOffset > 0 means right swipe
     if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
       // Swipe right detected - reply to message
-      setReplyingTo(message)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
-      setSelectedMessage(null)
+          setReplyingTo(message)
+          setShowQuickEmojis(false)
+          setShowActionMenu(false)
+          setSelectedMessage(null)
       // Add haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate(50)
@@ -9470,12 +9484,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         // Add haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
-        }
-        
-        // Reset swipe
-        setSwipeStartX(null)
-        setSwipeStartY(null)
-        setSwipeOffset(0)
+    }
+    
+    // Reset swipe
+    setSwipeStartX(null)
+    setSwipeStartY(null)
+    setSwipeOffset(0)
         setSwipedMessageId(null)
         return
       } else {
@@ -9883,8 +9897,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         ? await deleteDirectMessageForAll(selectedMessage.id)
         : await deleteDirectMessage(selectedMessage.id);
       
-      if (response.success) {
-        // Remove message from local state
+        if (response.success) {
+          // Remove message from local state
         const updatedMessages = messages.filter(m => m.id !== selectedMessage.id);
         setMessages(updatedMessages);
         setShowDeleteConfirm(false);
@@ -10211,7 +10225,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         </div>
       )}
       <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
-        <div className="chat-header-bar">
+      <div className="chat-header-bar">
         <button className="chat-header-back-btn" onClick={onBack}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -10301,7 +10315,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     )}
                     {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
-                      <div 
+                    <div 
                         className="message-swipe-reply-indicator"
                         style={{ 
                           opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
@@ -11415,66 +11429,66 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
 
   return (
     <>
-      <div className="settings-view">
-        <div className="view-header">
-          <button className="back-btn" onClick={onBack}>←</button>
-          <h2>Settings</h2>
-        </div>
-        <div className="settings-content">
-          <div className="settings-section">
-            <h3>Appearance</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Theme</span>
-                <span className="settings-item-desc">Switch between dark and light mode</span>
-              </div>
-              <button className="toggle-btn" onClick={onToggleTheme}>
-                {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
-              </button>
+    <div className="settings-view">
+      <div className="view-header">
+        <button className="back-btn" onClick={onBack}>←</button>
+        <h2>Settings</h2>
+      </div>
+      <div className="settings-content">
+        <div className="settings-section">
+          <h3>Appearance</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Theme</span>
+              <span className="settings-item-desc">Switch between dark and light mode</span>
             </div>
+            <button className="toggle-btn" onClick={onToggleTheme}>
+              {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
+            </button>
           </div>
-          <div className="settings-section">
-            <h3>Notifications</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Enable Notifications</span>
-                <span className="settings-item-desc">Receive alerts for new messages</span>
-              </div>
+        </div>
+        <div className="settings-section">
+          <h3>Notifications</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Enable Notifications</span>
+              <span className="settings-item-desc">Receive alerts for new messages</span>
+            </div>
               <button 
                 className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} 
                 onClick={() => handleToggleNotifications(!notificationsEnabled)}
               >
-                {notificationsEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
+              {notificationsEnabled ? 'ON' : 'OFF'}
+            </button>
           </div>
-          <div className="settings-section">
-            <h3>Privacy</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Privacy Settings</span>
-                <span className="settings-item-desc">Manage your privacy preferences</span>
-              </div>
+        </div>
+        <div className="settings-section">
+          <h3>Privacy</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Privacy Settings</span>
+              <span className="settings-item-desc">Manage your privacy preferences</span>
+            </div>
               <button className="btn-secondary" onClick={handlePrivacySettings}>Manage</button>
-            </div>
           </div>
-          <div className="settings-section">
-            <h3>Account</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Change Password</span>
-                <span className="settings-item-desc">Update your account password</span>
-              </div>
+        </div>
+        <div className="settings-section">
+          <h3>Account</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Change Password</span>
+              <span className="settings-item-desc">Update your account password</span>
+            </div>
               <button className="btn-secondary" onClick={handleChangePassword}>Change</button>
-            </div>
           </div>
-          <div className="settings-section">
-            <div className="settings-item">
-              <button className="btn-danger" onClick={onLogout}>Logout</button>
-            </div>
+        </div>
+        <div className="settings-section">
+          <div className="settings-item">
+            <button className="btn-danger" onClick={onLogout}>Logout</button>
           </div>
         </div>
       </div>
+    </div>
       {showPrivacyModal && (
         <PrivacySettingsModal
           onClose={() => setShowPrivacyModal(false)}
