@@ -7461,6 +7461,20 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       longPressTimer.current = null
     }
     
+    // If long-press already activated selection mode, handle it first (before any message lookup)
+    if (wasLongPressActivated) {
+      // Selection mode was already activated by long-press, just reset and return
+      // The selection mode is already active, so user can now tap other messages
+      e.preventDefault()
+      e.stopPropagation()
+      setSwipeStartX(null)
+      setSwipeStartY(null)
+      setSwipeOffset(0)
+      setSwipedMessageId(null)
+      longPressActivated.current = false // Reset flag
+      return
+    }
+    
     // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
     let message = null
     if (swipedMessageId) {
@@ -7476,20 +7490,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       }
     }
     
-    // If long-press already activated selection mode, handle it first
-    if (wasLongPressActivated) {
-      // Selection mode was already activated by long-press, just reset and return
-      // The selection mode is already active, so user can now tap other messages
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
-    }
-    
-    if (!message) {
-      // Reset swipe
+    if (!message && !wasLongPressActivated) {
+      // Reset swipe only if long-press didn't activate (to allow selection mode to work)
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
