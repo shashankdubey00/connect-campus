@@ -7480,10 +7480,29 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     if (wasLongPressActivated) {
       // Selection mode was already activated by long-press, just reset and return
       // The selection mode is already active, so user can now tap other messages
+      e.preventDefault()
+      e.stopPropagation()
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
+      
+      // Prevent click event from firing after touch (mobile browsers fire click after touch)
+      // Use a small timeout to prevent the click event
+      const preventClick = (clickEvent) => {
+        clickEvent.preventDefault()
+        clickEvent.stopPropagation()
+        clickEvent.stopImmediatePropagation()
+      }
+      const messageElement = e.currentTarget || e.target.closest('.message')
+      if (messageElement) {
+        messageElement.addEventListener('click', preventClick, { once: true, capture: true })
+        // Also prevent click on the parent container
+        setTimeout(() => {
+          messageElement.removeEventListener('click', preventClick, { capture: true })
+        }, 300)
+      }
+      
       longPressActivated.current = false // Reset flag
       return
     }
@@ -8103,7 +8122,15 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                   transform: swipedMessageId === message.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
                   transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
                 }}
-                onClick={(e) => handleMessageClick(e, message)}
+                onClick={(e) => {
+                  // Prevent click if we just had a long-press (mobile)
+                  if (isMobile && longPressActivated.current) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    return
+                  }
+                  handleMessageClick(e, message)
+                }}
                 onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
                 onTouchStart={(e) => handleMessageTouchStart(e, message)}
                 onTouchEnd={handleMessageTouchEnd}
