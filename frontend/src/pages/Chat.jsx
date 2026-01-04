@@ -797,17 +797,14 @@ const Chat = () => {
   }, [user, showCreateGroupModal, loadAvailableUsers])
 
   // Handle browser back/forward navigation (mobile swipe gestures)
-  const previousPathnameRef = useRef(location.pathname)
-  
   useEffect(() => {
-    // Check if we navigated away from /chat (browser back button/swipe)
-    if (previousPathnameRef.current === '/chat' && location.pathname !== '/chat') {
-      // User swiped back - prevent navigation away from /chat
-      // Navigate back to /chat using React Router immediately
-      navigate('/chat', { replace: true })
-      
-      // Use custom navigation to restore app state (inline logic to avoid dependency issues)
-      if (navigationHistory.current.length > 0) {
+    const handlePopState = (e) => {
+      // Check if we have app navigation history
+      if (navigationHistory.current.length > 0 && location.pathname === '/chat') {
+        // Prevent React Router from handling this - stay on /chat
+        window.history.pushState(null, '', '/chat')
+        
+        // Use custom navigation to restore app state
         const previousState = navigationHistory.current.pop()
         
         // Restore previous state
@@ -848,12 +845,19 @@ const Chat = () => {
         if (previousState.activeSection === 'chats') {
           loadAllCollegesWithMessages()
         }
+      } else if (navigationHistory.current.length === 0 && location.pathname === '/chat') {
+        // No app history - prevent navigation away from /chat
+        window.history.pushState(null, '', '/chat')
       }
     }
+
+    // Add popstate listener with capture to intercept before React Router
+    window.addEventListener('popstate', handlePopState, true)
     
-    // Update previous pathname
-    previousPathnameRef.current = location.pathname
-  }, [location.pathname, navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
+    return () => {
+      window.removeEventListener('popstate', handlePopState, true)
+    }
+  }, [location.pathname, chats, loadAllCollegesWithMessages]) // Include dependencies
 
   // Save current navigation state to history
   const saveNavigationState = () => {
