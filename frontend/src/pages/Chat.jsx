@@ -295,6 +295,35 @@ const Chat = () => {
     window.history.replaceState({}, document.title)
   }, [user, isLoading, location.key, location.pathname]) // Include location.key to detect navigation changes
 
+  // Handle browser back/forward navigation (mobile swipe gestures)
+  useEffect(() => {
+    const handlePopState = () => {
+      // Check if we're still on the chat route
+      if (location.pathname !== '/chat') {
+        // Browser navigated away from /chat, navigate back to /chat
+        navigate('/chat', { replace: true })
+        return
+      }
+      
+      // Browser already navigated back, now use custom navigation to restore app state
+      if (navigationHistory.current.length > 0) {
+        // Use custom navigation to restore previous app state
+        navigateBack()
+      } else {
+        // If no app history, prevent leaving by pushing current state back
+        // This keeps user on current page instead of going to landing page
+        window.history.pushState({}, document.title, window.location.pathname)
+      }
+    }
+
+    // Listen for browser back/forward navigation (mobile swipe gestures)
+    window.addEventListener('popstate', handlePopState)
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [location.pathname, navigate]) // Include location and navigate
+
   // Fetch states
   const fetchStates = async () => {
     try {
