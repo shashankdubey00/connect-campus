@@ -3437,8 +3437,10 @@ const Chat = () => {
   }
 
   // Prevent browser swipe-back navigation on mobile
+  const chatContainerRef = useRef(null)
+  
   useEffect(() => {
-    const chatContainer = document.querySelector('.chat-container')
+    const chatContainer = chatContainerRef.current || document.querySelector('.chat-container')
     if (!chatContainer) return
 
     let touchStartX = null
@@ -3447,30 +3449,43 @@ const Chat = () => {
     const VERTICAL_THRESHOLD = 30 // Maximum vertical movement to consider it horizontal
 
     const handleTouchStart = (e) => {
-      // Only prevent if touch starts on the container itself (not on messages)
-      if (e.target.closest('.message-content') || e.target.closest('.message')) {
+      // Only prevent if touch starts on the container itself (not on messages, inputs, buttons)
+      if (e.target.closest('.message-content') || 
+          e.target.closest('.message') || 
+          e.target.closest('input') ||
+          e.target.closest('button') ||
+          e.target.closest('textarea')) {
         return // Let message handlers deal with it
       }
       
-      const touch = e.touches[0]
+      const touch = e.touches?.[0]
+      if (!touch) return
+      
       touchStartX = touch.clientX
       touchStartY = touch.clientY
     }
 
     const handleTouchMove = (e) => {
-      // Only prevent if touch is not on a message
-      if (e.target.closest('.message-content') || e.target.closest('.message')) {
+      // Only prevent if touch is not on a message, input, or button
+      if (e.target.closest('.message-content') || 
+          e.target.closest('.message') || 
+          e.target.closest('input') ||
+          e.target.closest('button') ||
+          e.target.closest('textarea')) {
         return // Let message handlers deal with it
       }
 
       if (touchStartX === null || touchStartY === null) return
 
-      const touch = e.touches[0]
+      const touch = e.touches?.[0]
+      if (!touch) return
+      
       const deltaX = touch.clientX - touchStartX
       const deltaY = Math.abs(touch.clientY - touchStartY)
 
       // If horizontal swipe is significant and vertical movement is minimal, prevent browser navigation
-      if (Math.abs(deltaX) > SWIPE_THRESHOLD && deltaY < VERTICAL_THRESHOLD) {
+      // Only prevent on left edge (swipe from left edge indicates browser back gesture)
+      if (touchStartX < 20 && Math.abs(deltaX) > SWIPE_THRESHOLD && deltaY < VERTICAL_THRESHOLD && deltaX > 0) {
         e.preventDefault()
         e.stopPropagation()
       }
@@ -3493,7 +3508,7 @@ const Chat = () => {
   }, [])
 
   return (
-    <div className={`chat-container theme-${theme}`}>
+    <div ref={chatContainerRef} className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
       {(() => {
         // Check if we're in a chat view on mobile - use view state as primary indicator
