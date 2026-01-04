@@ -62,6 +62,7 @@ const Chat = () => {
   const [recentCollegeSearches, setRecentCollegeSearches] = useState([])
   const collegeSearchRef = useRef(null)
   const collegeSuggestionsRef = useRef(null)
+  const chatContainerRef = useRef(null) // Ref for chat container to prevent swipe-back
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [chatSelectionMode, setChatSelectionMode] = useState(false) // Selection mode for chats
   const [selectedChatIds, setSelectedChatIds] = useState(new Set()) // Set of selected chat IDs
@@ -3437,8 +3438,6 @@ const Chat = () => {
   }
 
   // Prevent browser swipe-back navigation on mobile
-  const chatContainerRef = useRef(null)
-  
   useEffect(() => {
     const chatContainer = chatContainerRef.current || document.querySelector('.chat-container')
     if (!chatContainer) return
