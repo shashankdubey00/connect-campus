@@ -62,7 +62,6 @@ const Chat = () => {
   const [recentCollegeSearches, setRecentCollegeSearches] = useState([])
   const collegeSearchRef = useRef(null)
   const collegeSuggestionsRef = useRef(null)
-  const chatContainerRef = useRef(null) // Ref for chat container to prevent swipe-back
   const [chats, setChats] = useState([]) // Dynamic chat list
   const [chatSelectionMode, setChatSelectionMode] = useState(false) // Selection mode for chats
   const [selectedChatIds, setSelectedChatIds] = useState(new Set()) // Set of selected chat IDs
@@ -800,65 +799,76 @@ const Chat = () => {
   // Handle browser back/forward navigation (mobile swipe gestures)
   useEffect(() => {
     const handlePopState = (e) => {
-      // Check if we have app navigation history
-      if (navigationHistory.current.length > 0 && location.pathname === '/chat') {
-        // Prevent React Router from handling this - stay on /chat
+      // Check current pathname directly from window (may have changed due to React Router)
+      const currentPath = window.location.pathname
+      
+      // If we have app navigation history, restore app state instead of navigating away
+      if (navigationHistory.current.length > 0) {
+        // Prevent navigation away from /chat - push state back
         window.history.pushState(null, '', '/chat')
         
         // Use custom navigation to restore app state
         const previousState = navigationHistory.current.pop()
         
-        // Restore previous state
-        setActiveSection(previousState.activeSection)
-        setView(previousState.view)
-        
-        // Restore selectedChat if it exists in current chats
-        if (previousState.selectedChat) {
-          const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
-          setSelectedChat(restoredChat || null)
-        } else {
-          setSelectedChat(null)
-        }
-        
-        // Restore selectedCollege
-        if (previousState.selectedCollege) {
-          const chatWithCollege = chats.find(c => 
-            c.college && (
-              c.college.aisheCode === previousState.selectedCollege.aisheCode ||
-              c.college.name === previousState.selectedCollege.name
-            )
-          )
-          if (chatWithCollege && chatWithCollege.college) {
-            setSelectedCollege(chatWithCollege.college)
+        // Use setTimeout to ensure React Router has processed, then restore state
+        setTimeout(() => {
+          navigate('/chat', { replace: true })
+          
+          // Restore previous state
+          setActiveSection(previousState.activeSection)
+          setView(previousState.view)
+          
+          // Restore selectedChat if it exists in current chats
+          if (previousState.selectedChat) {
+            const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
+            setSelectedChat(restoredChat || null)
           } else {
-            setSelectedCollege(previousState.selectedCollege)
+            setSelectedChat(null)
           }
-        } else {
-          setSelectedCollege(null)
-        }
-        
-        setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
-        setIsSearchActive(previousState.isSearchActive || false)
-        setSearchBarAtTop(previousState.searchBarAtTop || false)
-        setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
-        
-        // If going back to chats, load messages
-        if (previousState.activeSection === 'chats') {
-          loadAllCollegesWithMessages()
-        }
-      } else if (navigationHistory.current.length === 0 && location.pathname === '/chat') {
-        // No app history - prevent navigation away from /chat
+          
+          // Restore selectedCollege
+          if (previousState.selectedCollege) {
+            const chatWithCollege = chats.find(c => 
+              c.college && (
+                c.college.aisheCode === previousState.selectedCollege.aisheCode ||
+                c.college.name === previousState.selectedCollege.name
+              )
+            )
+            if (chatWithCollege && chatWithCollege.college) {
+              setSelectedCollege(chatWithCollege.college)
+            } else {
+              setSelectedCollege(previousState.selectedCollege)
+            }
+          } else {
+            setSelectedCollege(null)
+          }
+          
+          setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
+          setIsSearchActive(previousState.isSearchActive || false)
+          setSearchBarAtTop(previousState.searchBarAtTop || false)
+          setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
+          
+          // If going back to chats, load messages
+          if (previousState.activeSection === 'chats') {
+            loadAllCollegesWithMessages()
+          }
+        }, 0)
+      } else if (currentPath !== '/chat') {
+        // No app history and navigated away - navigate back to /chat
         window.history.pushState(null, '', '/chat')
+        setTimeout(() => {
+          navigate('/chat', { replace: true })
+        }, 0)
       }
     }
 
-    // Add popstate listener with capture to intercept before React Router
-    window.addEventListener('popstate', handlePopState, true)
+    // Add popstate listener to intercept browser navigation
+    window.addEventListener('popstate', handlePopState)
     
     return () => {
-      window.removeEventListener('popstate', handlePopState, true)
+      window.removeEventListener('popstate', handlePopState)
     }
-  }, [location.pathname, chats, loadAllCollegesWithMessages]) // Include dependencies
+  }, [navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
 
   // Save current navigation state to history
   const saveNavigationState = () => {
@@ -3437,77 +3447,8 @@ const Chat = () => {
     )
   }
 
-  // Prevent browser swipe-back navigation on mobile
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current || document.querySelector('.chat-container')
-    if (!chatContainer) return
-
-    let touchStartX = null
-    let touchStartY = null
-    const SWIPE_THRESHOLD = 50 // Minimum distance for a swipe
-    const VERTICAL_THRESHOLD = 30 // Maximum vertical movement to consider it horizontal
-
-    const handleTouchStart = (e) => {
-      // Only prevent if touch starts on the container itself (not on messages, inputs, buttons)
-      if (e.target.closest('.message-content') || 
-          e.target.closest('.message') || 
-          e.target.closest('input') ||
-          e.target.closest('button') ||
-          e.target.closest('textarea')) {
-        return // Let message handlers deal with it
-      }
-      
-      const touch = e.touches?.[0]
-      if (!touch) return
-      
-      touchStartX = touch.clientX
-      touchStartY = touch.clientY
-    }
-
-    const handleTouchMove = (e) => {
-      // Only prevent if touch is not on a message, input, or button
-      if (e.target.closest('.message-content') || 
-          e.target.closest('.message') || 
-          e.target.closest('input') ||
-          e.target.closest('button') ||
-          e.target.closest('textarea')) {
-        return // Let message handlers deal with it
-      }
-
-      if (touchStartX === null || touchStartY === null) return
-
-      const touch = e.touches?.[0]
-      if (!touch) return
-      
-      const deltaX = touch.clientX - touchStartX
-      const deltaY = Math.abs(touch.clientY - touchStartY)
-
-      // If horizontal swipe is significant and vertical movement is minimal, prevent browser navigation
-      // Only prevent on left edge (swipe from left edge indicates browser back gesture)
-      if (touchStartX < 20 && Math.abs(deltaX) > SWIPE_THRESHOLD && deltaY < VERTICAL_THRESHOLD && deltaX > 0) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    }
-
-    const handleTouchEnd = () => {
-      touchStartX = null
-      touchStartY = null
-    }
-
-    chatContainer.addEventListener('touchstart', handleTouchStart, { passive: true })
-    chatContainer.addEventListener('touchmove', handleTouchMove, { passive: false })
-    chatContainer.addEventListener('touchend', handleTouchEnd, { passive: true })
-
-    return () => {
-      chatContainer.removeEventListener('touchstart', handleTouchStart)
-      chatContainer.removeEventListener('touchmove', handleTouchMove)
-      chatContainer.removeEventListener('touchend', handleTouchEnd)
-    }
-  }, [])
-
   return (
-    <div ref={chatContainerRef} className={`chat-container theme-${theme}`}>
+    <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
       {(() => {
         // Check if we're in a chat view on mobile - use view state as primary indicator
@@ -5747,9 +5688,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchStart = (e, message) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -5784,9 +5722,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchEnd = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -5928,9 +5863,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchMove = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
@@ -7566,9 +7498,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch start on message (mobile)
   const handleMessageTouchStart = (e, message) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -7604,9 +7533,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch end on message (mobile)
   const handleMessageTouchEnd = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -7771,9 +7697,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch move on message (mobile)
   const handleMessageTouchMove = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
@@ -9532,9 +9455,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchStart = (e, message) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -9569,9 +9489,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchEnd = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -9713,9 +9630,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchMove = (e) => {
-    // Stop propagation to prevent browser swipe-back navigation
-    e.stopPropagation()
-    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
