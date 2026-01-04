@@ -296,33 +296,63 @@ const Chat = () => {
   }, [user, isLoading, location.key, location.pathname]) // Include location.key to detect navigation changes
 
   // Handle browser back/forward navigation (mobile swipe gestures)
+  const previousPathnameRef = useRef(location.pathname)
+  
   useEffect(() => {
-    const handlePopState = () => {
-      // Check if we're still on the chat route
-      if (location.pathname !== '/chat') {
-        // Browser navigated away from /chat, navigate back to /chat
-        navigate('/chat', { replace: true })
-        return
-      }
+    // Check if we navigated away from /chat (browser back button/swipe)
+    if (previousPathnameRef.current === '/chat' && location.pathname !== '/chat') {
+      // User swiped back - prevent navigation away from /chat
+      // Navigate back to /chat using React Router immediately
+      navigate('/chat', { replace: true })
       
-      // Browser already navigated back, now use custom navigation to restore app state
+      // Use custom navigation to restore app state (inline logic to avoid dependency issues)
       if (navigationHistory.current.length > 0) {
-        // Use custom navigation to restore previous app state
-        navigateBack()
-      } else {
-        // If no app history, prevent leaving by pushing current state back
-        // This keeps user on current page instead of going to landing page
-        window.history.pushState({}, document.title, window.location.pathname)
+        const previousState = navigationHistory.current.pop()
+        
+        // Restore previous state
+        setActiveSection(previousState.activeSection)
+        setView(previousState.view)
+        
+        // Restore selectedChat if it exists in current chats
+        if (previousState.selectedChat) {
+          const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
+          setSelectedChat(restoredChat || null)
+        } else {
+          setSelectedChat(null)
+        }
+        
+        // Restore selectedCollege
+        if (previousState.selectedCollege) {
+          const chatWithCollege = chats.find(c => 
+            c.college && (
+              c.college.aisheCode === previousState.selectedCollege.aisheCode ||
+              c.college.name === previousState.selectedCollege.name
+            )
+          )
+          if (chatWithCollege && chatWithCollege.college) {
+            setSelectedCollege(chatWithCollege.college)
+          } else {
+            setSelectedCollege(previousState.selectedCollege)
+          }
+        } else {
+          setSelectedCollege(null)
+        }
+        
+        setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
+        setIsSearchActive(previousState.isSearchActive || false)
+        setSearchBarAtTop(previousState.searchBarAtTop || false)
+        setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
+        
+        // If going back to chats, load messages
+        if (previousState.activeSection === 'chats') {
+          loadAllCollegesWithMessages()
+        }
       }
     }
-
-    // Listen for browser back/forward navigation (mobile swipe gestures)
-    window.addEventListener('popstate', handlePopState)
     
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-    }
-  }, [location.pathname, navigate]) // Include location and navigate
+    // Update previous pathname
+    previousPathnameRef.current = location.pathname
+  }, [location.pathname, navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
 
   // Fetch states
   const fetchStates = async () => {
