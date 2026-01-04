@@ -3436,6 +3436,62 @@ const Chat = () => {
     )
   }
 
+  // Prevent browser swipe-back navigation on mobile
+  useEffect(() => {
+    const chatContainer = document.querySelector('.chat-container')
+    if (!chatContainer) return
+
+    let touchStartX = null
+    let touchStartY = null
+    const SWIPE_THRESHOLD = 50 // Minimum distance for a swipe
+    const VERTICAL_THRESHOLD = 30 // Maximum vertical movement to consider it horizontal
+
+    const handleTouchStart = (e) => {
+      // Only prevent if touch starts on the container itself (not on messages)
+      if (e.target.closest('.message-content') || e.target.closest('.message')) {
+        return // Let message handlers deal with it
+      }
+      
+      const touch = e.touches[0]
+      touchStartX = touch.clientX
+      touchStartY = touch.clientY
+    }
+
+    const handleTouchMove = (e) => {
+      // Only prevent if touch is not on a message
+      if (e.target.closest('.message-content') || e.target.closest('.message')) {
+        return // Let message handlers deal with it
+      }
+
+      if (touchStartX === null || touchStartY === null) return
+
+      const touch = e.touches[0]
+      const deltaX = touch.clientX - touchStartX
+      const deltaY = Math.abs(touch.clientY - touchStartY)
+
+      // If horizontal swipe is significant and vertical movement is minimal, prevent browser navigation
+      if (Math.abs(deltaX) > SWIPE_THRESHOLD && deltaY < VERTICAL_THRESHOLD) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+
+    const handleTouchEnd = () => {
+      touchStartX = null
+      touchStartY = null
+    }
+
+    chatContainer.addEventListener('touchstart', handleTouchStart, { passive: true })
+    chatContainer.addEventListener('touchmove', handleTouchMove, { passive: false })
+    chatContainer.addEventListener('touchend', handleTouchEnd, { passive: true })
+
+    return () => {
+      chatContainer.removeEventListener('touchstart', handleTouchStart)
+      chatContainer.removeEventListener('touchmove', handleTouchMove)
+      chatContainer.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [])
+
   return (
     <div className={`chat-container theme-${theme}`}>
       {/* Top Header with Logo and Search - Hide on mobile when in chat view */}
@@ -5677,6 +5733,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchStart = (e, message) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -5711,6 +5770,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchEnd = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -5852,6 +5914,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchMove = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
@@ -7487,6 +7552,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch start on message (mobile)
   const handleMessageTouchStart = (e, message) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -7522,6 +7590,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch end on message (mobile)
   const handleMessageTouchEnd = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -7686,6 +7757,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   // Handle touch move on message (mobile)
   const handleMessageTouchMove = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
@@ -9444,6 +9518,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchStart = (e, message) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
@@ -9478,6 +9555,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchEnd = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Check if long-press successfully activated selection mode
     const wasLongPressActivated = longPressActivated.current
     
@@ -9619,6 +9699,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const handleMessageTouchMove = (e) => {
+    // Stop propagation to prevent browser swipe-back navigation
+    e.stopPropagation()
+    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null

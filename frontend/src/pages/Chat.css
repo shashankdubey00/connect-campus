@@ -47,6 +47,11 @@
   
   --divider: #2a3942;
   --placeholder-bg: #0b141a;
+  
+  /* Prevent browser swipe-back navigation */
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y pinch-zoom;
 }
 
 /* ============================================
