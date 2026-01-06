@@ -10465,6 +10465,22 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => handleMessageClick(e, message)}
+                    onTouchStart={(e) => {
+                      if (selectionMode) {
+                        // In selection mode, handle touch on the message div
+                        handleMessageTouchStart(e, message)
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      if (selectionMode) {
+                        handleMessageTouchEnd(e)
+                      }
+                    }}
+                    onTouchMove={(e) => {
+                      if (selectionMode) {
+                        handleMessageTouchMove(e)
+                      }
+                    }}
                     onContextMenu={(e) => {
                       if (!selectionMode) {
                         e.preventDefault()
@@ -10491,28 +10507,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
                       style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => {
-                        if (selectionMode) {
-                          // In selection mode, let touch pass through to parent
-                          e.stopPropagation()
-                          // Trigger selection on parent
-                          handleMessageTouchStart(e, message)
-                        } else {
+                        if (!selectionMode) {
                           handleMessageTouchStart(e, message)
                         }
+                        // In selection mode, pointer-events: none will let touch pass through to parent
                       }}
                       onTouchEnd={(e) => {
-                        if (selectionMode) {
-                          e.stopPropagation()
-                          handleMessageTouchEnd(e)
-                        } else {
+                        if (!selectionMode) {
                           handleMessageTouchEnd(e)
                         }
                       }}
                       onTouchMove={(e) => {
-                        if (selectionMode) {
-                          e.stopPropagation()
-                          handleMessageTouchMove(e)
-                        } else {
+                        if (!selectionMode) {
                           handleMessageTouchMove(e)
                         }
                       }}
