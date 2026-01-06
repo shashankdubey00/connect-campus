@@ -796,69 +796,7 @@ const Chat = () => {
     }
   }, [user, showCreateGroupModal, loadAvailableUsers])
 
-  // Handle browser back/forward navigation (mobile swipe gestures)
-  const previousPathnameRef = useRef(location.pathname)
-  
-  useLayoutEffect(() => {
-    // Check if we navigated away from /chat (browser back button/swipe)
-    if (previousPathnameRef.current === '/chat' && location.pathname !== '/chat') {
-      // User swiped back - check if we have app navigation history
-      if (navigationHistory.current.length > 0) {
-        // Navigate back to /chat and restore app state
-        navigate('/chat', { replace: true })
-        
-        // Use custom navigation to restore app state
-        const previousState = navigationHistory.current.pop()
-        
-        // Restore previous state
-        setActiveSection(previousState.activeSection)
-        setView(previousState.view)
-        
-        // Restore selectedChat if it exists in current chats
-        if (previousState.selectedChat) {
-          const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
-          setSelectedChat(restoredChat || null)
-        } else {
-          setSelectedChat(null)
-        }
-        
-        // Restore selectedCollege
-        if (previousState.selectedCollege) {
-          const chatWithCollege = chats.find(c => 
-            c.college && (
-              c.college.aisheCode === previousState.selectedCollege.aisheCode ||
-              c.college.name === previousState.selectedCollege.name
-            )
-          )
-          if (chatWithCollege && chatWithCollege.college) {
-            setSelectedCollege(chatWithCollege.college)
-          } else {
-            setSelectedCollege(previousState.selectedCollege)
-          }
-        } else {
-          setSelectedCollege(null)
-        }
-        
-        setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
-        setIsSearchActive(previousState.isSearchActive || false)
-        setSearchBarAtTop(previousState.searchBarAtTop || false)
-        setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
-        
-        // If going back to chats, load messages
-        if (previousState.activeSection === 'chats') {
-          loadAllCollegesWithMessages()
-        }
-      } else {
-        // No app history - navigate back to /chat (don't go to landing page)
-        navigate('/chat', { replace: true })
-      }
-    }
-    
-    // Update previous pathname
-    previousPathnameRef.current = location.pathname
-  }, [location.pathname, navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
-
-  // Save current navigation state to history
+  // Save current navigation state to history and push to browser history
   const saveNavigationState = () => {
     const currentState = {
       activeSection,
@@ -875,7 +813,91 @@ const Chat = () => {
     if (navigationHistory.current.length > 10) {
       navigationHistory.current.shift()
     }
+    
+    // Push state to browser history so back/forward works within /chat
+    // This ensures browser history has /chat entries, not landing page
+    window.history.pushState({ appState: currentState }, '', '/chat')
   }
+
+  // Handle browser back/forward navigation (mobile swipe gestures)
+  useEffect(() => {
+    const handlePopState = (e) => {
+      // Check current pathname - if we're being navigated away from /chat, prevent it
+      const currentPath = window.location.pathname
+      
+      // If we have app navigation history, restore app state
+      if (navigationHistory.current.length > 0) {
+        // Push state back to /chat immediately to prevent navigation away
+        if (currentPath !== '/chat') {
+          window.history.pushState(null, '', '/chat')
+        }
+        
+        // Use custom navigation to restore app state
+        const previousState = navigationHistory.current.pop()
+        
+        // Use requestAnimationFrame to ensure state updates happen after navigation
+        requestAnimationFrame(() => {
+          // Restore previous state
+          setActiveSection(previousState.activeSection)
+          setView(previousState.view)
+          
+          // Restore selectedChat if it exists in current chats
+          if (previousState.selectedChat) {
+            const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
+            setSelectedChat(restoredChat || null)
+          } else {
+            setSelectedChat(null)
+          }
+          
+          // Restore selectedCollege
+          if (previousState.selectedCollege) {
+            const chatWithCollege = chats.find(c => 
+              c.college && (
+                c.college.aisheCode === previousState.selectedCollege.aisheCode ||
+                c.college.name === previousState.selectedCollege.name
+              )
+            )
+            if (chatWithCollege && chatWithCollege.college) {
+              setSelectedCollege(chatWithCollege.college)
+            } else {
+              setSelectedCollege(previousState.selectedCollege)
+            }
+          } else {
+            setSelectedCollege(null)
+          }
+          
+          setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
+          setIsSearchActive(previousState.isSearchActive || false)
+          setSearchBarAtTop(previousState.searchBarAtTop || false)
+          setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
+          
+          // If going back to chats, load messages
+          if (previousState.activeSection === 'chats') {
+            loadAllCollegesWithMessages()
+          }
+          
+          // Ensure React Router knows we're on /chat
+          navigate('/chat', { replace: true })
+        })
+      } else {
+        // No app history - prevent navigation away from /chat
+        if (currentPath !== '/chat') {
+          window.history.pushState(null, '', '/chat')
+          requestAnimationFrame(() => {
+            navigate('/chat', { replace: true })
+          })
+        }
+      }
+    }
+
+    // Add popstate listener to intercept browser navigation
+    // Use capture phase to run before React Router
+    window.addEventListener('popstate', handlePopState, true)
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState, true)
+    }
+  }, [navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
 
   // Navigate back to previous page
   const navigateBack = () => {
