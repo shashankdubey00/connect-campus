@@ -76,6 +76,7 @@ const Chat = () => {
   const [isLoadingChats, setIsLoadingChats] = useState(false) // Loading state for chats
   const isLoadingChatsRef = useRef(false) // Prevent duplicate calls
   const navigationHistory = useRef([]) // Track navigation history for back button
+  const isSelectionModeActiveRef = useRef(false) // Track if any chat view is in selection mode
   const [groups, setGroups] = useState([]) // User's groups
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
@@ -822,6 +823,23 @@ const Chat = () => {
   // Handle browser back/forward navigation (mobile swipe gestures)
   useEffect(() => {
     const handlePopState = (e) => {
+      // Check if selection mode is active by checking if selection-mode-bar exists in DOM
+      const selectionModeBar = document.querySelector('.selection-mode-bar')
+      const isInChatView = view === 'live-chat' || view === 'group-chat' || view === 'direct-chat'
+      
+      // If selection mode is active and we're in a chat view, prevent navigation
+      // The back button handler in the chat view will exit selection mode
+      if (selectionModeBar && isInChatView) {
+        // Push state back to prevent navigation away
+        window.history.pushState(null, '', '/chat')
+        // Trigger a click on the back button to exit selection mode
+        const backButton = document.querySelector('.chat-header-back-btn')
+        if (backButton) {
+          backButton.click()
+        }
+        return
+      }
+      
       // Check current pathname - if we're being navigated away from /chat, prevent it
       const currentPath = window.location.pathname
       
@@ -897,7 +915,7 @@ const Chat = () => {
     return () => {
       window.removeEventListener('popstate', handlePopState, true)
     }
-  }, [navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
+  }, [navigate, chats, loadAllCollegesWithMessages, view]) // Include dependencies
 
   // Navigate back to previous page
   const navigateBack = () => {
