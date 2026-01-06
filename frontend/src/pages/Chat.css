@@ -47,11 +47,6 @@
   
   --divider: #2a3942;
   --placeholder-bg: #0b141a;
-  
-  /* Prevent browser swipe-back navigation */
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: auto;
-  touch-action: pan-y pinch-zoom;
 }
 
 /* ============================================
@@ -5674,24 +5669,8 @@
 }
 
 /* Message Selection Checkbox */
-.message-selection-checkbox {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-}
-
-.message-selection-checkbox input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: var(--btn-primary, #00a884);
-}
-
 .message.selection-mode {
   position: relative;
-  padding-left: 40px;
   cursor: pointer;
 }
 

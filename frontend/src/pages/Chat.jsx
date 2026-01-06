@@ -101,12 +101,6 @@ const Chat = () => {
         if (data.success) {
           setUser(data.user)
           
-          // Ensure we stay on /chat route if we're already there (e.g., on refresh)
-          if (location.pathname === '/chat') {
-            // Stay on /chat - don't navigate away
-            navigate('/chat', { replace: true })
-          }
-          
           // Connect Socket.IO after user is loaded (token will be read from cookies)
           try {
             const socketInstance = connectSocket();
@@ -147,22 +141,6 @@ const Chat = () => {
           });
         } else {
           // If not authenticated, redirect to login
-          // But if we're on /chat, preserve that in returnPath
-          setTimeout(() => {
-            navigate('/login', {
-              state: {
-                returnPath: location.pathname === '/chat' ? '/chat' : '/chat',
-                college: location.state?.college,
-              }
-            })
-          }, 100)
-          return
-        }
-      } catch (error) {
-        console.error('Failed to load user:', error)
-        // If we're on /chat route, try to stay there even on error
-        // Only redirect to login if we're not already on /chat
-        if (location.pathname !== '/chat') {
           setTimeout(() => {
             navigate('/login', {
               state: {
@@ -171,7 +149,18 @@ const Chat = () => {
               }
             })
           }, 100)
+          return
         }
+      } catch (error) {
+        console.error('Failed to load user:', error)
+        setTimeout(() => {
+          navigate('/login', {
+            state: {
+              returnPath: '/chat',
+              college: location.state?.college,
+            }
+          })
+        }, 100)
         return
       } finally {
         setIsLoading(false)
@@ -807,7 +796,7 @@ const Chat = () => {
     }
   }, [user, showCreateGroupModal, loadAvailableUsers])
 
-  // Save current navigation state to history
+  // Save current navigation state to history and push to browser history
   const saveNavigationState = () => {
     const currentState = {
       activeSection,
@@ -824,80 +813,79 @@ const Chat = () => {
     if (navigationHistory.current.length > 10) {
       navigationHistory.current.shift()
     }
+    
+    // Push state to browser history so back/forward works within /chat
+    // This ensures browser history has /chat entries, not landing page
+    window.history.pushState({ appState: currentState }, '', '/chat')
   }
 
   // Handle browser back/forward navigation (mobile swipe gestures)
-  // Only handle when we're on /chat route to avoid interfering with other routes
   useEffect(() => {
     const handlePopState = (e) => {
-      // Only handle popstate if we're on /chat route
-      // Let React Router handle navigation for other routes
-      if (location.pathname !== '/chat') {
-        return // Don't interfere with other routes
-      }
-      
+      // Check current pathname - if we're being navigated away from /chat, prevent it
       const currentPath = window.location.pathname
       
-      // Only handle if we have app navigation history
+      // If we have app navigation history, restore app state
       if (navigationHistory.current.length > 0) {
-        // Use the same logic as navigateBack() function
+        // Push state back to /chat immediately to prevent navigation away
+        if (currentPath !== '/chat') {
+          window.history.pushState(null, '', '/chat')
+        }
+        
+        // Use custom navigation to restore app state
         const previousState = navigationHistory.current.pop()
         
-        // Restore previous state (same as navigateBack)
-        setActiveSection(previousState.activeSection)
-        setView(previousState.view)
-        
-        // Restore selectedChat if it exists in current chats
-        if (previousState.selectedChat) {
-          const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
-          setSelectedChat(restoredChat || null)
-        } else {
-          setSelectedChat(null)
-        }
-        
-        // Restore selectedCollege
-        if (previousState.selectedCollege) {
-          const chatWithCollege = chats.find(c => 
-            c.college && (
-              c.college.aisheCode === previousState.selectedCollege.aisheCode ||
-              c.college.name === previousState.selectedCollege.name
-            )
-          )
-          if (chatWithCollege && chatWithCollege.college) {
-            setSelectedCollege(chatWithCollege.college)
+        // Use requestAnimationFrame to ensure state updates happen after navigation
+        requestAnimationFrame(() => {
+          // Restore previous state
+          setActiveSection(previousState.activeSection)
+          setView(previousState.view)
+          
+          // Restore selectedChat if it exists in current chats
+          if (previousState.selectedChat) {
+            const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
+            setSelectedChat(restoredChat || null)
           } else {
-            setSelectedCollege(previousState.selectedCollege)
+            setSelectedChat(null)
           }
-        } else {
-          setSelectedCollege(null)
-        }
-        
-        setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
-        setIsSearchActive(previousState.isSearchActive || false)
-        setSearchBarAtTop(previousState.searchBarAtTop || false)
-        setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
-        
-        // If going back to chats, load messages
-        if (previousState.activeSection === 'chats') {
-          loadAllCollegesWithMessages()
-        }
-        
-        // Ensure we stay on /chat route (prevent navigation away)
-        if (currentPath !== '/chat') {
-          window.history.pushState(null, '', '/chat')
+          
+          // Restore selectedCollege
+          if (previousState.selectedCollege) {
+            const chatWithCollege = chats.find(c => 
+              c.college && (
+                c.college.aisheCode === previousState.selectedCollege.aisheCode ||
+                c.college.name === previousState.selectedCollege.name
+              )
+            )
+            if (chatWithCollege && chatWithCollege.college) {
+              setSelectedCollege(chatWithCollege.college)
+            } else {
+              setSelectedCollege(previousState.selectedCollege)
+            }
+          } else {
+            setSelectedCollege(null)
+          }
+          
+          setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
+          setIsSearchActive(previousState.isSearchActive || false)
+          setSearchBarAtTop(previousState.searchBarAtTop || false)
+          setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
+          
+          // If going back to chats, load messages
+          if (previousState.activeSection === 'chats') {
+            loadAllCollegesWithMessages()
+          }
+          
+          // Ensure React Router knows we're on /chat
           navigate('/chat', { replace: true })
-        }
+        })
       } else {
-        // No app history - if trying to navigate away from /chat, prevent it
+        // No app history - prevent navigation away from /chat
         if (currentPath !== '/chat') {
           window.history.pushState(null, '', '/chat')
-          navigate('/chat', { replace: true })
-          // Reset to default view
-          setActiveSection('chats')
-          setView('list')
-          setSelectedChat(null)
-          setSelectedCollege(null)
-          setShowChatList(true)
+          requestAnimationFrame(() => {
+            navigate('/chat', { replace: true })
+          })
         }
       }
     }
@@ -909,7 +897,7 @@ const Chat = () => {
     return () => {
       window.removeEventListener('popstate', handlePopState, true)
     }
-  }, [location.pathname, navigate, chats, loadAllCollegesWithMessages]) // Include location.pathname to check route
+  }, [navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
 
   // Navigate back to previous page
   const navigateBack = () => {
@@ -981,8 +969,6 @@ const Chat = () => {
 
   // Handle section change
   const handleSectionChange = (section) => {
-    // Save navigation state before changing section (same as other navigations)
-    saveNavigationState()
     setActiveSection(section)
     setView('list')
     setSelectedChat(null)
@@ -3838,7 +3824,6 @@ const Chat = () => {
           <button
             className={`mobile-nav-item ${view === 'settings' || activeSection === 'settings' ? 'active' : ''}`}
             onClick={() => { 
-              saveNavigationState() // Save current state before navigating
               setActiveSection('chats') // Keep chats visible
               setView('settings')
               setShowChatList(false)
@@ -6585,16 +6570,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onClick={(e) => handleMessageClick(e, message)}
                     onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
                   >
-                    {selectionMode && (
-                      <div className="message-selection-checkbox">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedItems.has(message.id)}
-                          onChange={() => handleToggleSelection(message.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    )}
                     {!message.isOwn && (
                       <div className="message-sender-info">
                         <div 
@@ -8246,16 +8221,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onTouchEnd={handleMessageTouchEnd}
                 onTouchMove={handleMessageTouchMove}
               >
-                {selectionMode && (
-                  <div className="message-selection-checkbox">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedItems.has(message.id)}
-                      onChange={() => handleToggleSelection(message.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                )}
                 {!message.isOwn && (
                   <div className="message-sender-info">
                     <div className="message-sender-avatar">
@@ -10439,16 +10404,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       }
                     }}
                   >
-                    {selectionMode && (
-                      <div className="message-selection-checkbox">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedItems.has(message.id)}
-                          onChange={() => handleToggleSelection(message.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    )}
                     {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                     <div 
