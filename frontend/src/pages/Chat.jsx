@@ -76,7 +76,6 @@ const Chat = () => {
   const [isLoadingChats, setIsLoadingChats] = useState(false) // Loading state for chats
   const isLoadingChatsRef = useRef(false) // Prevent duplicate calls
   const navigationHistory = useRef([]) // Track navigation history for back button
-  const isSelectionModeActiveRef = useRef(false) // Track if any chat view is in selection mode
   const [groups, setGroups] = useState([]) // User's groups
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
