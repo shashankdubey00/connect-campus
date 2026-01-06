@@ -4693,7 +4693,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     return (
       <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
         <div className="chat-header-bar">
-          <button className="chat-header-back-btn" onClick={onBack}>
+          <button 
+            className="chat-header-back-btn" 
+            onClick={() => {
+              if (selectionMode) {
+                handleExitSelectionMode()
+              } else {
+                onBack()
+              }
+            }}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -6444,7 +6453,13 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           {/* WhatsApp-like back button */}
             <button 
               className="chat-header-back-btn"
-              onClick={onBack}
+              onClick={() => {
+                if (selectionMode) {
+                  handleExitSelectionMode()
+                } else {
+                  onBack()
+                }
+              }}
               title="Back"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -7967,7 +7982,16 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     return (
       <div className="live-chat-view">
         <div className="chat-header-bar">
-          <button className="chat-header-back-btn" onClick={onBack}>
+          <button 
+            className="chat-header-back-btn" 
+            onClick={() => {
+              if (selectionMode) {
+                handleExitSelectionMode()
+              } else {
+                onBack()
+              }
+            }}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -10130,7 +10154,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     return (
       <div className="live-chat-view">
         <div className="chat-header-bar">
-          <button className="chat-header-back-btn" onClick={onBack}>
+          <button 
+            className="chat-header-back-btn" 
+            onClick={() => {
+              if (selectionMode) {
+                handleExitSelectionMode()
+              } else {
+                onBack()
+              }
+            }}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -10327,7 +10360,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       )}
       <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
       <div className="chat-header-bar">
-        <button className="chat-header-back-btn" onClick={onBack}>
+        <button 
+          className="chat-header-back-btn" 
+          onClick={() => {
+            if (selectionMode) {
+              handleExitSelectionMode()
+            } else {
+              onBack()
+            }
+          }}
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
