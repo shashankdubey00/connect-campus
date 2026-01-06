@@ -10490,9 +10490,38 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     <div 
                       className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
                       style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
-                      onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                      onTouchEnd={handleMessageTouchEnd}
-                      onTouchMove={handleMessageTouchMove}
+                      onTouchStart={(e) => {
+                        if (selectionMode) {
+                          // In selection mode, let touch pass through to parent
+                          e.stopPropagation()
+                          // Trigger selection on parent
+                          handleMessageTouchStart(e, message)
+                        } else {
+                          handleMessageTouchStart(e, message)
+                        }
+                      }}
+                      onTouchEnd={(e) => {
+                        if (selectionMode) {
+                          e.stopPropagation()
+                          handleMessageTouchEnd(e)
+                        } else {
+                          handleMessageTouchEnd(e)
+                        }
+                      }}
+                      onTouchMove={(e) => {
+                        if (selectionMode) {
+                          e.stopPropagation()
+                          handleMessageTouchMove(e)
+                        } else {
+                          handleMessageTouchMove(e)
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (selectionMode) {
+                          // In selection mode, let click pass through to parent
+                          e.stopPropagation()
+                        }
+                      }}
                       onContextMenu={(e) => {
                         if (!selectionMode) {
                           e.preventDefault()

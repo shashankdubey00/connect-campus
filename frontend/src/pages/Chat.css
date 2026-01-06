@@ -5672,6 +5672,21 @@
 .message.selection-mode {
   position: relative;
   cursor: pointer;
+  width: 100%;
+  min-height: 44px; /* Minimum touch target size */
+  padding: 4px 0; /* Add vertical padding for easier clicking */
+}
+
+.message.selection-mode .message-content {
+  pointer-events: none; /* Allow clicks to pass through to parent */
+}
+
+.message.selection-mode .message-sender-info {
+  pointer-events: auto; /* Keep avatar clickable */
+}
+
+.message.selection-mode .message-sender-avatar {
+  pointer-events: auto; /* Keep avatar clickable */
 }
 
 .message.selection-selected {
