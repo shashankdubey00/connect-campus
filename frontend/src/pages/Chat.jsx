@@ -101,6 +101,12 @@ const Chat = () => {
         if (data.success) {
           setUser(data.user)
           
+          // Ensure we stay on /chat route if we're already there (e.g., on refresh)
+          if (location.pathname === '/chat') {
+            // Stay on /chat - don't navigate away
+            navigate('/chat', { replace: true })
+          }
+          
           // Connect Socket.IO after user is loaded (token will be read from cookies)
           try {
             const socketInstance = connectSocket();
@@ -141,10 +147,11 @@ const Chat = () => {
           });
         } else {
           // If not authenticated, redirect to login
+          // But if we're on /chat, preserve that in returnPath
           setTimeout(() => {
             navigate('/login', {
               state: {
-                returnPath: '/chat',
+                returnPath: location.pathname === '/chat' ? '/chat' : '/chat',
                 college: location.state?.college,
               }
             })
@@ -153,14 +160,18 @@ const Chat = () => {
         }
       } catch (error) {
         console.error('Failed to load user:', error)
-        setTimeout(() => {
-          navigate('/login', {
-            state: {
-              returnPath: '/chat',
-              college: location.state?.college,
-            }
-          })
-        }, 100)
+        // If we're on /chat route, try to stay there even on error
+        // Only redirect to login if we're not already on /chat
+        if (location.pathname !== '/chat') {
+          setTimeout(() => {
+            navigate('/login', {
+              state: {
+                returnPath: '/chat',
+                college: location.state?.college,
+              }
+            })
+          }, 100)
+        }
         return
       } finally {
         setIsLoading(false)
@@ -871,13 +882,16 @@ const Chat = () => {
           setSearchBarAtTop(previousState.searchBarAtTop || false)
           setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
           
-          // If going back to chats, load messages
-          if (previousState.activeSection === 'chats') {
+          // Only load messages if going back to chats section (not settings or community)
+          // And only if we're actually on /chat route
+          if (previousState.activeSection === 'chats' && currentPath === '/chat') {
             loadAllCollegesWithMessages()
           }
           
-          // Ensure React Router knows we're on /chat
-          navigate('/chat', { replace: true })
+          // Only navigate if we're not already on /chat to avoid reload
+          if (currentPath !== '/chat') {
+            navigate('/chat', { replace: true })
+          }
         })
       } else {
         // No app history - prevent navigation away from /chat
