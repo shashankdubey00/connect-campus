@@ -827,20 +827,19 @@ const Chat = () => {
   }
 
   // Handle browser back/forward navigation (mobile swipe gestures)
-  // Use the same logic as navigateBack() to ensure consistency
+  // Only handle when we're on /chat route to avoid interfering with other routes
   useEffect(() => {
     const handlePopState = (e) => {
-      // Always prevent navigation away from /chat
+      // Only handle popstate if we're on /chat route
+      // Let React Router handle navigation for other routes
+      if (location.pathname !== '/chat') {
+        return // Don't interfere with other routes
+      }
+      
       const currentPath = window.location.pathname
       
-      // If we have app navigation history, restore app state (same as navigateBack)
+      // Only handle if we have app navigation history
       if (navigationHistory.current.length > 0) {
-        // Prevent navigation away from /chat
-        if (currentPath !== '/chat') {
-          // Push state back immediately to prevent navigation
-          window.history.pushState(null, '', '/chat')
-        }
-        
         // Use the same logic as navigateBack() function
         const previousState = navigationHistory.current.pop()
         
@@ -883,22 +882,23 @@ const Chat = () => {
           loadAllCollegesWithMessages()
         }
         
-        // Ensure we stay on /chat route
-        if (currentPath !== '/chat') {
-          navigate('/chat', { replace: true })
-        }
-      } else {
-        // No app history - prevent navigation away from /chat
+        // Ensure we stay on /chat route (prevent navigation away)
         if (currentPath !== '/chat') {
           window.history.pushState(null, '', '/chat')
           navigate('/chat', { replace: true })
         }
-        // Reset to default view (same as navigateToHome)
-        setActiveSection('chats')
-        setView('list')
-        setSelectedChat(null)
-        setSelectedCollege(null)
-        setShowChatList(true)
+      } else {
+        // No app history - if trying to navigate away from /chat, prevent it
+        if (currentPath !== '/chat') {
+          window.history.pushState(null, '', '/chat')
+          navigate('/chat', { replace: true })
+          // Reset to default view
+          setActiveSection('chats')
+          setView('list')
+          setSelectedChat(null)
+          setSelectedCollege(null)
+          setShowChatList(true)
+        }
       }
     }
 
@@ -909,7 +909,7 @@ const Chat = () => {
     return () => {
       window.removeEventListener('popstate', handlePopState, true)
     }
-  }, [navigate, chats, loadAllCollegesWithMessages]) // Include dependencies
+  }, [location.pathname, navigate, chats, loadAllCollegesWithMessages]) // Include location.pathname to check route
 
   // Navigate back to previous page
   const navigateBack = () => {
