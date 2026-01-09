@@ -6534,10 +6534,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => {
-                      // Prevent click if we just had a long-press (mobile)
-                      if (isMobile && longPressActivated.current) {
+                      // On mobile, don't handle clicks - use touch events only
+                      if (isMobile) {
                         e.preventDefault()
-                        e.stopPropagation()
                         return
                       }
                       handleMessageClick(e, message)
@@ -6547,13 +6546,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onTouchEnd={handleMessageTouchEnd}
                     onTouchMove={handleMessageTouchMove}
                   >
-                    {/* Selection Checkbox - Only visible in selection mode */}
+                    {/* Selection Checkbox - Only visible in selection mode on mobile */}
                     {isMobile && selectionMode && (
                       <div 
                         className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                        onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
-                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
                         onTouchEnd={(e) => {
+                          e.preventDefault()
                           e.stopPropagation()
                           handleSelectionCheckboxTap(e, message.id)
                         }}
@@ -10452,13 +10454,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       }
                     }}
                   >
-                    {/* Selection Checkbox - Only visible in selection mode */}
+                    {/* Selection Checkbox - Only visible in selection mode on mobile */}
                     {isMobile && selectionMode && (
                       <div 
                         className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                        onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
-                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
                         onTouchEnd={(e) => {
+                          e.preventDefault()
                           e.stopPropagation()
                           handleSelectionCheckboxTap(e, message.id)
                         }}
