@@ -2659,6 +2659,21 @@
   justify-content: flex-start;
 }
 
+/* Adjust message layout when in selection mode - selection indicator always on left */
+.message.selection-mode {
+  padding-left: 40px; /* Make room for selection indicator on left */
+}
+
+.message.selection-mode .message-content {
+  margin-left: 0; /* Reset any left margin */
+}
+
+@media (max-width: 768px) {
+  .message.selection-mode {
+    padding-left: 44px;
+  }
+}
+
 .message-content {
   max-width: 65%;
   padding: 8px 12px;
@@ -5635,32 +5650,43 @@
 @media (max-width: 768px) {
   .selection-mode-bar {
     padding: 10px 12px;
-    min-height: 52px;
-    flex-wrap: wrap;
+    min-height: 56px;
+    flex-wrap: nowrap;
     gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1001;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
   .selection-mode-info {
-    font-size: 14px;
-    flex: 1;
-    min-width: 100px;
+    font-size: 15px;
+    flex: 0 0 auto;
+    min-width: 80px;
+    font-weight: 600;
   }
 
   .selection-mode-actions {
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    flex: 1;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .selection-mode-btn {
-    padding: 6px 10px;
-    font-size: 13px;
+    padding: 8px 10px;
+    font-size: 12px;
     gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .selection-mode-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
   }
 
   .selection-mode-btn span {
@@ -5673,12 +5699,76 @@
   position: relative;
   cursor: pointer;
   width: 100%;
-  min-height: 44px; /* Minimum touch target size */
-  padding: 4px 0; /* Add vertical padding for easier clicking */
+  min-height: 48px; /* Minimum touch target size for mobile */
+  padding: 6px 8px; /* Add padding for easier clicking */
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  .message.selection-mode {
+    min-height: 52px; /* Larger touch target on mobile */
+    padding: 8px 12px;
+  }
 }
 
 .message.selection-mode .message-content {
   pointer-events: none; /* Allow clicks to pass through to parent */
+  position: relative;
+}
+
+/* Selection indicator (checkmark-like visual) */
+.message.selection-mode::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background-color: transparent;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.message.selection-selected::before {
+  background-color: var(--btn-primary, #00a884);
+  border-color: var(--btn-primary, #00a884);
+}
+
+.message.selection-selected::after {
+  content: '✓';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 11;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .message.selection-mode::before {
+    left: 12px;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .message.selection-selected::after {
+    left: 12px;
+    font-size: 16px;
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .message.selection-mode .message-sender-info {
@@ -5690,8 +5780,22 @@
 }
 
 .message.selection-selected {
-  background-color: rgba(0, 168, 132, 0.1);
-  border-left: 3px solid var(--btn-primary, #00a884);
+  background-color: rgba(0, 168, 132, 0.15) !important;
+  border-left: 4px solid var(--btn-primary, #00a884) !important;
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+.message.selection-selected .message-content {
+  background-color: rgba(0, 168, 132, 0.2) !important;
+}
+
+.message.selection-selected.own-message .message-content {
+  background-color: rgba(0, 168, 132, 0.25) !important;
+}
+
+.message.selection-selected.other-message .message-content {
+  background-color: rgba(0, 168, 132, 0.2) !important;
 }
 
 /* Chat Selection Mode */

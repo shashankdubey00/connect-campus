@@ -6599,8 +6599,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     style={{ position: 'relative' }}
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
-                    onClick={(e) => handleMessageClick(e, message)}
+                    onClick={(e) => {
+                      // Prevent click if we just had a long-press (mobile)
+                      if (isMobile && longPressActivated.current) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        return
+                      }
+                      handleMessageClick(e, message)
+                    }}
                     onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+                    onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                    onTouchEnd={handleMessageTouchEnd}
+                    onTouchMove={handleMessageTouchMove}
                   >
                     {!message.isOwn && (
                       <div className="message-sender-info">
@@ -10465,22 +10476,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => handleMessageClick(e, message)}
-                    onTouchStart={(e) => {
-                      if (selectionMode) {
-                        // In selection mode, handle touch on the message div
-                        handleMessageTouchStart(e, message)
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      if (selectionMode) {
-                        handleMessageTouchEnd(e)
-                      }
-                    }}
-                    onTouchMove={(e) => {
-                      if (selectionMode) {
-                        handleMessageTouchMove(e)
-                      }
-                    }}
+                    onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                    onTouchEnd={handleMessageTouchEnd}
+                    onTouchMove={handleMessageTouchMove}
                     onContextMenu={(e) => {
                       if (!selectionMode) {
                         e.preventDefault()
