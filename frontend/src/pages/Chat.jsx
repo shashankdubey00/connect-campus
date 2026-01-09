@@ -5748,11 +5748,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     longPressActivated.current = false
     
     // Only start long-press timer if NOT already in selection mode
-    // Long-press just shows checkboxes, doesn't select
+    // Long-press enters selection mode AND selects the message
     if (!selectionMode && isMobile) {
       longPressTimer.current = setTimeout(() => {
-        // Enter selection mode (show checkboxes) but don't select any message yet
+        // Enter selection mode AND select this message
         setSelectionMode(true)
+        setSelectedItems(new Set([message.id])) // Select the long-pressed message
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
@@ -5763,7 +5764,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to show checkboxes
+      }, 500) // 0.5 second long-press to select message
     }
   }
   
@@ -7579,11 +7580,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     longPressActivated.current = false
     
     // Only start long-press timer if NOT already in selection mode
-    // Long-press just shows checkboxes, doesn't select
+    // Long-press enters selection mode AND selects the message
     if (!selectionMode && isMobile) {
       longPressTimer.current = setTimeout(() => {
-        // Enter selection mode (show checkboxes) but don't select any message yet
+        // Enter selection mode AND select this message
         setSelectionMode(true)
+        setSelectedItems(new Set([message.id])) // Select the long-pressed message
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
@@ -7594,7 +7596,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to show checkboxes
+      }, 500) // 0.5 second long-press to select message
     }
   }
   
@@ -9560,11 +9562,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     longPressActivated.current = false
     
     // Only start long-press timer if NOT already in selection mode
-    // Long-press just shows checkboxes, doesn't select
+    // Long-press enters selection mode AND selects the message
     if (!selectionMode && isMobile) {
       longPressTimer.current = setTimeout(() => {
-        // Enter selection mode (show checkboxes) but don't select any message yet
+        // Enter selection mode AND select this message
         setSelectionMode(true)
+        setSelectedItems(new Set([message.id])) // Select the long-pressed message
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
@@ -9575,7 +9578,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to show checkboxes
+      }, 500) // 0.5 second long-press to select message
     }
   }
   
