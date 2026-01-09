@@ -5925,14 +5925,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
-        }
+      // Cancel long press immediately on ANY movement (horizontal or vertical)
+      // This prevents selection when swiping to reply OR scrolling up/down
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+        longPressActivated.current = false // Reset flag if cancelled
       }
       
       // Swipe RIGHT to reply (opposite of WhatsApp)
@@ -7786,14 +7784,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
-        }
+      // Cancel long press immediately on ANY movement (horizontal or vertical)
+      // This prevents selection when swiping to reply OR scrolling up/down
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+        longPressActivated.current = false // Reset flag if cancelled
       }
       
       // Swipe RIGHT to reply (opposite of WhatsApp)
@@ -9747,14 +9743,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
-        }
+      // Cancel long press immediately on ANY movement (horizontal or vertical)
+      // This prevents selection when swiping to reply OR scrolling up/down
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+        longPressActivated.current = false // Reset flag if cancelled
       }
       
       // Swipe RIGHT to reply (opposite of WhatsApp)
