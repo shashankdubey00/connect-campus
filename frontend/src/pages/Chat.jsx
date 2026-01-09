@@ -5925,9 +5925,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Only cancel long press if there's significant movement (swipe gesture)
-      // Allow small movements (up to 10px) without cancelling long press
-      if (totalMovement > 10) {
+      // Cancel long press immediately on any movement (swipe gesture)
+      // Use very small threshold (5px) to prevent selection during swipe-to-reply
+      if (totalMovement > 5) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
@@ -7786,9 +7786,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Only cancel long press if there's significant movement (swipe gesture)
-      // Allow small movements (up to 10px) without cancelling long press
-      if (totalMovement > 10) {
+      // Cancel long press immediately on any movement (swipe gesture)
+      // Use very small threshold (5px) to prevent selection during swipe-to-reply
+      if (totalMovement > 5) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
@@ -9747,9 +9747,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Only cancel long press if there's significant movement (swipe gesture)
-      // Allow small movements (up to 10px) without cancelling long press
-      if (totalMovement > 10) {
+      // Cancel long press immediately on any movement (swipe gesture)
+      // Use very small threshold (5px) to prevent selection during swipe-to-reply
+      if (totalMovement > 5) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
