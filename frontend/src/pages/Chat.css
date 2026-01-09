@@ -2652,16 +2652,9 @@
   transition: background-color 0.2s ease;
 }
 
-/* Selection mode - add padding smoothly to make room for indicator */
+/* Selection mode - no padding needed since we removed the indicator */
 .message.selection-mode {
-  padding-left: 40px; /* Make room for selection indicator */
-  transition: padding-left 0.2s ease, background-color 0.2s ease;
-}
-
-@media (max-width: 768px) {
-  .message.selection-mode {
-    padding-left: 44px;
-  }
+  transition: background-color 0.2s ease;
 }
 
 .message.own-message {
@@ -5726,63 +5719,7 @@
   transition: transform 0.2s ease, margin 0.2s ease;
 }
 
-/* Selection indicator (checkmark-like visual) */
-.message.selection-mode::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
-  background-color: transparent;
-  z-index: 10;
-  transition: all 0.2s ease;
-  opacity: 1;
-  pointer-events: none;
-}
-
-@media (max-width: 768px) {
-  .message.selection-mode::before {
-    left: 12px;
-    width: 24px;
-    height: 24px;
-  }
-}
-
-.message.selection-selected::before {
-  background-color: var(--btn-primary, #00a884);
-  border-color: var(--btn-primary, #00a884);
-}
-
-.message.selection-selected::after {
-  content: '✓';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: white;
-  font-size: 14px;
-  font-weight: bold;
-  z-index: 11;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s ease;
-}
-
-@media (max-width: 768px) {
-  .message.selection-selected::after {
-    left: 12px;
-    font-size: 16px;
-    width: 24px;
-    height: 24px;
-  }
-}
+/* Selection indicator removed - using background highlight only */
 
 .message.selection-mode .message-sender-info {
   pointer-events: auto; /* Keep avatar clickable */
