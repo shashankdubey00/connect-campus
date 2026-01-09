@@ -5736,11 +5736,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
     
-    // Start long-press timer (0.5 second for mobile)
+    // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
         if (isMobile) {
-        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        // On mobile, automatically enter selection mode after 0.3 second long press (WhatsApp-like)
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
@@ -5754,7 +5754,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         navigator.vibrate(50)
       }
       }
-    }, 500) // 0.5 second for mobile long-press
+    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -7553,11 +7553,11 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
     
-    // Start long-press timer (0.5 second for mobile)
+    // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
         if (isMobile) {
-        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        // On mobile, automatically enter selection mode after 0.3 second long press (WhatsApp-like)
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
@@ -7571,7 +7571,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         navigator.vibrate(50)
       }
       }
-    }, 500) // 0.5 second for mobile long-press
+    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
   }
 
   // Handle touch end on message (mobile)
@@ -9518,11 +9518,11 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
     
-    // Start long-press timer (0.5 second for mobile)
+    // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
     longPressTimer.current = setTimeout(() => {
         if (isMobile) {
-        // On mobile, automatically enter selection mode after 0.5 second long press (WhatsApp-like)
+        // On mobile, automatically enter selection mode after 0.3 second long press (WhatsApp-like)
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
@@ -9536,7 +9536,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         navigator.vibrate(50)
       }
       }
-    }, 500) // 0.5 second for mobile long-press
+    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
   }
 
   const handleMessageTouchEnd = (e) => {

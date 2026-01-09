@@ -2649,6 +2649,19 @@
   display: flex;
   margin-bottom: 4px;
   position: relative;
+  transition: background-color 0.2s ease;
+}
+
+/* Selection mode - add padding smoothly to make room for indicator */
+.message.selection-mode {
+  padding-left: 40px; /* Make room for selection indicator */
+  transition: padding-left 0.2s ease, background-color 0.2s ease;
+}
+
+@media (max-width: 768px) {
+  .message.selection-mode {
+    padding-left: 44px;
+  }
 }
 
 .message.own-message {
@@ -2659,19 +2672,13 @@
   justify-content: flex-start;
 }
 
-/* Adjust message layout when in selection mode - selection indicator always on left */
-.message.selection-mode {
-  padding-left: 40px; /* Make room for selection indicator on left */
+/* Message content should not shift when selection mode activates */
+.message .message-content {
+  transition: transform 0.2s ease, margin 0.2s ease;
 }
 
 .message.selection-mode .message-content {
   margin-left: 0; /* Reset any left margin */
-}
-
-@media (max-width: 768px) {
-  .message.selection-mode {
-    padding-left: 44px;
-  }
 }
 
 .message-content {
@@ -5700,7 +5707,7 @@
   cursor: pointer;
   width: 100%;
   min-height: 48px; /* Minimum touch target size for mobile */
-  padding: 6px 8px; /* Add padding for easier clicking */
+  padding: 6px 8px; /* Keep original padding - no shift */
   margin: 2px 0;
   border-radius: 4px;
   transition: background-color 0.2s ease;
@@ -5709,13 +5716,14 @@
 @media (max-width: 768px) {
   .message.selection-mode {
     min-height: 52px; /* Larger touch target on mobile */
-    padding: 8px 12px;
+    padding: 8px 12px; /* Keep original padding */
   }
 }
 
 .message.selection-mode .message-content {
   pointer-events: none; /* Allow clicks to pass through to parent */
   position: relative;
+  transition: transform 0.2s ease, margin 0.2s ease;
 }
 
 /* Selection indicator (checkmark-like visual) */
@@ -5732,6 +5740,16 @@
   background-color: transparent;
   z-index: 10;
   transition: all 0.2s ease;
+  opacity: 1;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .message.selection-mode::before {
+    left: 12px;
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .message.selection-selected::before {
@@ -5754,15 +5772,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.2s ease;
 }
 
 @media (max-width: 768px) {
-  .message.selection-mode::before {
-    left: 12px;
-    width: 24px;
-    height: 24px;
-  }
-  
   .message.selection-selected::after {
     left: 12px;
     font-size: 16px;
