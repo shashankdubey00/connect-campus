@@ -5928,24 +5928,25 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
+      // IMPORTANT: Cancel long press on ANY movement (even 1px)
+      // This ensures selection ONLY happens when finger is completely still
+      if (totalMovement > 0) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
+          longPressActivated.current = false
         }
       }
       
-      // Swipe RIGHT to reply (opposite of WhatsApp)
-      // Swipe RIGHT means your finger moves to a larger X coordinate
-      // deltaX = currentX - startX will be positive when swiping right
-      if (deltaX > 0) {
-        // Swipe right detected - allow reply gesture
-        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
+      // Only start visual swipe movement after significant horizontal movement (15px+)
+      // This prevents accidental message movement during long-press attempts
+      const SWIPE_THRESHOLD = 15
+      
+      if (deltaX > SWIPE_THRESHOLD) {
+        // Significant right swipe detected - show visual swipe for reply
+        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
-        // Reset if swiping left (negative deltaX)
+        // Not enough movement for swipe - keep message in place
         setSwipeOffset(0)
       }
     }
@@ -7792,24 +7793,25 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
+      // IMPORTANT: Cancel long press on ANY movement (even 1px)
+      // This ensures selection ONLY happens when finger is completely still
+      if (totalMovement > 0) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
+          longPressActivated.current = false
         }
       }
       
-      // Swipe RIGHT to reply (opposite of WhatsApp)
-      // Swipe RIGHT means your finger moves to a larger X coordinate
-      // deltaX = currentX - startX will be positive when swiping right
-      if (deltaX > 0) {
-        // Swipe right detected - allow reply gesture
-        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
+      // Only start visual swipe movement after significant horizontal movement (15px+)
+      // This prevents accidental message movement during long-press attempts
+      const SWIPE_THRESHOLD = 15
+      
+      if (deltaX > SWIPE_THRESHOLD) {
+        // Significant right swipe detected - show visual swipe for reply
+        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
-        // Reset if swiping left (negative deltaX)
+        // Not enough movement for swipe - keep message in place
         setSwipeOffset(0)
       }
     }
@@ -9758,24 +9760,25 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // Cancel long press immediately on any movement (swipe gesture)
-      // Use very small threshold (5px) to prevent selection during swipe-to-reply
-      if (totalMovement > 5) {
+      // IMPORTANT: Cancel long press on ANY movement (even 1px)
+      // This ensures selection ONLY happens when finger is completely still
+      if (totalMovement > 0) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
-          longPressActivated.current = false // Reset flag if cancelled
+          longPressActivated.current = false
         }
       }
       
-      // Swipe RIGHT to reply (opposite of WhatsApp)
-      // Swipe RIGHT means your finger moves to a larger X coordinate
-      // deltaX = currentX - startX will be positive when swiping right
-      if (deltaX > 0) {
-        // Swipe right detected - allow reply gesture
-        setSwipeOffset(Math.min(deltaX, 100)) // Cap at 100px (swipe right)
+      // Only start visual swipe movement after significant horizontal movement (15px+)
+      // This prevents accidental message movement during long-press attempts
+      const SWIPE_THRESHOLD = 15
+      
+      if (deltaX > SWIPE_THRESHOLD) {
+        // Significant right swipe detected - show visual swipe for reply
+        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
-        // Reset if swiping left (negative deltaX)
+        // Not enough movement for swipe - keep message in place
         setSwipeOffset(0)
       }
     }
