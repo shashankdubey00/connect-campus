@@ -5758,14 +5758,15 @@
   color: white;
 }
 
-/* Adjust message content to make room for checkbox on mobile */
+/* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  .message {
-    padding-left: 36px !important;
+  .message.selection-mode {
+    padding-left: 40px !important;
+    transition: padding-left 0.2s ease;
   }
   
-  .message.own-message {
-    padding-left: 36px !important;
+  .message.own-message.selection-mode {
+    padding-left: 40px !important;
   }
 }
 

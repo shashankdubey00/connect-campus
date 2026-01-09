@@ -5729,6 +5729,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
       longPressActivated.current = false
       return
     }
@@ -5742,24 +5746,44 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
     longPressActivated.current = false
+    
+    // Only start long-press timer if NOT already in selection mode
+    // Long-press just shows checkboxes, doesn't select
+    if (!selectionMode && isMobile) {
+      longPressTimer.current = setTimeout(() => {
+        // Enter selection mode (show checkboxes) but don't select any message yet
+        setSelectionMode(true)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        longPressActivated.current = true
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }, 500) // 0.5 second long-press to show checkboxes
+    }
   }
   
-  // Handle selection checkbox tap
+  // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!selectionMode) {
-      // Enter selection mode and select this message
-      setSelectionMode(true)
-      setSelectedItems(new Set([messageId]))
-      setShowMessageHeader(false)
-      setSelectedMessage(null)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
+    // Toggle selection for this message
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(messageId)) {
+      newSelected.delete(messageId)
     } else {
-      // Toggle selection for this message
-      handleToggleSelection(messageId)
+      newSelected.add(messageId)
+    }
+    setSelectedItems(newSelected)
+    
+    // If no messages selected, exit selection mode
+    if (newSelected.size === 0) {
+      setSelectionMode(false)
     }
     
     // Haptic feedback
@@ -5875,9 +5899,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // IMPORTANT: Cancel long press on ANY movement (even 1px)
-      // This ensures selection ONLY happens when finger is completely still
-      if (totalMovement > 0) {
+      // Cancel long press on ANY movement (scrolling or swiping)
+      // This prevents accidental selection mode when scrolling
+      if (totalMovement > 3) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
@@ -5886,11 +5910,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
-      // This prevents accidental message movement during long-press attempts
       const SWIPE_THRESHOLD = 15
       
-      if (deltaX > SWIPE_THRESHOLD) {
-        // Significant right swipe detected - show visual swipe for reply
+      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
+        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
         setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
         // Not enough movement for swipe - keep message in place
@@ -6579,10 +6602,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onTouchEnd={handleMessageTouchEnd}
                     onTouchMove={handleMessageTouchMove}
                   >
-                    {/* Selection Checkbox - Always visible on mobile */}
-                    {isMobile && (
+                    {/* Selection Checkbox - Only visible in selection mode */}
+                    {isMobile && selectionMode && (
                       <div 
-                        className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                        className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                         onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
                         onTouchStart={(e) => e.stopPropagation()}
                         onTouchEnd={(e) => {
@@ -6590,7 +6613,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                           handleSelectionCheckboxTap(e, message.id)
                         }}
                       >
-                        {selectionMode && selectedItems.has(message.id) ? (
+                        {selectedItems.has(message.id) ? (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                           </svg>
@@ -7537,6 +7560,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
       longPressActivated.current = false
       return
     }
@@ -7550,24 +7577,44 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
     longPressActivated.current = false
+    
+    // Only start long-press timer if NOT already in selection mode
+    // Long-press just shows checkboxes, doesn't select
+    if (!selectionMode && isMobile) {
+      longPressTimer.current = setTimeout(() => {
+        // Enter selection mode (show checkboxes) but don't select any message yet
+        setSelectionMode(true)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        longPressActivated.current = true
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }, 500) // 0.5 second long-press to show checkboxes
+    }
   }
   
-  // Handle selection checkbox tap
+  // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!selectionMode) {
-      // Enter selection mode and select this message
-      setSelectionMode(true)
-      setSelectedItems(new Set([messageId]))
-      setShowMessageHeader(false)
-      setSelectedMessage(null)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
+    // Toggle selection for this message
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(messageId)) {
+      newSelected.delete(messageId)
     } else {
-      // Toggle selection for this message
-      handleToggleSelection(messageId)
+      newSelected.add(messageId)
+    }
+    setSelectedItems(newSelected)
+    
+    // If no messages selected, exit selection mode
+    if (newSelected.size === 0) {
+      setSelectionMode(false)
     }
     
     // Haptic feedback
@@ -7707,9 +7754,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // IMPORTANT: Cancel long press on ANY movement (even 1px)
-      // This ensures selection ONLY happens when finger is completely still
-      if (totalMovement > 0) {
+      // Cancel long press on ANY movement (scrolling or swiping)
+      // This prevents accidental selection mode when scrolling
+      if (totalMovement > 3) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
@@ -7718,11 +7765,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
-      // This prevents accidental message movement during long-press attempts
       const SWIPE_THRESHOLD = 15
       
-      if (deltaX > SWIPE_THRESHOLD) {
-        // Significant right swipe detected - show visual swipe for reply
+      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
+        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
         setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
         // Not enough movement for swipe - keep message in place
@@ -9495,6 +9541,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
       longPressActivated.current = false
       return
     }
@@ -9508,24 +9558,44 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
     longPressActivated.current = false
+    
+    // Only start long-press timer if NOT already in selection mode
+    // Long-press just shows checkboxes, doesn't select
+    if (!selectionMode && isMobile) {
+      longPressTimer.current = setTimeout(() => {
+        // Enter selection mode (show checkboxes) but don't select any message yet
+        setSelectionMode(true)
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        longPressActivated.current = true
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }, 500) // 0.5 second long-press to show checkboxes
+    }
   }
   
-  // Handle selection checkbox tap
+  // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!selectionMode) {
-      // Enter selection mode and select this message
-      setSelectionMode(true)
-      setSelectedItems(new Set([messageId]))
-      setShowMessageHeader(false)
-      setSelectedMessage(null)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
+    // Toggle selection for this message
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(messageId)) {
+      newSelected.delete(messageId)
     } else {
-      // Toggle selection for this message
-      handleToggleSelection(messageId)
+      newSelected.add(messageId)
+    }
+    setSelectedItems(newSelected)
+    
+    // If no messages selected, exit selection mode
+    if (newSelected.size === 0) {
+      setSelectionMode(false)
     }
     
     // Haptic feedback
@@ -9641,9 +9711,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const deltaY = Math.abs(clientY - swipeStartY)
       const totalMovement = Math.abs(deltaX) + deltaY
       
-      // IMPORTANT: Cancel long press on ANY movement (even 1px)
-      // This ensures selection ONLY happens when finger is completely still
-      if (totalMovement > 0) {
+      // Cancel long press on ANY movement (scrolling or swiping)
+      // This prevents accidental selection mode when scrolling
+      if (totalMovement > 3) {
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current)
           longPressTimer.current = null
@@ -9652,11 +9722,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
-      // This prevents accidental message movement during long-press attempts
       const SWIPE_THRESHOLD = 15
       
-      if (deltaX > SWIPE_THRESHOLD) {
-        // Significant right swipe detected - show visual swipe for reply
+      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
+        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
         setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
       } else {
         // Not enough movement for swipe - keep message in place
@@ -10436,10 +10505,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       }
                     }}
                   >
-                    {/* Selection Checkbox - Always visible on mobile */}
-                    {isMobile && (
+                    {/* Selection Checkbox - Only visible in selection mode */}
+                    {isMobile && selectionMode && (
                       <div 
-                        className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                        className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                         onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
                         onTouchStart={(e) => e.stopPropagation()}
                         onTouchEnd={(e) => {
@@ -10447,7 +10516,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                           handleSelectionCheckboxTap(e, message.id)
                         }}
                       >
-                        {selectionMode && selectedItems.has(message.id) ? (
+                        {selectedItems.has(message.id) ? (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                           </svg>
