@@ -5727,7 +5727,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
-    // VULNERABILITY FIX 1: Ignore multi-finger touches
+    // Ignore multi-finger touches
     if (e.touches.length > 1) {
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
@@ -5737,71 +5737,42 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       return
     }
     
-    // VULNERABILITY FIX 2: Check if touch is on any interactive/excluded element
-    const target = e.target
-    const isExcludedElement = 
-      // Reply elements
-      target.closest('.message-reply-info') || 
-      target.closest('.message-reply-content') ||
-      target.closest('.reply-preview') ||
-      // Avatar and sender info
-      target.closest('.message-sender-avatar') ||
-      target.closest('.message-sender-info') ||
-      target.closest('.message-sender') ||
-      // Footer elements (timestamp, status)
-      target.closest('.message-footer') ||
-      target.closest('.message-time') ||
-      target.closest('.message-status') ||
-      // Interactive elements
-      target.closest('button') ||
-      target.closest('a') ||
-      target.closest('input') ||
-      target.closest('.emoji-picker') ||
-      target.closest('.action-menu') ||
-      target.closest('.quick-emojis') ||
-      // Class checks
-      target.classList.contains('message-reply-info') ||
-      target.classList.contains('message-reply-text') ||
-      target.classList.contains('message-reply-name') ||
-      target.classList.contains('message-sender-avatar') ||
-      target.classList.contains('message-sender') ||
-      target.classList.contains('message-time') ||
-      target.classList.contains('message-status')
-    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
-    // Store swipe start position and track which message is being swiped
+    // Store swipe start position for swipe-to-reply
     setSwipeStartX(clientX)
     setSwipeStartY(clientY)
     setSwipeOffset(0)
-    setSwipedMessageId(message.id) // Track which message is being swiped
+    setSwipedMessageId(message.id)
     
-    // Don't start long-press timer if touching excluded elements
-    if (isExcludedElement) {
+    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
+    const target = e.target
+    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
+    
+    // Don't start timer if not touching message text
+    if (!isMessageText) {
       longPressActivated.current = false
       return
     }
     
-    // Start long-press timer (1 second for mobile)
-    longPressActivated.current = false // Reset flag
+    // Start long-press timer (1 second)
+    longPressActivated.current = false
     longPressTimer.current = setTimeout(() => {
       if (isMobile) {
-        // On mobile, automatically enter selection mode after 1 second long press
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true // Mark that long-press activated selection mode
+        longPressActivated.current = true
       
-        // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
       }
-    }, 1000) // 1 second for mobile long-press
+    }, 1000)
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -6661,15 +6632,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onTouchMove={handleMessageTouchMove}
                   >
                     {!message.isOwn && (
-                      <div 
-                        className="message-sender-info"
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                      >
+                      <div className="message-sender-info">
                         <div 
                           className="message-sender-avatar"
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchEnd={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation()
                             e.preventDefault()
@@ -6798,11 +6763,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         return null
                       })()}
                       <p>{message.text}</p>
-                      <div 
-                        className="message-footer"
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                      >
+                      <div className="message-footer">
                         <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
@@ -7606,7 +7567,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
-    // VULNERABILITY FIX 1: Ignore multi-finger touches
+    // Ignore multi-finger touches
     if (e.touches.length > 1) {
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
@@ -7616,71 +7577,42 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       return
     }
     
-    // VULNERABILITY FIX 2: Check if touch is on any interactive/excluded element
-    const target = e.target
-    const isExcludedElement = 
-      // Reply elements
-      target.closest('.message-reply-info') || 
-      target.closest('.message-reply-content') ||
-      target.closest('.reply-preview') ||
-      // Avatar and sender info
-      target.closest('.message-sender-avatar') ||
-      target.closest('.message-sender-info') ||
-      target.closest('.message-sender') ||
-      // Footer elements (timestamp, status)
-      target.closest('.message-footer') ||
-      target.closest('.message-time') ||
-      target.closest('.message-status') ||
-      // Interactive elements
-      target.closest('button') ||
-      target.closest('a') ||
-      target.closest('input') ||
-      target.closest('.emoji-picker') ||
-      target.closest('.action-menu') ||
-      target.closest('.quick-emojis') ||
-      // Class checks
-      target.classList.contains('message-reply-info') ||
-      target.classList.contains('message-reply-text') ||
-      target.classList.contains('message-reply-name') ||
-      target.classList.contains('message-sender-avatar') ||
-      target.classList.contains('message-sender') ||
-      target.classList.contains('message-time') ||
-      target.classList.contains('message-status')
-    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
-    // Store swipe start position and track which message is being swiped
+    // Store swipe start position for swipe-to-reply
     setSwipeStartX(clientX)
     setSwipeStartY(clientY)
     setSwipeOffset(0)
-    setSwipedMessageId(message.id) // Track which message is being swiped
+    setSwipedMessageId(message.id)
     
-    // Don't start long-press timer if touching excluded elements
-    if (isExcludedElement) {
+    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
+    const target = e.target
+    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
+    
+    // Don't start timer if not touching message text
+    if (!isMessageText) {
       longPressActivated.current = false
       return
     }
     
-    // Start long-press timer (1 second for mobile)
-    longPressActivated.current = false // Reset flag
+    // Start long-press timer (1 second)
+    longPressActivated.current = false
     longPressTimer.current = setTimeout(() => {
       if (isMobile) {
-        // On mobile, automatically enter selection mode after 1 second long press
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true // Mark that long-press activated selection mode
+        longPressActivated.current = true
       
-        // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
       }
-    }, 1000) // 1 second for mobile long-press
+    }, 1000)
   }
 
   // Handle touch end on message (mobile)
@@ -8392,16 +8324,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onTouchMove={handleMessageTouchMove}
               >
                 {!message.isOwn && (
-                  <div 
-                    className="message-sender-info"
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
-                  >
-                    <div 
-                      className="message-sender-avatar"
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => e.stopPropagation()}
-                    >
+                  <div className="message-sender-info">
+                    <div className="message-sender-avatar">
                       <img 
                         src={senderAvatar}
                         alt={message.sender}
@@ -8411,11 +8335,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                       />
                     </div>
                     {showSender && (
-                      <div 
-                        className="message-sender"
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                      >
+                      <div className="message-sender">
                         {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
                       </div>
                     )}
@@ -8445,11 +8365,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     return null
                   })()}
                   <p>{message.text}</p>
-                  <div 
-                    className="message-footer"
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
-                  >
+                  <div className="message-footer">
                     <span className="message-time">
                       {new Date(message.timestamp).toLocaleTimeString('en-US', { 
                         hour: 'numeric', 
@@ -9641,7 +9557,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
-    // VULNERABILITY FIX 1: Ignore multi-finger touches
+    // Ignore multi-finger touches
     if (e.touches.length > 1) {
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
@@ -9651,71 +9567,42 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       return
     }
     
-    // VULNERABILITY FIX 2: Check if touch is on any interactive/excluded element
-    const target = e.target
-    const isExcludedElement = 
-      // Reply elements
-      target.closest('.message-reply-info') || 
-      target.closest('.message-reply-content') ||
-      target.closest('.reply-preview') ||
-      // Avatar and sender info
-      target.closest('.message-sender-avatar') ||
-      target.closest('.message-sender-info') ||
-      target.closest('.message-sender') ||
-      // Footer elements (timestamp, status)
-      target.closest('.message-footer') ||
-      target.closest('.message-time') ||
-      target.closest('.message-status') ||
-      // Interactive elements
-      target.closest('button') ||
-      target.closest('a') ||
-      target.closest('input') ||
-      target.closest('.emoji-picker') ||
-      target.closest('.action-menu') ||
-      target.closest('.quick-emojis') ||
-      // Class checks
-      target.classList.contains('message-reply-info') ||
-      target.classList.contains('message-reply-text') ||
-      target.classList.contains('message-reply-name') ||
-      target.classList.contains('message-sender-avatar') ||
-      target.classList.contains('message-sender') ||
-      target.classList.contains('message-time') ||
-      target.classList.contains('message-status')
-    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
-    // Store swipe start position and track which message is being swiped
+    // Store swipe start position for swipe-to-reply
     setSwipeStartX(clientX)
     setSwipeStartY(clientY)
     setSwipeOffset(0)
-    setSwipedMessageId(message.id) // Track which message is being swiped
+    setSwipedMessageId(message.id)
     
-    // Don't start long-press timer if touching excluded elements
-    if (isExcludedElement) {
+    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
+    const target = e.target
+    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
+    
+    // Don't start timer if not touching message text
+    if (!isMessageText) {
       longPressActivated.current = false
       return
     }
     
-    // Start long-press timer (1 second for mobile)
-    longPressActivated.current = false // Reset flag
+    // Start long-press timer (1 second)
+    longPressActivated.current = false
     longPressTimer.current = setTimeout(() => {
       if (isMobile) {
-        // On mobile, automatically enter selection mode after 1 second long press
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true // Mark that long-press activated selection mode
+        longPressActivated.current = true
       
-        // Add haptic feedback if available (mobile)
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
       }
-    }, 1000) // 1 second for mobile long-press
+    }, 1000)
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -10743,11 +10630,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         return null
                       })()}
                       <p>{message.text}</p>
-                      <div 
-                        className="message-footer"
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                      >
+                      <div className="message-footer">
                         <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
