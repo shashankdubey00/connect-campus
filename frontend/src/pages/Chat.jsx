@@ -5794,98 +5794,42 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchEnd = (e) => {
-    // Check if long-press successfully activated selection mode
-    const wasLongPressActivated = longPressActivated.current
-    
+    // Clear long-press timer
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
     
-    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
-    let message = null
-    if (swipedMessageId) {
-      message = messages.find(m => m.id === swipedMessageId)
-    }
-    
-    // Fallback: try to get from DOM if swipedMessageId is not available
-    if (!message) {
-      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
-      if (messageElement) {
-        const messageId = messageElement.dataset.messageId
-        message = messages.find(m => m.id === messageId)
-      }
-    }
-    
-    // If long-press already activated selection mode, handle it first
-    if (wasLongPressActivated) {
-      // Selection mode was already activated by long-press, just reset and return
-      // The selection mode is already active, so user can now tap other messages
+    // If long-press activated, just reset and return (selection already done)
+    if (longPressActivated.current) {
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
+      longPressActivated.current = false
       return
     }
     
-    if (!message) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
-    }
-    
-    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
-    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
-      handleToggleSelection(message.id)
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
-    }
-    
-    // Check if swipe was significant enough for reply (mobile only)
-    // Swipe RIGHT to reply (opposite of WhatsApp)
-    // swipeOffset > 0 means right swipe
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
-      // Swipe right detected - reply to message
-          setReplyingTo(message)
+    // Check for swipe-to-reply (only when NOT in selection mode)
+    if (!selectionMode && swipeStartX !== null && swipeOffset > 50 && isMobile) {
+      const message = messages.find(m => m.id === swipedMessageId)
+      if (message) {
+        setReplyingTo(message)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-          setSelectedMessage(null)
-      // Add haptic feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(50)
-      }
-      // Scroll to input area to show reply preview
-      setTimeout(() => {
-        const inputArea = document.querySelector('.chat-input-area')
-        if (inputArea) {
-          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        setSelectedMessage(null)
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
         }
-      }, 100)
-      
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      return
+      }
     }
     
-    // Reset swipe
+    // Reset all touch state
     setSwipeStartX(null)
     setSwipeStartY(null)
     setSwipeOffset(0)
-    setSwipedMessageId(null) // Reset swiped message
-    longPressActivated.current = false // Reset flag
+    setSwipedMessageId(null)
+    longPressActivated.current = false
   }
 
   const handleMessageTouchMove = (e) => {
