@@ -5727,6 +5727,15 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
+    // Check if touch is on a reply/quote element - don't trigger selection for those
+    const target = e.target
+    const isReplyElement = target.closest('.message-reply-info') || 
+                           target.closest('.message-reply-content') ||
+                           target.closest('.reply-preview') ||
+                           target.classList.contains('message-reply-info') ||
+                           target.classList.contains('message-reply-text') ||
+                           target.classList.contains('message-reply-name')
+    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
@@ -5735,6 +5744,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
+    
+    // Don't start long-press timer if touching reply elements
+    if (isReplyElement) {
+      longPressActivated.current = false
+      return
+    }
     
     // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
@@ -7544,6 +7559,15 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
+    // Check if touch is on a reply/quote element - don't trigger selection for those
+    const target = e.target
+    const isReplyElement = target.closest('.message-reply-info') || 
+                           target.closest('.message-reply-content') ||
+                           target.closest('.reply-preview') ||
+                           target.classList.contains('message-reply-info') ||
+                           target.classList.contains('message-reply-text') ||
+                           target.classList.contains('message-reply-name')
+    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
@@ -7552,6 +7576,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
+    
+    // Don't start long-press timer if touching reply elements
+    if (isReplyElement) {
+      longPressActivated.current = false
+      return
+    }
     
     // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
@@ -9509,6 +9539,15 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const touch = e.touches ? e.touches[0] : null
     if (!touch) return
     
+    // Check if touch is on a reply/quote element - don't trigger selection for those
+    const target = e.target
+    const isReplyElement = target.closest('.message-reply-info') || 
+                           target.closest('.message-reply-content') ||
+                           target.closest('.reply-preview') ||
+                           target.classList.contains('message-reply-info') ||
+                           target.classList.contains('message-reply-text') ||
+                           target.classList.contains('message-reply-name')
+    
     const clientX = touch.clientX
     const clientY = touch.clientY
     
@@ -9517,6 +9556,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id) // Track which message is being swiped
+    
+    // Don't start long-press timer if touching reply elements
+    if (isReplyElement) {
+      longPressActivated.current = false
+      return
+    }
     
     // Start long-press timer (0.3 second for mobile)
     longPressActivated.current = false // Reset flag
