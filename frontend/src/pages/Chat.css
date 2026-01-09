@@ -5719,7 +5719,57 @@
   transition: transform 0.2s ease, margin 0.2s ease;
 }
 
-/* Selection indicator removed - using background highlight only */
+/* Selection Checkbox Styles */
+.message-selection-checkbox {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.message-selection-checkbox .checkbox-circle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.message-selection-checkbox:hover .checkbox-circle {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.message-selection-checkbox.selected {
+  background: #00a884;
+  border-radius: 50%;
+}
+
+.message-selection-checkbox.selected svg {
+  color: white;
+}
+
+/* Adjust message content to make room for checkbox on mobile */
+@media (max-width: 768px) {
+  .message {
+    padding-left: 36px !important;
+  }
+  
+  .message.own-message {
+    padding-left: 36px !important;
+  }
+}
+
+/* Selection indicator removed - using checkbox instead */
 
 .message.selection-mode .message-sender-info {
   pointer-events: auto; /* Keep avatar clickable */

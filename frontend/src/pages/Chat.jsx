@@ -5729,10 +5729,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
       longPressActivated.current = false
       return
     }
@@ -5745,34 +5741,31 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
+    longPressActivated.current = false
+  }
+  
+  // Handle selection checkbox tap
+  const handleSelectionCheckboxTap = (e, messageId) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
-    const target = e.target
-    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
-    
-    // Don't start timer if not touching message text
-    if (!isMessageText) {
-      longPressActivated.current = false
-      return
+    if (!selectionMode) {
+      // Enter selection mode and select this message
+      setSelectionMode(true)
+      setSelectedItems(new Set([messageId]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+    } else {
+      // Toggle selection for this message
+      handleToggleSelection(messageId)
     }
     
-    // Start long-press timer (1 second)
-    longPressActivated.current = false
-    longPressTimer.current = setTimeout(() => {
-      if (isMobile) {
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        longPressActivated.current = true
-      
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
-      }
-    }, 2000)
+    // Haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -6586,6 +6579,26 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onTouchEnd={handleMessageTouchEnd}
                     onTouchMove={handleMessageTouchMove}
                   >
+                    {/* Selection Checkbox - Always visible on mobile */}
+                    {isMobile && (
+                      <div 
+                        className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                        onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation()
+                          handleSelectionCheckboxTap(e, message.id)
+                        }}
+                      >
+                        {selectionMode && selectedItems.has(message.id) ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                          </svg>
+                        ) : (
+                          <div className="checkbox-circle"></div>
+                        )}
+                      </div>
+                    )}
                     {!message.isOwn && (
                       <div className="message-sender-info">
                         <div 
@@ -7524,10 +7537,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
       longPressActivated.current = false
       return
     }
@@ -7540,34 +7549,31 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
+    longPressActivated.current = false
+  }
+  
+  // Handle selection checkbox tap
+  const handleSelectionCheckboxTap = (e, messageId) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
-    const target = e.target
-    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
-    
-    // Don't start timer if not touching message text
-    if (!isMessageText) {
-      longPressActivated.current = false
-      return
+    if (!selectionMode) {
+      // Enter selection mode and select this message
+      setSelectionMode(true)
+      setSelectedItems(new Set([messageId]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+    } else {
+      // Toggle selection for this message
+      handleToggleSelection(messageId)
     }
     
-    // Start long-press timer (1 second)
-    longPressActivated.current = false
-    longPressTimer.current = setTimeout(() => {
-      if (isMobile) {
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        longPressActivated.current = true
-      
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
-      }
-    }, 2000)
+    // Haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
   }
 
   // Handle touch end on message (mobile)
@@ -8233,6 +8239,26 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onTouchEnd={handleMessageTouchEnd}
                 onTouchMove={handleMessageTouchMove}
               >
+                {/* Selection Checkbox - Always visible on mobile */}
+                {isMobile && (
+                  <div 
+                    className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                    onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation()
+                      handleSelectionCheckboxTap(e, message.id)
+                    }}
+                  >
+                    {selectionMode && selectedItems.has(message.id) ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                      </svg>
+                    ) : (
+                      <div className="checkbox-circle"></div>
+                    )}
+                  </div>
+                )}
                 {!message.isOwn && (
                   <div className="message-sender-info">
                     <div className="message-sender-avatar">
@@ -9469,10 +9495,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     
     // Ignore multi-finger touches
     if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
       longPressActivated.current = false
       return
     }
@@ -9485,34 +9507,31 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     setSwipeStartY(clientY)
     setSwipeOffset(0)
     setSwipedMessageId(message.id)
+    longPressActivated.current = false
+  }
+  
+  // Handle selection checkbox tap
+  const handleSelectionCheckboxTap = (e, messageId) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    // SIMPLE CHECK: Only trigger selection if touching message text (<p> tag)
-    const target = e.target
-    const isMessageText = target.tagName === 'P' || target.closest('.message-content > p')
-    
-    // Don't start timer if not touching message text
-    if (!isMessageText) {
-      longPressActivated.current = false
-      return
+    if (!selectionMode) {
+      // Enter selection mode and select this message
+      setSelectionMode(true)
+      setSelectedItems(new Set([messageId]))
+      setShowMessageHeader(false)
+      setSelectedMessage(null)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+    } else {
+      // Toggle selection for this message
+      handleToggleSelection(messageId)
     }
     
-    // Start long-press timer (1 second)
-    longPressActivated.current = false
-    longPressTimer.current = setTimeout(() => {
-      if (isMobile) {
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        longPressActivated.current = true
-      
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
-      }
-    }, 2000)
+    // Haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -10417,6 +10436,26 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       }
                     }}
                   >
+                    {/* Selection Checkbox - Always visible on mobile */}
+                    {isMobile && (
+                      <div 
+                        className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                        onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation()
+                          handleSelectionCheckboxTap(e, message.id)
+                        }}
+                      >
+                        {selectionMode && selectedItems.has(message.id) ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                          </svg>
+                        ) : (
+                          <div className="checkbox-circle"></div>
+                        )}
+                      </div>
+                    )}
                     {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                     <div 
