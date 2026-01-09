@@ -5772,7 +5772,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           navigator.vibrate(50)
         }
       }
-    }, 1000)
+    }, 2000)
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -7612,7 +7612,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           navigator.vibrate(50)
         }
       }
-    }, 1000)
+    }, 2000)
   }
 
   // Handle touch end on message (mobile)
@@ -8813,7 +8813,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     if (!alreadyRead) {
                       markDirectMessageRead(msg.id)
                     }
-                  }, 1000) // 1 second delay to ensure delivered status is processed first
+                  }, 2000) // 1 second delay to ensure delivered status is processed first
                 }
               } else {
                 // Already delivered, just mark as read
@@ -9602,7 +9602,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           navigator.vibrate(50)
         }
       }
-    }, 1000)
+    }, 2000)
   }
 
   const handleMessageTouchEnd = (e) => {
