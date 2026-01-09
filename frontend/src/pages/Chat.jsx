@@ -5769,7 +5769,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         navigator.vibrate(50)
       }
       }
-    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
+    }, 1000) // 1 second for mobile long-press
   }
 
   const handleMessageTouchEnd = (e) => {
@@ -7606,7 +7606,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         navigator.vibrate(50)
       }
       }
-    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
+    }, 1000) // 1 second for mobile long-press
   }
 
   // Handle touch end on message (mobile)
@@ -9591,7 +9591,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         navigator.vibrate(50)
       }
       }
-    }, 300) // 0.3 second for mobile long-press (WhatsApp-like)
+    }, 1000) // 1 second for mobile long-press
   }
 
   const handleMessageTouchEnd = (e) => {
