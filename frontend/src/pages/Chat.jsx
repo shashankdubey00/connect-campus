@@ -5862,52 +5862,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       return
     }
     
-    // Double-tap detection for mobile (similar to desktop double-click)
-    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
-      const currentTime = Date.now()
-      const timeDiff = currentTime - lastClickTime.current
-      
-      // Check if this is a double-tap (within 300ms and same message)
-      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        lastClickTime.current = 0
-        lastClickedMessage.current = null
-        
-        // Add haptic feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-    }
-    
-    // Reset swipe
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-        setSwipedMessageId(null)
-        return
-      } else {
-        // Single tap - store for potential double-tap
-        lastClickTime.current = currentTime
-        lastClickedMessage.current = message
-        
-        // Clear timer if exists
-        if (doubleClickTimer.current) {
-          clearTimeout(doubleClickTimer.current)
-        }
-        
-        // If no double-tap within 300ms, clear selection
-        doubleClickTimer.current = setTimeout(() => {
-          lastClickTime.current = 0
-          lastClickedMessage.current = null
-        }, 300)
-      }
-    }
-    
     // Reset swipe
     setSwipeStartX(null)
     setSwipeStartY(null)
@@ -7724,52 +7678,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       setSwipeOffset(0)
       setSwipedMessageId(null)
       return
-    }
-    
-    // Double-tap detection for mobile (similar to desktop double-click)
-    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
-      const currentTime = Date.now()
-      const timeDiff = currentTime - lastClickTime.current
-      
-      // Check if this is a double-tap (within 300ms and same message)
-      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        lastClickTime.current = 0
-        lastClickedMessage.current = null
-        
-        // Add haptic feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-    }
-    
-    // Reset swipe
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-        setSwipedMessageId(null)
-        return
-      } else {
-        // Single tap - store for potential double-tap
-        lastClickTime.current = currentTime
-        lastClickedMessage.current = message
-        
-        // Clear timer if exists
-        if (doubleClickTimer.current) {
-          clearTimeout(doubleClickTimer.current)
-        }
-        
-        // If no double-tap within 300ms, clear selection
-        doubleClickTimer.current = setTimeout(() => {
-          lastClickTime.current = 0
-          lastClickedMessage.current = null
-        }, 300)
-      }
     }
     
     // Reset swipe
@@ -9692,52 +9600,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipeOffset(0)
       setSwipedMessageId(null)
       return
-    }
-    
-    // Double-tap detection for mobile (similar to desktop double-click)
-    if (isMobile && Math.abs(swipeOffset) <= 10) { // Only if no significant swipe
-      const currentTime = Date.now()
-      const timeDiff = currentTime - lastClickTime.current
-      
-      // Check if this is a double-tap (within 300ms and same message)
-      if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
-        // Double-tap detected - automatically enter selection mode (WhatsApp-like)
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        lastClickTime.current = 0
-        lastClickedMessage.current = null
-        
-        // Add haptic feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-    }
-    
-    // Reset swipe
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-        setSwipedMessageId(null)
-        return
-      } else {
-        // Single tap - store for potential double-tap
-        lastClickTime.current = currentTime
-        lastClickedMessage.current = message
-        
-        // Clear timer if exists
-        if (doubleClickTimer.current) {
-          clearTimeout(doubleClickTimer.current)
-        }
-        
-        // If no double-tap within 300ms, clear selection
-        doubleClickTimer.current = setTimeout(() => {
-          lastClickTime.current = 0
-          lastClickedMessage.current = null
-        }, 300)
-      }
     }
     
     // Reset swipe
