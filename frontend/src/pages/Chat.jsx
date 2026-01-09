@@ -6741,7 +6741,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         
                         if (repliedMessage) {
                           return (
-                            <div className="message-reply-info">
+                            <div 
+                              className="message-reply-info"
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchEnd={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <div className="message-reply-line"></div>
                               <div className="message-reply-content">
                                 <span className="message-reply-name">
@@ -8333,7 +8338,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     const repliedMsg = messages.find(m => m.id === message.replyTo)
                     if (repliedMsg) {
                       return (
-                        <div className="message-reply-info">
+                        <div 
+                          className="message-reply-info"
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <div className="message-reply-line"></div>
                           <div className="message-reply-content">
                             <span className="message-reply-name">
@@ -10590,7 +10600,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         
                         if (repliedMessage) {
                           return (
-                            <div className="message-reply-info">
+                            <div 
+                              className="message-reply-info"
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchEnd={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <div className="message-reply-line"></div>
                               <div className="message-reply-content">
                                 <span className="message-reply-name">
