@@ -296,10 +296,13 @@ const Chat = () => {
   }, [user, isLoading, location.key, location.pathname]) // Include location.key to detect navigation changes
 
 
+  // API Base URL for college endpoints
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
   // Fetch states
   const fetchStates = async () => {
     try {
-      const response = await fetch('/api/colleges/states')
+      const response = await fetch(`${API_BASE_URL}/api/colleges/states`)
       const data = await response.json()
       if (data.success) {
         setStates(data.states)
@@ -312,7 +315,7 @@ const Chat = () => {
   // Fetch districts
   const fetchDistricts = async (state) => {
     try {
-      const response = await fetch(`/api/colleges/districts?state=${encodeURIComponent(state)}`)
+      const response = await fetch(`${API_BASE_URL}/api/colleges/districts?state=${encodeURIComponent(state)}`)
       const data = await response.json()
       if (data.success) {
         setDistricts(data.districts)
@@ -336,7 +339,7 @@ const Chat = () => {
         params.append('district', selectedDistrict)
       }
 
-      const response = await fetch(`/api/colleges/search?${params}`)
+      const response = await fetch(`${API_BASE_URL}/api/colleges/search?${params}`)
       const data = await response.json()
       
       if (data.success) {
