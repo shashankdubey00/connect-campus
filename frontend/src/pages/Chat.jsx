@@ -5738,8 +5738,28 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         longPressTimer.current = null
       }
       longPressActivated.current = false
+      touchJustHappened.current = false
       return
     }
+    
+    // Check if touch target is a reply/quote element or checkbox - don't start long-press
+    const target = e.target
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox')) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+      return
+    }
+    
+    // Mark that touch just happened to prevent click synthesis (immediately)
+    touchJustHappened.current = true
+    // Clear after longer delay to ensure click is prevented
+    setTimeout(() => {
+      touchJustHappened.current = false
+    }, 500) // Extended to 500ms to fully prevent click synthesis
     
     const clientX = touch.clientX
     const clientY = touch.clientY
@@ -9523,8 +9543,28 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         longPressTimer.current = null
       }
       longPressActivated.current = false
+      touchJustHappened.current = false
       return
     }
+    
+    // Check if touch target is a reply/quote element or checkbox - don't start long-press
+    const target = e.target
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox')) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+      return
+    }
+    
+    // Mark that touch just happened to prevent click synthesis (immediately)
+    touchJustHappened.current = true
+    // Clear after longer delay to ensure click is prevented
+    setTimeout(() => {
+      touchJustHappened.current = false
+    }, 500) // Extended to 500ms to fully prevent click synthesis
     
     const clientX = touch.clientX
     const clientY = touch.clientY
