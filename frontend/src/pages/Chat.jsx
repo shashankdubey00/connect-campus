@@ -4649,6 +4649,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
   const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
+  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
   const actionMenuRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const quickEmojiRef = useRef(null)
@@ -5805,6 +5806,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // If long-press activated, just reset and return (selection already done)
     if (longPressActivated.current) {
+      // Prevent any click events from firing after long-press
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
@@ -5815,6 +5822,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     
     // Check for swipe-to-reply (only when NOT in selection mode)
     if (!selectionMode && swipeStartX !== null && swipeOffset > 50 && isMobile) {
+      // Prevent click synthesis after swipe
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
       const message = messages.find(m => m.id === swipedMessageId)
       if (message) {
         setReplyingTo(message)
@@ -6537,9 +6550,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => {
-                      // On mobile, don't handle clicks - use touch events only
+                      // On mobile, prevent click if touch just happened or if in selection mode
                       if (isMobile) {
+                        if (touchJustHappened.current || longPressActivated.current) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          return
+                        }
+                        // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
                         e.preventDefault()
+                        e.stopPropagation()
                         return
                       }
                       handleMessageClick(e, message)
@@ -7132,6 +7152,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   const lastClickedMessage = useRef(null)
   const longPressTimer = useRef(null)
   const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
+  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
   const socket = getSocket()
   const groupId = group?.id || chat?.groupId || group?._id || chat?.groupId
 
@@ -7515,8 +7536,25 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         longPressTimer.current = null
       }
       longPressActivated.current = false
+      touchJustHappened.current = false
       return
     }
+    
+    // Check if touch target is a reply/quote element - don't start long-press
+    const target = e.target
+    if (target.closest('.message-reply-info') || target.closest('.message-reply')) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+      return
+    }
+    
+    // Mark that touch just happened to prevent click synthesis
+    touchJustHappened.current = true
+    setTimeout(() => {
+      touchJustHappened.current = false
+    }, 300) // Clear after 300ms to allow clicks on desktop
     
     const clientX = touch.clientX
     const clientY = touch.clientY
@@ -7603,35 +7641,19 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     if (wasLongPressActivated) {
       // Selection mode was already activated by long-press, just reset and return
       // The selection mode is already active, so user can now tap other messages
+      // Prevent any click events from firing after long-press
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
       e.preventDefault()
       e.stopPropagation()
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
-      
-      // Prevent click event from firing after touch (mobile browsers fire click after touch)
-      // Use a small timeout to prevent the click event
-      const preventClick = (clickEvent) => {
-        clickEvent.preventDefault()
-        clickEvent.stopPropagation()
-        clickEvent.stopImmediatePropagation()
-        return false
-      }
-      const messageElement = e.currentTarget || e.target.closest('.message')
-      if (messageElement) {
-        // Add listener with capture phase to catch it early
-        messageElement.addEventListener('click', preventClick, { once: true, capture: true, passive: false })
-        // Also add to document to catch any bubbling clicks
-        document.addEventListener('click', preventClick, { once: true, capture: true, passive: false })
-        // Clean up after a short delay
-        setTimeout(() => {
-          messageElement.removeEventListener('click', preventClick, { capture: true })
-          document.removeEventListener('click', preventClick, { capture: true })
-        }, 500)
-      }
-      
-      longPressActivated.current = false // Reset flag
+      longPressActivated.current = false
       return
     }
     
@@ -7641,26 +7663,20 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
-    }
-    
-    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
-    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
-      handleToggleSelection(message.id)
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
+      longPressActivated.current = false
       return
     }
     
     // Check if swipe was significant enough for reply (mobile only)
     // Swipe RIGHT to reply (opposite of WhatsApp)
     // swipeOffset > 0 means right swipe
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
+    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0 && !selectionMode) {
+      // Prevent click synthesis after swipe
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
       // Swipe right detected - reply to message
       setReplyingTo(message)
       setSelectedMessage(null)
@@ -7713,6 +7729,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           longPressTimer.current = null
           longPressActivated.current = false
         }
+        // Reset touch flag on movement to allow normal scrolling behavior
+        touchJustHappened.current = false
       }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
@@ -8223,8 +8241,14 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                   transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
                 }}
                 onClick={(e) => {
-                  // Prevent click if we just had a long-press (mobile)
-                  if (isMobile && longPressActivated.current) {
+                  // On mobile, prevent click if touch just happened or if in selection mode
+                  if (isMobile) {
+                    if (touchJustHappened.current || longPressActivated.current) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                    // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
                     e.preventDefault()
                     e.stopPropagation()
                     return
@@ -8240,9 +8264,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 {isMobile && (
                   <div 
                     className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
-                    onClick={(e) => handleSelectionCheckboxTap(e, message.id)}
-                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
                     onTouchEnd={(e) => {
+                      e.preventDefault()
                       e.stopPropagation()
                       handleSelectionCheckboxTap(e, message.id)
                     }}
@@ -8516,6 +8543,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const typingTimeoutRef = useRef(null) // Store typing timeout
   const longPressTimer = useRef(null)
   const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
+  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
   const actionMenuRef = useRef(null)
   const quickEmojiRef = useRef(null)
   const doubleClickTimer = useRef(null)
@@ -9584,11 +9612,17 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     if (wasLongPressActivated) {
       // Selection mode was already activated by long-press, just reset and return
       // The selection mode is already active, so user can now tap other messages
+      // Prevent any click events from firing after long-press
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
       setSwipeStartX(null)
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
+      longPressActivated.current = false
       return
     }
     
@@ -9598,42 +9632,25 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipeStartY(null)
       setSwipeOffset(0)
       setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
+      longPressActivated.current = false
       return
     }
     
-    // If in selection mode (entered via long-press or double-tap), toggle selection (WhatsApp-like)
-    if (selectionMode && isMobile && Math.abs(swipeOffset) <= 10) {
-      handleToggleSelection(message.id)
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false // Reset flag
-      return
-    }
-    
-    // Check if swipe was significant enough for reply (mobile only)
-    // Swipe RIGHT to reply (opposite of WhatsApp)
-    // swipeOffset > 0 means right swipe
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0) {
-      // Swipe right detected - reply to message
-          setReplyingTo(message)
-          setShowQuickEmojis(false)
-          setShowActionMenu(false)
-          setSelectedMessage(null)
-      // Add haptic feedback
+    // Check for swipe-to-reply (only when NOT in selection mode)
+    if (!selectionMode && swipeStartX !== null && swipeOffset > 50 && isMobile) {
+      // Prevent click synthesis after swipe
+      touchJustHappened.current = true
+      setTimeout(() => {
+        touchJustHappened.current = false
+      }, 300)
+      
+      setReplyingTo(message)
+      setShowQuickEmojis(false)
+      setShowActionMenu(false)
+      setSelectedMessage(null)
       if (navigator.vibrate) {
         navigator.vibrate(50)
       }
-      // Scroll to input area to show reply preview
-      setTimeout(() => {
-        const inputArea = document.querySelector('.chat-input-area')
-        if (inputArea) {
-          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-        }
-      }, 100)
       
       // Reset swipe
       setSwipeStartX(null)
@@ -9642,6 +9659,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSwipedMessageId(null)
       return
     }
+    
+    // REMOVED: Single tap should NOT select in selection mode
+    // Only checkbox tap should select messages
     
     // Reset swipe
     setSwipeStartX(null)
@@ -9671,6 +9691,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           longPressTimer.current = null
           longPressActivated.current = false
         }
+        // Reset touch flag on movement to allow normal scrolling behavior
+        touchJustHappened.current = false
       }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
@@ -10446,7 +10468,21 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     style={{ position: 'relative' }}
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
-                    onClick={(e) => handleMessageClick(e, message)}
+                    onClick={(e) => {
+                      // On mobile, prevent click if touch just happened or if in selection mode
+                      if (isMobile) {
+                        if (touchJustHappened.current || longPressActivated.current) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          return
+                        }
+                        // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
+                        e.preventDefault()
+                        e.stopPropagation()
+                        return
+                      }
+                      handleMessageClick(e, message)
+                    }}
                     onTouchStart={(e) => handleMessageTouchStart(e, message)}
                     onTouchEnd={handleMessageTouchEnd}
                     onTouchMove={handleMessageTouchMove}
