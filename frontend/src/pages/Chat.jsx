@@ -6550,17 +6550,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => {
-                      // On mobile, prevent click if touch just happened or if in selection mode
+                      // On mobile, completely block all click events - use touch events only
                       if (isMobile) {
-                        if (touchJustHappened.current || longPressActivated.current) {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          return
-                        }
-                        // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
                         e.preventDefault()
                         e.stopPropagation()
-                        return
+                        e.stopImmediatePropagation()
+                        return false
                       }
                       handleMessageClick(e, message)
                     }}
@@ -7540,9 +7535,11 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       return
     }
     
-    // Check if touch target is a reply/quote element - don't start long-press
+    // Check if touch target is a reply/quote element or checkbox - don't start long-press
     const target = e.target
-    if (target.closest('.message-reply-info') || target.closest('.message-reply')) {
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox')) {
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
         longPressTimer.current = null
@@ -7550,11 +7547,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       return
     }
     
-    // Mark that touch just happened to prevent click synthesis
+    // Mark that touch just happened to prevent click synthesis (immediately)
     touchJustHappened.current = true
+    // Clear after longer delay to ensure click is prevented
     setTimeout(() => {
       touchJustHappened.current = false
-    }, 300) // Clear after 300ms to allow clicks on desktop
+    }, 500) // Extended to 500ms to fully prevent click synthesis
     
     const clientX = touch.clientX
     const clientY = touch.clientY
@@ -10469,17 +10467,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     onMouseEnter={() => !selectionMode && handleMessageHover(message)}
                     onMouseLeave={() => !selectionMode && handleMessageUnhover()}
                     onClick={(e) => {
-                      // On mobile, prevent click if touch just happened or if in selection mode
+                      // On mobile, completely block all click events - use touch events only
                       if (isMobile) {
-                        if (touchJustHappened.current || longPressActivated.current) {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          return
-                        }
-                        // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
                         e.preventDefault()
                         e.stopPropagation()
-                        return
+                        e.stopImmediatePropagation()
+                        return false
                       }
                       handleMessageClick(e, message)
                     }}
