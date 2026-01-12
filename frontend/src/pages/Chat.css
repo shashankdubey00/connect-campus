@@ -2581,7 +2581,10 @@
 
   /* Adjust messages area padding when action header or selection bar is visible */
   .live-chat-view.has-action-header .chat-messages-area {
-    padding-top: 116px; /* 60px (header) + 56px (selection bar). Safe for both action header (48px) and selection bar (56px) */
+    /* Extra-safe padding: in some mobile widths the selection bar can wrap and become taller,
+       which otherwise makes the top message look "hidden" behind the fixed bars. */
+    padding-top: 140px;
+    scroll-padding-top: 140px;
   }
 
   /* NOTE: we avoid relying on :has() here because support can vary; the rule above already reserves enough space. */
