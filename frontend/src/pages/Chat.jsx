@@ -4649,6 +4649,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
   const longPressMessageId = useRef(null) // Track which message is being long-pressed
+  const longPressTriggered = useRef(false) // Prevent tap-toggle immediately after long-press
+  const touchMoved = useRef(false) // Prevent toggle on scroll
   const actionMenuRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const quickEmojiRef = useRef(null)
@@ -5730,12 +5732,17 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
     if (!isMobile || selectionMode) return
+    touchMoved.current = false
+    longPressTriggered.current = false
+    touchMoved.current = false
+    longPressTriggered.current = false
+    touchMoved.current = false
+    longPressTriggered.current = false
     
     // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
-        target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox') ||
+        target.closest('.message-reply') ||
         target.closest('button') ||
         target.closest('a')) {
       return
@@ -5747,6 +5754,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
+        longPressTriggered.current = true
         // Enter selection mode and select this message
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
@@ -5790,16 +5798,31 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   // Cancel long-press on touch end
-  const handleMessageTouchEnd = (e) => {
+  const handleMessageTouchEnd = (e, message) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
     longPressMessageId.current = null
+
+    // WhatsApp-style: in selection mode, tap toggles selection (mobile only)
+    if (isMobile) {
+      if (longPressTriggered.current) {
+        longPressTriggered.current = false
+        return
+      }
+      if (touchMoved.current) return
+      if (selectionMode && message?.id) {
+        e?.preventDefault?.()
+        e?.stopPropagation?.()
+        handleToggleSelection(message.id)
+      }
+    }
   }
 
   // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
+    if (isMobile) touchMoved.current = true
     if (isMobile && longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -6473,33 +6496,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     </div>
                   )}
                   <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
-                    <div className="chat-left-col">
-                      {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                      {isMobile && (
-                        <div 
-                          className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                          onTouchStart={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          onTouchEnd={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            if (selectionMode) {
-                              handleSelectionCheckboxTap(e, message.id)
-                            }
-                          }}
-                        >
-                          {selectedItems.has(message.id) ? (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                            </svg>
-                          ) : (
-                            <div className="checkbox-circle"></div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <div className="chat-left-col" />
                     <div className="chat-main-col">
                       <div 
                         className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
@@ -6519,7 +6516,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         }}
                         onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
                         onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchEnd={(e) => handleMessageTouchEnd(e, message)}
                         onTouchMove={handleMessageTouchMove}
                       >
                         {!message.isOwn && (
@@ -6617,7 +6614,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
                       style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
                       onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                      onTouchEnd={handleMessageTouchEnd}
+                      onTouchEnd={(e) => handleMessageTouchEnd(e, message)}
                       onTouchMove={handleMessageTouchMove}
                       onContextMenu={(e) => {
                         if (isMobile) {
@@ -7466,8 +7463,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
-        target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox') ||
+        target.closest('.message-reply') ||
         target.closest('button') ||
         target.closest('a')) {
       return
@@ -7479,6 +7475,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
+        longPressTriggered.current = true
         // Enter selection mode and select this message
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
@@ -7522,17 +7519,31 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   }
 
   // Cancel long-press on touch end
-  const handleMessageTouchEnd = (e) => {
+  const handleMessageTouchEnd = (e, message) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
     longPressMessageId.current = null
+
+    if (isMobile) {
+      if (longPressTriggered.current) {
+        longPressTriggered.current = false
+        return
+      }
+      if (touchMoved.current) return
+      if (selectionMode && message?.id) {
+        e?.preventDefault?.()
+        e?.stopPropagation?.()
+        handleToggleSelection(message.id)
+      }
+    }
   }
 
   // Handle touch move on message (mobile)
   // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
+    if (isMobile) touchMoved.current = true
     if (isMobile && longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -8026,33 +8037,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
             return (
               <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`} key={message.id}>
-                <div className="chat-left-col">
-                  {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                  {isMobile && (
-                    <div 
-                      className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                      onTouchStart={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        if (selectionMode) {
-                          handleSelectionCheckboxTap(e, message.id)
-                        }
-                      }}
-                    >
-                      {selectedItems.has(message.id) ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                        </svg>
-                      ) : (
-                        <div className="checkbox-circle"></div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <div className="chat-left-col" />
                 <div className="chat-main-col">
                   <div 
                     className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
@@ -8079,7 +8064,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     }}
                     onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
                     onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                    onTouchEnd={handleMessageTouchEnd}
+                    onTouchEnd={(e) => handleMessageTouchEnd(e, message)}
                     onTouchMove={handleMessageTouchMove}
                   >
                     {!message.isOwn && (
@@ -9321,8 +9306,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
-        target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox') ||
+        target.closest('.message-reply') ||
         target.closest('button') ||
         target.closest('a')) {
       return
@@ -9334,6 +9318,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
+        longPressTriggered.current = true
         // Enter selection mode and select this message
         setSelectionMode(true)
         setSelectedItems(new Set([message.id]))
@@ -9377,16 +9362,30 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   // Cancel long-press on touch end
-  const handleMessageTouchEnd = (e) => {
+  const handleMessageTouchEnd = (e, message) => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
     longPressMessageId.current = null
+
+    if (isMobile) {
+      if (longPressTriggered.current) {
+        longPressTriggered.current = false
+        return
+      }
+      if (touchMoved.current) return
+      if (selectionMode && message?.id) {
+        e?.preventDefault?.()
+        e?.stopPropagation?.()
+        handleToggleSelection(message.id)
+      }
+    }
   }
 
   // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
+    if (isMobile) touchMoved.current = true
     if (isMobile && longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
@@ -10154,33 +10153,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                     </div>
                   )}
                   <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
-                    <div className="chat-left-col">
-                      {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                      {isMobile && (
-                        <div 
-                          className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                          onTouchStart={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          onTouchEnd={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            if (selectionMode) {
-                              handleSelectionCheckboxTap(e, message.id)
-                            }
-                          }}
-                        >
-                          {selectedItems.has(message.id) ? (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                            </svg>
-                          ) : (
-                            <div className="checkbox-circle"></div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <div className="chat-left-col" />
                     <div className="chat-main-col">
                       <div 
                         className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
@@ -10199,7 +10172,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                           handleMessageClick(e, message)
                         }}
                         onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchEnd={(e) => handleMessageTouchEnd(e, message)}
                         onTouchMove={handleMessageTouchMove}
                         onContextMenu={(e) => {
                           if (!selectionMode) {
