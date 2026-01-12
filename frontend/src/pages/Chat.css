@@ -5738,10 +5738,11 @@
 
 /* Selection Checkbox Styles */
 .message-selection-checkbox {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  /* Rendered inside `.chat-left-col` (universal grid). Keep it flow-positioned. */
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
   width: 28px;
   height: 28px;
   display: flex;
@@ -5786,65 +5787,32 @@
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  /* NO-REWRITE LAYOUT LOCK (production-safe)
-     Use a stable 2-column grid for every message row:
-     - Col 1: selection tick gutter (always reserved)
-     - Col 2: message content (bubble/sender/reply)
-     This prevents long replied messages from re-wrapping differently when selection UI appears. */
-  .chat-messages-area .message {
+  /* UNIVERSAL ROW WRAPPER (key fix): every row type uses the same 2-col grid */
+  .chat-messages-area .chat-row {
     display: grid;
-    grid-template-columns: 44px 1fr;
-    align-items: start;
+    grid-template-columns: 44px 1fr; /* LOCKED */
+    align-items: flex-start;
     column-gap: 0;
     box-sizing: border-box;
     contain: layout paint;
-  }
-
-  /* Put checkbox in the gutter (col 1). No absolute positioning on mobile to avoid overlap/reflow. */
-  .chat-messages-area .message .message-selection-checkbox {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    align-self: center;
-    justify-self: center;
-  }
-
-  /* Keep sender info + bubble in column 2 */
-  .chat-messages-area .message .message-sender-info,
-  .chat-messages-area .message .message-content-wrap,
-  .chat-messages-area .message .message-content,
-  .chat-messages-area .message .message-swipe-reply-indicator {
-    grid-column: 2;
-  }
-
-  /* Alignment wrapper in col 2 (final-fix): flex controls left/right; bubble never pushes itself */
-  .chat-messages-area .message .message-content-wrap {
-    display: flex;
-    width: 100%;
     min-width: 0;
   }
 
-  .chat-messages-area .message .message-content-wrap.sent {
-    justify-content: flex-end;
+  .chat-messages-area .chat-left-col {
+    width: 44px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
-  .chat-messages-area .message .message-content-wrap.received {
-    justify-content: flex-start;
+  .chat-messages-area .chat-main-col {
+    min-width: 0;
   }
 
-  /* Bubble sizing: capped, but alignment is controlled by the wrapper above */
-  .chat-messages-area .message .message-content {
-    max-width: 75%;
-    width: auto;
-  }
-
-  /* Reply preview should never collapse inside the bubble */
-  .chat-messages-area .message .message-reply-info {
-    width: 100%;
-    box-sizing: border-box;
+  /* Date rows must respect the grid too */
+  .chat-messages-area .chat-row.date-row .chat-main-col {
+    display: flex;
+    justify-content: center;
   }
 }
 

@@ -6463,58 +6463,67 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               return (
                 <Fragment key={message.id}>
                   {showDate && (
-                    <div className="date-separator" key={`date-${message.id}`}>
-                      <span>{message.date}</span>
+                    <div className="chat-row date-row" key={`date-${message.id}`}>
+                      <div className="chat-left-col" />
+                      <div className="chat-main-col">
+                        <div className="date-separator">
+                          <span>{message.date}</span>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div 
-                    className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
-                    data-message-id={message.id}
-                    style={{ position: 'relative' }}
-                    onMouseEnter={() => !selectionMode && handleMessageHover(message)}
-                    onMouseLeave={() => !selectionMode && handleMessageUnhover()}
-                    onClick={(e) => {
-                      // On mobile, completely block all click events - use touch events only
-                      if (isMobile) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        e.stopImmediatePropagation()
-                        return false
-                      }
-                      handleMessageClick(e, message)
-                    }}
-                    onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
-                    onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                    onTouchEnd={handleMessageTouchEnd}
-                    onTouchMove={handleMessageTouchMove}
-                  >
-                    {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                    {isMobile && (
+                  <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
+                    <div className="chat-left-col">
+                      {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                      {isMobile && (
+                        <div 
+                          className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
+                          onTouchStart={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            if (selectionMode) {
+                              handleSelectionCheckboxTap(e, message.id)
+                            }
+                          }}
+                        >
+                          {selectedItems.has(message.id) ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                            </svg>
+                          ) : (
+                            <div className="checkbox-circle"></div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="chat-main-col">
                       <div 
-                        className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                        onTouchStart={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (selectionMode) {
-                            handleSelectionCheckboxTap(e, message.id)
+                        className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                        data-message-id={message.id}
+                        style={{ position: 'relative' }}
+                        onMouseEnter={() => !selectionMode && handleMessageHover(message)}
+                        onMouseLeave={() => !selectionMode && handleMessageUnhover()}
+                        onClick={(e) => {
+                          // On mobile, completely block all click events - use touch events only
+                          if (isMobile) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            e.stopImmediatePropagation()
+                            return false
                           }
+                          handleMessageClick(e, message)
                         }}
+                        onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+                        onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchMove={handleMessageTouchMove}
                       >
-                        {selectedItems.has(message.id) ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                          </svg>
-                        ) : (
-                          <div className="checkbox-circle"></div>
-                        )}
-                      </div>
-                    )}
-                    {!message.isOwn && (
-                      <div className="message-sender-info">
+                        {!message.isOwn && (
+                          <div className="message-sender-info">
                         <div 
                           className="message-sender-avatar"
                           onClick={(e) => {
@@ -6585,8 +6594,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         >
                           {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
                         </div>
-                      </div>
-                    )}
+                          </div>
+                        )}
                     {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                     <div 
@@ -6712,6 +6721,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       </div>
                     </div>
                     </div>
+                    </div>
+                      </div>
                     </div>
                   </div>
                 </Fragment>
@@ -8014,16 +8025,44 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
 
             return (
-              <div 
-                key={message.id} 
-                className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
-                data-message-id={message.id}
-                style={{ 
-                  position: 'relative',
-                  transform: swipedMessageId === message.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
-                  transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
-                }}
-                onClick={(e) => {
+              <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`} key={message.id}>
+                <div className="chat-left-col">
+                  {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                  {isMobile && (
+                    <div 
+                      className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
+                      onTouchStart={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (selectionMode) {
+                          handleSelectionCheckboxTap(e, message.id)
+                        }
+                      }}
+                    >
+                      {selectedItems.has(message.id) ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                        </svg>
+                      ) : (
+                        <div className="checkbox-circle"></div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="chat-main-col">
+                  <div 
+                    className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                    data-message-id={message.id}
+                    style={{ 
+                      position: 'relative',
+                      transform: swipedMessageId === message.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
+                      transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
+                    }}
+                    onClick={(e) => {
                   // On mobile, prevent click if touch just happened or if in selection mode
                   if (isMobile) {
                     if (false) {
@@ -8037,38 +8076,13 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     return
                   }
                   handleMessageClick(e, message)
-                }}
-                onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
-                onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                onTouchEnd={handleMessageTouchEnd}
-                onTouchMove={handleMessageTouchMove}
-              >
-                {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                {isMobile && (
-                  <div 
-                    className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                    onTouchStart={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
                     }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (selectionMode) {
-                        handleSelectionCheckboxTap(e, message.id)
-                      }
-                    }}
+                    onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
+                    onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                    onTouchEnd={handleMessageTouchEnd}
+                    onTouchMove={handleMessageTouchMove}
                   >
-                    {selectedItems.has(message.id) ? (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                      </svg>
-                    ) : (
-                      <div className="checkbox-circle"></div>
-                    )}
-                  </div>
-                )}
-                {!message.isOwn && (
+                    {!message.isOwn && (
                   <div className="message-sender-info">
                     <div className="message-sender-avatar">
                       <img 
@@ -8085,7 +8099,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                       </div>
                     )}
                   </div>
-                )}
+                    )}
                 <div className="message-content">
                   {message.replyTo && (() => {
                     const repliedMsg = messages.find(m => m.id === message.replyTo)
@@ -8125,6 +8139,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                         </svg>
                       </span>
                     )}
+                  </div>
+                </div>
                   </div>
                 </div>
               </div>
@@ -10128,62 +10144,71 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               return (
                 <Fragment key={message.id}>
                   {showDate && (
-                    <div className="date-separator" key={`date-${message.id}`}>
-                      <span>{message.date}</span>
+                    <div className="chat-row date-row" key={`date-${message.id}`}>
+                      <div className="chat-left-col" />
+                      <div className="chat-main-col">
+                        <div className="date-separator">
+                          <span>{message.date}</span>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div 
-                    className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
-                    data-message-id={message.id}
-                    style={{ position: 'relative' }}
-                    onMouseEnter={() => !selectionMode && handleMessageHover(message)}
-                    onMouseLeave={() => !selectionMode && handleMessageUnhover()}
-                    onClick={(e) => {
-                      // On mobile, completely block all click events - use touch events only
-                      if (isMobile) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        e.stopImmediatePropagation()
-                        return false
-                      }
-                      handleMessageClick(e, message)
-                    }}
-                    onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                    onTouchEnd={handleMessageTouchEnd}
-                    onTouchMove={handleMessageTouchMove}
-                    onContextMenu={(e) => {
-                      if (!selectionMode) {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }
-                    }}
-                  >
-                    {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                    {isMobile && (
+                  <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
+                    <div className="chat-left-col">
+                      {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                      {isMobile && (
+                        <div 
+                          className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
+                          onTouchStart={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            if (selectionMode) {
+                              handleSelectionCheckboxTap(e, message.id)
+                            }
+                          }}
+                        >
+                          {selectedItems.has(message.id) ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                            </svg>
+                          ) : (
+                            <div className="checkbox-circle"></div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="chat-main-col">
                       <div 
-                        className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                        onTouchStart={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
+                        className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                        data-message-id={message.id}
+                        style={{ position: 'relative' }}
+                        onMouseEnter={() => !selectionMode && handleMessageHover(message)}
+                        onMouseLeave={() => !selectionMode && handleMessageUnhover()}
+                        onClick={(e) => {
+                          // On mobile, completely block all click events - use touch events only
+                          if (isMobile) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            e.stopImmediatePropagation()
+                            return false
+                          }
+                          handleMessageClick(e, message)
                         }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (selectionMode) {
-                            handleSelectionCheckboxTap(e, message.id)
+                        onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchMove={handleMessageTouchMove}
+                        onContextMenu={(e) => {
+                          if (!selectionMode) {
+                            e.preventDefault()
+                            e.stopPropagation()
                           }
                         }}
                       >
-                        {selectedItems.has(message.id) ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                          </svg>
-                        ) : (
-                          <div className="checkbox-circle"></div>
-                        )}
-                      </div>
-                    )}
-                    {/* Reply indicator when swiping right (mobile) - only for this message */}
+                        {/* Reply indicator when swiping right (mobile) - only for this message */}
                     {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
                     <div 
                         className="message-swipe-reply-indicator"
@@ -10302,6 +10327,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                             })()}
                           </span>
                         )}
+                      </div>
+                    </div>
                       </div>
                     </div>
                   </div>
