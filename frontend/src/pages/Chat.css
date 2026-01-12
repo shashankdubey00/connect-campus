@@ -5743,14 +5743,61 @@
   transition: transform 0.2s ease, margin 0.2s ease;
 }
 
-/* Selection UI removed (WhatsApp-style): no checkbox/radio column */
+/* Selection Checkbox Styles */
+.message-selection-checkbox {
+  /* Rendered inside `.chat-left-col` (universal grid). Keep it flow-positioned. */
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  /* no-rewrite: keep in DOM always, but hidden unless selection mode is active */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Show checkboxes only when selection mode is active (visual layer only) */
+.live-chat-view.selection-mode-active .message-selection-checkbox {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.message-selection-checkbox .checkbox-circle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.message-selection-checkbox:hover .checkbox-circle {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.message-selection-checkbox.selected {
+  background: #00a884;
+  border-radius: 50%;
+}
+
+.message-selection-checkbox.selected svg {
+  color: white;
+}
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
   /* UNIVERSAL ROW WRAPPER (key fix): every row type uses the same 2-col grid */
   .chat-messages-area .chat-row {
     display: grid;
-    grid-template-columns: 0px 1fr; /* LOCKED (no left UI) */
+    grid-template-columns: 44px 1fr; /* LOCKED */
     align-items: flex-start;
     column-gap: 0;
     box-sizing: border-box;
@@ -5759,8 +5806,10 @@
   }
 
   .chat-messages-area .chat-left-col {
-    width: 0;
-    display: none;
+    width: 44px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .chat-messages-area .chat-main-col {
