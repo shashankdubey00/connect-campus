@@ -5786,9 +5786,56 @@
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  /* Reserve space permanently (no layout changes when selecting) */
+  /* NO-REWRITE LAYOUT LOCK (production-safe)
+     Use a stable 2-column grid for every message row:
+     - Col 1: selection tick gutter (always reserved)
+     - Col 2: message content (bubble/sender/reply)
+     This prevents long replied messages from re-wrapping differently when selection UI appears. */
   .chat-messages-area .message {
-    padding-left: 44px;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    align-items: start;
+    column-gap: 0;
+    box-sizing: border-box;
+    contain: layout paint;
+  }
+
+  /* Put checkbox in the gutter (col 1). No absolute positioning on mobile to avoid overlap/reflow. */
+  .chat-messages-area .message .message-selection-checkbox {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: center;
+    justify-self: center;
+  }
+
+  /* Keep sender info + bubble in column 2 */
+  .chat-messages-area .message .message-sender-info,
+  .chat-messages-area .message .message-content,
+  .chat-messages-area .message .message-swipe-reply-indicator {
+    grid-column: 2;
+  }
+
+  /* Bubble sizing: content-sized but capped. */
+  .chat-messages-area .message .message-content {
+    width: fit-content;
+    max-width: 75%;
+  }
+
+  .chat-messages-area .message.own-message .message-content {
+    justify-self: end;
+  }
+
+  .chat-messages-area .message.other-message .message-content {
+    justify-self: start;
+  }
+
+  /* Reply preview should never collapse inside the bubble */
+  .chat-messages-area .message .message-reply-info {
+    width: 100%;
     box-sizing: border-box;
   }
 }
