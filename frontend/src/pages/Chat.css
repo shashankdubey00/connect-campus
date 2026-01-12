@@ -5739,7 +5739,7 @@
 /* Selection Checkbox Styles */
 .message-selection-checkbox {
   position: absolute;
-  left: 4px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   width: 28px;
@@ -5751,6 +5751,15 @@
   z-index: 20;
   border-radius: 50%;
   transition: all 0.2s ease;
+  /* no-rewrite: keep in DOM always, but hidden unless selection mode is active */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Show checkboxes only when selection mode is active (visual layer only) */
+.live-chat-view.selection-mode-active .message-selection-checkbox {
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .message-selection-checkbox .checkbox-circle {
@@ -5777,15 +5786,10 @@
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  /* WhatsApp-style: reserve a left gutter for selection tick so bubbles don't shrink/collapse */
-  .live-chat-view.selection-mode-active .chat-messages-area {
-    /* base padding is 20px; add ~32px gutter for checkbox */
-    padding-left: 52px;
-  }
-
-  /* Place checkbox inside the gutter without affecting bubble width */
-  .live-chat-view.selection-mode-active .message-selection-checkbox {
-    left: -40px;
+  /* Reserve space permanently (no layout changes when selecting) */
+  .chat-messages-area .message {
+    padding-left: 44px;
+    box-sizing: border-box;
   }
 }
 

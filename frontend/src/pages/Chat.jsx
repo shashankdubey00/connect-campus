@@ -6488,8 +6488,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     onTouchEnd={handleMessageTouchEnd}
                     onTouchMove={handleMessageTouchMove}
                   >
-                    {/* Selection Checkbox - Only visible in selection mode on mobile */}
-                    {isMobile && selectionMode && (
+                    {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                    {isMobile && (
                       <div 
                         className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                         onTouchStart={(e) => {
@@ -6499,7 +6499,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         onTouchEnd={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          handleSelectionCheckboxTap(e, message.id)
+                          if (selectionMode) {
+                            handleSelectionCheckboxTap(e, message.id)
+                          }
                         }}
                       >
                         {selectedItems.has(message.id) ? (
@@ -8037,8 +8039,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onTouchEnd={handleMessageTouchEnd}
                 onTouchMove={handleMessageTouchMove}
               >
-                {/* Selection Checkbox - Only visible in selection mode on mobile */}
-                {isMobile && selectionMode && (
+                {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                {isMobile && (
                   <div 
                     className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                     onTouchStart={(e) => {
@@ -8048,7 +8050,9 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     onTouchEnd={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      handleSelectionCheckboxTap(e, message.id)
+                      if (selectionMode) {
+                        handleSelectionCheckboxTap(e, message.id)
+                      }
                     }}
                   >
                     {selectedItems.has(message.id) ? (
@@ -10150,8 +10154,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                       }
                     }}
                   >
-                    {/* Selection Checkbox - Only visible in selection mode on mobile */}
-                    {isMobile && selectionMode && (
+                    {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                    {isMobile && (
                       <div 
                         className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                         onTouchStart={(e) => {
@@ -10161,7 +10165,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         onTouchEnd={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          handleSelectionCheckboxTap(e, message.id)
+                          if (selectionMode) {
+                            handleSelectionCheckboxTap(e, message.id)
+                          }
                         }}
                       >
                         {selectedItems.has(message.id) ? (
