@@ -4648,8 +4648,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [selectedItems, setSelectedItems] = useState(new Set()) // Set of selected message/chat IDs
   const messagesEndRef = useRef(null)
   const longPressTimer = useRef(null)
-  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
-  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
+  const longPressMessageId = useRef(null) // Track which message is being long-pressed
   const actionMenuRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const quickEmojiRef = useRef(null)
@@ -4688,6 +4687,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       clearBlockMessageTimeout()
       if (longPressTimer.current) {
         clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
       }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
@@ -5727,69 +5727,41 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
   }
 
+  // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
-    const touch = e.touches ? e.touches[0] : null
-    if (!touch) return
+    if (!isMobile || selectionMode) return
     
-    // Ignore multi-finger touches
-    if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
-      longPressActivated.current = false
-      touchJustHappened.current = false
-      return
-    }
-    
-    // Check if touch target is a reply/quote element or checkbox - don't start long-press
+    // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
         target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox')) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
     
-    // Mark that touch just happened to prevent click synthesis (immediately)
-    touchJustHappened.current = true
-    // Clear after longer delay to ensure click is prevented
-    setTimeout(() => {
-      touchJustHappened.current = false
-    }, 500) // Extended to 500ms to fully prevent click synthesis
+    // Store which message is being long-pressed
+    longPressMessageId.current = message.id
     
-    const clientX = touch.clientX
-    const clientY = touch.clientY
-    
-    // Store swipe start position for swipe-to-reply
-    setSwipeStartX(clientX)
-    setSwipeStartY(clientY)
-    setSwipeOffset(0)
-    setSwipedMessageId(message.id)
-    longPressActivated.current = false
-    
-    // Only start long-press timer if NOT already in selection mode
-    // Long-press enters selection mode AND selects the message
-    if (!selectionMode && isMobile) {
-      longPressTimer.current = setTimeout(() => {
-        // Enter selection mode AND select this message
+    // Start long-press timer
+    longPressTimer.current = setTimeout(() => {
+      if (longPressMessageId.current === message.id) {
+        // Enter selection mode and select this message
         setSelectionMode(true)
-        setSelectedItems(new Set([message.id])) // Select the long-pressed message
+        setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true
         
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to select message
-    }
+      }
+      longPressMessageId.current = null
+    }, 500) // 500ms long-press
   }
   
   // Handle selection checkbox tap - ONLY way to select messages
@@ -5817,87 +5789,21 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
   }
 
+  // Cancel long-press on touch end
   const handleMessageTouchEnd = (e) => {
-    // Clear long-press timer
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-    
-    // If long-press activated, just reset and return (selection already done)
-    if (longPressActivated.current) {
-      // Prevent any click events from firing after long-press
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false
-      return
-    }
-    
-    // Check for swipe-to-reply (only when NOT in selection mode)
-    if (!selectionMode && swipeStartX !== null && swipeOffset > 50 && isMobile) {
-      // Prevent click synthesis after swipe
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      const message = messages.find(m => m.id === swipedMessageId)
-      if (message) {
-        setReplyingTo(message)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        setSelectedMessage(null)
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
-      }
-    }
-    
-    // Reset all touch state
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-    setSwipedMessageId(null)
-    longPressActivated.current = false
+    longPressMessageId.current = null
   }
 
+  // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
-    // IMMEDIATELY cancel long-press timer on ANY touch movement (scrolling or swiping)
-    // This prevents accidental selection mode when scrolling
     if (isMobile && longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
-      longPressActivated.current = false
-      touchJustHappened.current = false
-    }
-    
-    // Track swipe for reply gesture
-    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
-      const touch = e.touches ? e.touches[0] : null
-      if (!touch) return
-      
-      const clientX = touch.clientX
-      const clientY = touch.clientY
-      const deltaX = clientX - swipeStartX
-      const deltaY = Math.abs(clientY - swipeStartY)
-      
-      // Only start visual swipe movement after significant horizontal movement (15px+)
-      const SWIPE_THRESHOLD = 15
-      
-      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
-        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
-        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
-      } else {
-        // Not enough movement for swipe - keep message in place
-        setSwipeOffset(0)
-      }
+      longPressMessageId.current = null
     }
   }
   
@@ -7164,8 +7070,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   const lastClickTime = useRef(0)
   const lastClickedMessage = useRef(null)
   const longPressTimer = useRef(null)
-  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
-  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
+  const longPressMessageId = useRef(null) // Track which message is being long-pressed
   const socket = getSocket()
   const groupId = group?.id || chat?.groupId || group?._id || chat?.groupId
 
@@ -7537,70 +7442,75 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     }
   }
 
-  // Handle touch start on message (mobile)
+  // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
-    const touch = e.touches ? e.touches[0] : null
-    if (!touch) return
+    if (!isMobile || selectionMode) return
     
-    // Ignore multi-finger touches
-    if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
-      longPressActivated.current = false
-      touchJustHappened.current = false
-      return
-    }
-    
-    // Check if touch target is a reply/quote element or checkbox - don't start long-press
+    // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
         target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox')) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
     
-    // Mark that touch just happened to prevent click synthesis (immediately)
-    touchJustHappened.current = true
-    // Clear after longer delay to ensure click is prevented
-    setTimeout(() => {
-      touchJustHappened.current = false
-    }, 500) // Extended to 500ms to fully prevent click synthesis
+    // Store which message is being long-pressed
+    longPressMessageId.current = message.id
     
-    const clientX = touch.clientX
-    const clientY = touch.clientY
-    
-    // Store swipe start position for swipe-to-reply
-    setSwipeStartX(clientX)
-    setSwipeStartY(clientY)
-    setSwipeOffset(0)
-    setSwipedMessageId(message.id)
-    longPressActivated.current = false
-    
-    // Only start long-press timer if NOT already in selection mode
-    // Long-press enters selection mode AND selects the message
-    if (!selectionMode && isMobile) {
-      longPressTimer.current = setTimeout(() => {
-        // Enter selection mode AND select this message
+    // Start long-press timer
+    longPressTimer.current = setTimeout(() => {
+      if (longPressMessageId.current === message.id) {
+        // Enter selection mode and select this message
         setSelectionMode(true)
-        setSelectedItems(new Set([message.id])) // Select the long-pressed message
+        setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true
         
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to select message
+      }
+      longPressMessageId.current = null
+    }, 500) // 500ms long-press
+  }
+    if (!isMobile || selectionMode) return
+    
+    // Don't start long-press on interactive elements
+    const target = e.target
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
+      return
     }
+    
+    // Store which message is being long-pressed
+    longPressMessageId.current = message.id
+    
+    // Start long-press timer
+    longPressTimer.current = setTimeout(() => {
+      if (longPressMessageId.current === message.id) {
+        // Enter selection mode and select this message
+        setSelectionMode(true)
+        setSelectedItems(new Set([message.id]))
+        setShowMessageHeader(false)
+        setSelectedMessage(null)
+        setShowQuickEmojis(false)
+        setShowActionMenu(false)
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(50)
+        }
+      }
+      longPressMessageId.current = null
+    }, 500) // 500ms long-press
   }
   
   // Handle selection checkbox tap - ONLY way to select messages
@@ -7628,137 +7538,22 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     }
   }
 
-  // Handle touch end on message (mobile)
+  // Cancel long-press on touch end
   const handleMessageTouchEnd = (e) => {
-    // Check if long-press successfully activated selection mode
-    const wasLongPressActivated = longPressActivated.current
-    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-    
-    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
-    let message = null
-    if (swipedMessageId) {
-      message = messages.find(m => m.id === swipedMessageId)
-    }
-    
-    // Fallback: try to get from DOM if swipedMessageId is not available
-    if (!message) {
-      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
-      if (messageElement) {
-        const messageId = messageElement.dataset.messageId
-        message = messages.find(m => m.id === messageId)
-      }
-    }
-    
-    // If long-press already activated selection mode, handle it first
-    if (wasLongPressActivated) {
-      // Selection mode was already activated by long-press, just reset and return
-      // The selection mode is already active, so user can now tap other messages
-      // Prevent any click events from firing after long-press
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      e.preventDefault()
-      e.stopPropagation()
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false
-      return
-    }
-    
-    if (!message) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false
-      return
-    }
-    
-    // Check if swipe was significant enough for reply (mobile only)
-    // Swipe RIGHT to reply (opposite of WhatsApp)
-    // swipeOffset > 0 means right swipe
-    if (swipeStartX !== null && Math.abs(swipeOffset) > 50 && isMobile && swipeOffset > 0 && !selectionMode) {
-      // Prevent click synthesis after swipe
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      // Swipe right detected - reply to message
-      setReplyingTo(message)
-      setSelectedMessage(null)
-      // Add haptic feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(50)
-      }
-      // Scroll to input area to show reply preview
-      setTimeout(() => {
-        const inputArea = document.querySelector('.chat-input-area')
-        if (inputArea) {
-          inputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-        }
-      }, 100)
-      
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      return
-    }
-    
-    // Reset swipe
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-    setSwipedMessageId(null) // Reset swiped message
-    longPressActivated.current = false // Reset flag
+    longPressMessageId.current = null
   }
 
   // Handle touch move on message (mobile)
+  // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
-    // Track swipe for reply gesture
-    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
-      const touch = e.touches ? e.touches[0] : null
-      if (!touch) return
-      
-      const clientX = touch.clientX
-      const clientY = touch.clientY
-      const deltaX = clientX - swipeStartX
-      const deltaY = Math.abs(clientY - swipeStartY)
-      const totalMovement = Math.abs(deltaX) + deltaY
-      
-      // Cancel long press on ANY movement (scrolling or swiping)
-      // This prevents accidental selection mode when scrolling
-      if (totalMovement > 3) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false
-        }
-        // Reset touch flag on movement to allow normal scrolling behavior
-        touchJustHappened.current = false
-      }
-      
-      // Only start visual swipe movement after significant horizontal movement (15px+)
-      const SWIPE_THRESHOLD = 15
-      
-      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
-        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
-        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
-      } else {
-        // Not enough movement for swipe - keep message in place
-        setSwipeOffset(0)
-      }
+    if (isMobile && longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+      longPressMessageId.current = null
     }
   }
 
@@ -8259,7 +8054,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onClick={(e) => {
                   // On mobile, prevent click if touch just happened or if in selection mode
                   if (isMobile) {
-                    if (touchJustHappened.current || longPressActivated.current) {
+                    if (false) {
                       e.preventDefault()
                       e.stopPropagation()
                       return
@@ -8558,8 +8353,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const blockMessageTimeoutRef = useRef(null) // Store timeout ID for cleanup
   const typingTimeoutRef = useRef(null) // Store typing timeout
   const longPressTimer = useRef(null)
-  const longPressActivated = useRef(false) // Track if long-press successfully activated selection mode
-  const touchJustHappened = useRef(false) // Track if touch event just happened to prevent click synthesis
+  const longPressMessageId = useRef(null) // Track which message is being long-pressed
   const actionMenuRef = useRef(null)
   const quickEmojiRef = useRef(null)
   const doubleClickTimer = useRef(null)
@@ -9530,69 +9324,41 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
   }
 
+  // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
-    const touch = e.touches ? e.touches[0] : null
-    if (!touch) return
+    if (!isMobile || selectionMode) return
     
-    // Ignore multi-finger touches
-    if (e.touches.length > 1) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
-      longPressActivated.current = false
-      touchJustHappened.current = false
-      return
-    }
-    
-    // Check if touch target is a reply/quote element or checkbox - don't start long-press
+    // Don't start long-press on interactive elements
     const target = e.target
     if (target.closest('.message-reply-info') || 
         target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox')) {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current)
-        longPressTimer.current = null
-      }
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
     
-    // Mark that touch just happened to prevent click synthesis (immediately)
-    touchJustHappened.current = true
-    // Clear after longer delay to ensure click is prevented
-    setTimeout(() => {
-      touchJustHappened.current = false
-    }, 500) // Extended to 500ms to fully prevent click synthesis
+    // Store which message is being long-pressed
+    longPressMessageId.current = message.id
     
-    const clientX = touch.clientX
-    const clientY = touch.clientY
-    
-    // Store swipe start position for swipe-to-reply
-    setSwipeStartX(clientX)
-    setSwipeStartY(clientY)
-    setSwipeOffset(0)
-    setSwipedMessageId(message.id)
-    longPressActivated.current = false
-    
-    // Only start long-press timer if NOT already in selection mode
-    // Long-press enters selection mode AND selects the message
-    if (!selectionMode && isMobile) {
-      longPressTimer.current = setTimeout(() => {
-        // Enter selection mode AND select this message
+    // Start long-press timer
+    longPressTimer.current = setTimeout(() => {
+      if (longPressMessageId.current === message.id) {
+        // Enter selection mode and select this message
         setSelectionMode(true)
-        setSelectedItems(new Set([message.id])) // Select the long-pressed message
+        setSelectedItems(new Set([message.id]))
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-        longPressActivated.current = true
         
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
         }
-      }, 500) // 0.5 second long-press to select message
-    }
+      }
+      longPressMessageId.current = null
+    }, 500) // 500ms long-press
   }
   
   // Handle selection checkbox tap - ONLY way to select messages
@@ -9620,127 +9386,21 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     }
   }
 
+  // Cancel long-press on touch end
   const handleMessageTouchEnd = (e) => {
-    // Check if long-press successfully activated selection mode
-    const wasLongPressActivated = longPressActivated.current
-    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-    
-    // Use the stored swipedMessageId to find the message (more reliable than DOM lookup)
-    let message = null
-    if (swipedMessageId) {
-      message = messages.find(m => m.id === swipedMessageId)
-    }
-    
-    // Fallback: try to get from DOM if swipedMessageId is not available
-    if (!message) {
-      const messageElement = e.currentTarget?.closest?.('.message') || e.target?.closest?.('.message')
-      if (messageElement) {
-        const messageId = messageElement.dataset.messageId
-        message = messages.find(m => m.id === messageId)
-      }
-    }
-    
-    // If long-press already activated selection mode, handle it first
-    if (wasLongPressActivated) {
-      // Selection mode was already activated by long-press, just reset and return
-      // The selection mode is already active, so user can now tap other messages
-      // Prevent any click events from firing after long-press
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false
-      return
-    }
-    
-    if (!message) {
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      longPressActivated.current = false
-      return
-    }
-    
-    // Check for swipe-to-reply (only when NOT in selection mode)
-    if (!selectionMode && swipeStartX !== null && swipeOffset > 50 && isMobile) {
-      // Prevent click synthesis after swipe
-      touchJustHappened.current = true
-      setTimeout(() => {
-        touchJustHappened.current = false
-      }, 300)
-      
-      setReplyingTo(message)
-      setShowQuickEmojis(false)
-      setShowActionMenu(false)
-      setSelectedMessage(null)
-      if (navigator.vibrate) {
-        navigator.vibrate(50)
-      }
-      
-      // Reset swipe
-      setSwipeStartX(null)
-      setSwipeStartY(null)
-      setSwipeOffset(0)
-      setSwipedMessageId(null)
-      return
-    }
-    
-    // REMOVED: Single tap should NOT select in selection mode
-    // Only checkbox tap should select messages
-    
-    // Reset swipe
-    setSwipeStartX(null)
-    setSwipeStartY(null)
-    setSwipeOffset(0)
-    setSwipedMessageId(null) // Reset swiped message
-    longPressActivated.current = false // Reset flag
+    longPressMessageId.current = null
   }
 
+  // Cancel long-press immediately on any movement (prevents selection during scrolling)
   const handleMessageTouchMove = (e) => {
-    // Track swipe for reply gesture
-    if (swipeStartX !== null && swipeStartY !== null && isMobile) {
-      const touch = e.touches ? e.touches[0] : null
-      if (!touch) return
-      
-      const clientX = touch.clientX
-      const clientY = touch.clientY
-      const deltaX = clientX - swipeStartX
-      const deltaY = Math.abs(clientY - swipeStartY)
-      const totalMovement = Math.abs(deltaX) + deltaY
-      
-      // Cancel long press on ANY movement (scrolling or swiping)
-      // This prevents accidental selection mode when scrolling
-      if (totalMovement > 3) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false
-        }
-        // Reset touch flag on movement to allow normal scrolling behavior
-        touchJustHappened.current = false
-      }
-      
-      // Only start visual swipe movement after significant horizontal movement (15px+)
-      const SWIPE_THRESHOLD = 15
-      
-      if (deltaX > SWIPE_THRESHOLD && !selectionMode) {
-        // Significant right swipe detected - show visual swipe for reply (only when not in selection mode)
-        setSwipeOffset(Math.min(deltaX - SWIPE_THRESHOLD, 100))
-      } else {
-        // Not enough movement for swipe - keep message in place
-        setSwipeOffset(0)
-      }
+    if (isMobile && longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+      longPressMessageId.current = null
     }
   }
 
