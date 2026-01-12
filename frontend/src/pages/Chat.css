@@ -2818,11 +2818,7 @@
   white-space: pre-wrap; /* Preserve line breaks and wrap text */
   /* Ensure emojis render correctly */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-  /* Center emoji-only messages vertically */
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
+  display: block; /* Avoid flex/text min-content quirks that can cause per-character wrapping */
 }
 
 /* Bubble comfort on mobile: reduce early wrapping by allowing wider bubbles */
