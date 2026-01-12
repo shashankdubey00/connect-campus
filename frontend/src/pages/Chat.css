@@ -2684,7 +2684,7 @@
   position: relative;
   user-select: text;
   min-width: 0; /* allow internal text/reply blocks to wrap/ellipsis correctly */
-  flex: 1 1 auto; /* prevents bubble collapsing when sibling (sender info) is long */
+  flex: 0 1 auto; /* keep bubble sized to content (up to max-width); don't stretch full row */
 }
 
 .message-footer {
@@ -5798,14 +5798,15 @@
 }
 
 .message.selection-selected {
-  background-color: rgba(0, 168, 132, 0.15) !important;
-  border-left: 4px solid var(--btn-primary, #00a884) !important;
-  border-radius: 4px;
-  margin: 2px 0;
+  /* Only highlight the bubble (message-content). Full-row highlight looks like "double selection"
+     in group/college chats (especially when a reply block already has a left border). */
+  background-color: transparent !important;
+  border-left: none !important;
 }
 
 .message.selection-selected .message-content {
   background-color: rgba(0, 168, 132, 0.2) !important;
+  outline: 1px solid rgba(0, 168, 132, 0.35);
 }
 
 .message.selection-selected.own-message .message-content {
@@ -5814,6 +5815,11 @@
 
 .message.selection-selected.other-message .message-content {
   background-color: rgba(0, 168, 132, 0.2) !important;
+}
+
+/* Keep reply preview styling stable inside selected messages */
+.message.selection-selected .message-reply-info {
+  max-width: 100%;
 }
 
 /* Chat Selection Mode */
