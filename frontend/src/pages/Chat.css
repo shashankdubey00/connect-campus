@@ -5814,23 +5814,31 @@
 
   /* Keep sender info + bubble in column 2 */
   .chat-messages-area .message .message-sender-info,
+  .chat-messages-area .message .message-content-wrap,
   .chat-messages-area .message .message-content,
   .chat-messages-area .message .message-swipe-reply-indicator {
     grid-column: 2;
   }
 
-  /* Bubble sizing: content-sized but capped. */
+  /* Alignment wrapper in col 2 (final-fix): flex controls left/right; bubble never pushes itself */
+  .chat-messages-area .message .message-content-wrap {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .chat-messages-area .message .message-content-wrap.sent {
+    justify-content: flex-end;
+  }
+
+  .chat-messages-area .message .message-content-wrap.received {
+    justify-content: flex-start;
+  }
+
+  /* Bubble sizing: capped, but alignment is controlled by the wrapper above */
   .chat-messages-area .message .message-content {
-    width: fit-content;
     max-width: 75%;
-  }
-
-  .chat-messages-area .message.own-message .message-content {
-    justify-self: end;
-  }
-
-  .chat-messages-area .message.other-message .message-content {
-    justify-self: start;
+    width: auto;
   }
 
   /* Reply preview should never collapse inside the bubble */

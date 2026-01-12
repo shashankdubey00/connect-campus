@@ -6602,6 +6602,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         </svg>
                       </div>
                     )}
+                    <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
+                    <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
                     <div 
                       className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
                       style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
@@ -6708,6 +6710,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                           </span>
                         )}
                       </div>
+                    </div>
+                    </div>
                     </div>
                   </div>
                 </Fragment>
