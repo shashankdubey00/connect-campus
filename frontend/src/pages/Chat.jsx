@@ -8278,10 +8278,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 onTouchEnd={handleMessageTouchEnd}
                 onTouchMove={handleMessageTouchMove}
               >
-                {/* Selection Checkbox - Always visible on mobile */}
-                {isMobile && (
+                {/* Selection Checkbox - Only visible in selection mode on mobile */}
+                {isMobile && selectionMode && (
                   <div 
-                    className={`message-selection-checkbox ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}
+                    className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                     onTouchStart={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
@@ -8292,7 +8292,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                       handleSelectionCheckboxTap(e, message.id)
                     }}
                   >
-                    {selectionMode && selectedItems.has(message.id) ? (
+                    {selectedItems.has(message.id) ? (
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                       </svg>
