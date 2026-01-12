@@ -5869,6 +5869,15 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   const handleMessageTouchMove = (e) => {
+    // IMMEDIATELY cancel long-press timer on ANY touch movement (scrolling or swiping)
+    // This prevents accidental selection mode when scrolling
+    if (isMobile && longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+      longPressActivated.current = false
+      touchJustHappened.current = false
+    }
+    
     // Track swipe for reply gesture
     if (swipeStartX !== null && swipeStartY !== null && isMobile) {
       const touch = e.touches ? e.touches[0] : null
@@ -5878,17 +5887,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const clientY = touch.clientY
       const deltaX = clientX - swipeStartX
       const deltaY = Math.abs(clientY - swipeStartY)
-      const totalMovement = Math.abs(deltaX) + deltaY
-      
-      // Cancel long press on ANY movement (scrolling or swiping)
-      // This prevents accidental selection mode when scrolling
-      if (totalMovement > 3) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-          longPressActivated.current = false
-        }
-      }
       
       // Only start visual swipe movement after significant horizontal movement (15px+)
       const SWIPE_THRESHOLD = 15
