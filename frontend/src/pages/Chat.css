@@ -2687,6 +2687,21 @@
   flex: 0 1 auto; /* keep bubble sized to content (up to max-width); don't stretch full row */
 }
 
+/* Option A (WhatsApp-style): wrapper aligns full-width; bubble stays content-sized */
+.message-content-wrap {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.message-content-wrap.sent {
+  justify-content: flex-end;
+}
+
+.message-content-wrap.received {
+  justify-content: flex-start;
+}
+
 .message-footer {
   display: flex;
   align-items: center;
@@ -5756,6 +5771,7 @@
     box-sizing: border-box;
     contain: layout paint;
     min-width: 0;
+    width: 100%;
   }
 
   .chat-messages-area .chat-left-col {
@@ -5764,6 +5780,13 @@
   }
 
   .chat-messages-area .chat-main-col {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* MAIN FIX: give each message a full-width alignment context so own/other justification works */
+  .chat-messages-area .chat-row.message-row .message {
+    width: 100%;
     min-width: 0;
   }
 
