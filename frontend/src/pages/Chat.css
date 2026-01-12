@@ -2647,9 +2647,12 @@
 
 .message {
   display: flex;
+  align-items: flex-end;
+  gap: 8px;
   margin-bottom: 4px;
   position: relative;
   transition: background-color 0.2s ease;
+  min-width: 0; /* prevent flex children from forcing overflow/collapsing */
 }
 
 /* Selection mode - no padding needed since we removed the indicator */
@@ -2680,6 +2683,8 @@
   border-radius: 8px;
   position: relative;
   user-select: text;
+  min-width: 0; /* allow internal text/reply blocks to wrap/ellipsis correctly */
+  flex: 1 1 auto; /* prevents bubble collapsing when sibling (sender info) is long */
 }
 
 .message-footer {
@@ -2733,6 +2738,8 @@
   position: relative;
   z-index: 10;
   pointer-events: auto;
+  min-width: 0; /* allow sender name to truncate instead of squeezing bubble */
+  flex: 0 1 auto;
 }
 
 .message-sender-avatar {
@@ -2767,6 +2774,16 @@
   position: relative;
   z-index: 10;
   pointer-events: auto;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .message-sender {
+    max-width: 120px;
+  }
 }
 
 .message-sender:hover {
