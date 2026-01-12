@@ -7478,40 +7478,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       longPressMessageId.current = null
     }, 500) // 500ms long-press
   }
-    if (!isMobile || selectionMode) return
-    
-    // Don't start long-press on interactive elements
-    const target = e.target
-    if (target.closest('.message-reply-info') || 
-        target.closest('.message-reply') || 
-        target.closest('.message-selection-checkbox') ||
-        target.closest('button') ||
-        target.closest('a')) {
-      return
-    }
-    
-    // Store which message is being long-pressed
-    longPressMessageId.current = message.id
-    
-    // Start long-press timer
-    longPressTimer.current = setTimeout(() => {
-      if (longPressMessageId.current === message.id) {
-        // Enter selection mode and select this message
-        setSelectionMode(true)
-        setSelectedItems(new Set([message.id]))
-        setShowMessageHeader(false)
-        setSelectedMessage(null)
-        setShowQuickEmojis(false)
-        setShowActionMenu(false)
-        
-        // Haptic feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(50)
-        }
-      }
-      longPressMessageId.current = null
-    }, 500) // 500ms long-press
-  }
   
   // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
