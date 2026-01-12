@@ -3279,7 +3279,7 @@ const Chat = () => {
       if (!selectedChat && !college) {
         console.error('LiveChatView: Missing chat or college data', { selectedChat, college })
         return (
-          <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
+          <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
             <div className="chat-header-bar">
               <button className="chat-header-back-btn" onClick={() => { setView('list'); if (isMobileView) setShowChatList(true) }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4712,7 +4712,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Safety check: if no collegeId, show error message
   if (!collegeId && chat?.type === 'college') {
     return (
-      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
+      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
           <button 
             className="chat-header-back-btn" 
@@ -6191,7 +6191,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }
 
   return (
-    <div className="live-chat-view">
+    <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
       {/* Selection Mode Bar - Always visible when in selection mode */}
       {selectionMode && (() => {
         // Calculate selection type
@@ -7757,7 +7757,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
   if (!groupId) {
     return (
-      <div className="live-chat-view">
+      <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
           <button 
             className="chat-header-back-btn" 
@@ -7782,7 +7782,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   }
 
   return (
-    <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
+    <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
       <div className="chat-header-bar">
         <button 
           className="chat-header-back-btn" 
@@ -9844,7 +9844,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   if (!otherUserId) {
     console.error('DirectChatView: otherUserId is required but missing')
     return (
-      <div className="live-chat-view">
+      <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
           <button 
             className="chat-header-back-btn" 
@@ -9912,7 +9912,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }, [otherUserLastSeen, isOtherUserOnline])
 
   return (
-    <div className="live-chat-view">
+    <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
       {/* Selection Mode Bar - Always visible when in selection mode */}
       {selectionMode && (() => {
         // Calculate selection type
@@ -10050,7 +10050,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           </button>
         </div>
       )}
-      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''}`}>
+      <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
       <div className="chat-header-bar">
         <button 
           className="chat-header-back-btn" 

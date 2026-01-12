@@ -5774,13 +5774,15 @@
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  .message.selection-mode {
-    padding-left: 40px !important;
-    transition: padding-left 0.2s ease;
+  /* WhatsApp-style: reserve a left gutter for selection tick so bubbles don't shrink/collapse */
+  .live-chat-view.selection-mode-active .chat-messages-area {
+    /* base padding is 20px; add ~32px gutter for checkbox */
+    padding-left: 52px;
   }
-  
-  .message.own-message.selection-mode {
-    padding-left: 40px !important;
+
+  /* Place checkbox inside the gutter without affecting bubble width */
+  .live-chat-view.selection-mode-active .message-selection-checkbox {
+    left: -40px;
   }
 }
 
