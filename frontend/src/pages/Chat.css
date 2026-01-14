@@ -5806,6 +5806,7 @@
     box-sizing: border-box;
     contain: layout paint;
     min-width: 0;
+    width: 100%; /* ensure all rows span full width so right-aligned bubbles share the same edge */
   }
 
   .chat-messages-area .chat-left-col {
@@ -5817,6 +5818,12 @@
 
   .chat-messages-area .chat-main-col {
     min-width: 0;
+    width: 100%; /* give message a full-width alignment context */
+  }
+
+  /* Make the message container fill the row so `justify-content:flex-end` aligns to the same right edge */
+  .chat-messages-area .chat-row.message-row .message {
+    width: 100%;
   }
 
   /* Date rows must respect the grid too */
