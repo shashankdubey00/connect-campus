@@ -2616,6 +2616,14 @@
   background-size: 100px 100px;
 }
 
+/* Group/college chats can feel "centered" on mobile when many members send messages.
+   Nudge ONLY your own bubbles slightly closer to the right edge (visual-only). */
+@media (max-width: 768px) {
+  .chat-messages-area .message.own-message {
+    margin-right: -8px;
+  }
+}
+
 .loading-messages,
 .no-messages {
   text-align: center;
