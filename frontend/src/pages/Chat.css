@@ -2765,8 +2765,10 @@
   position: relative;
   z-index: 10;
   pointer-events: auto;
-  min-width: 0; /* allow sender name to truncate instead of squeezing bubble */
+  min-width: 0;
   flex: 0 1 auto;
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .message-sender-avatar {
@@ -2856,13 +2858,16 @@
 .message-time {
   color: var(--message-time);
   font-size: 11px;
-  display: block;
+  display: inline;
   text-align: right;
-  margin-top: 2px;
+  margin-top: 0;
+  white-space: nowrap;
+  margin-left: 4px;
 }
 
 .other-message .message-time {
   text-align: left;
+  margin-left: 0;
 }
 
 /* Block Message UI - Professional WhatsApp-style */
