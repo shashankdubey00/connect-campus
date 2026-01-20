@@ -2656,11 +2656,11 @@
 .message {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 0;
+  margin-bottom: 8px;
   position: relative;
   transition: background-color 0.2s ease;
-  min-width: 0; /* prevent flex children from forcing overflow/collapsing */
+  width: 100%;
 }
 
 /* Selection mode - no padding needed since we removed the indicator */
@@ -2674,6 +2674,7 @@
 
 .message.other-message {
   justify-content: flex-start;
+  gap: 8px;
 }
 
 /* Message content should not shift when selection mode activates */
@@ -2686,33 +2687,41 @@
 }
 
 .message-content {
-  max-width: 65%;
+  max-width: 70%;
   padding: 8px 12px;
   border-radius: 12px;
   position: relative;
   user-select: text;
-  min-width: 0; /* allow internal text/reply blocks to wrap/ellipsis correctly */
-  flex: 0 1 auto; /* keep bubble sized to content (up to max-width); don't stretch full row */
+  min-width: 0;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .message-footer {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 .message-time {
   font-size: 11px;
   color: var(--message-time);
   opacity: 0.8;
+  white-space: nowrap;
+  display: inline;
+  margin-left: 4px;
 }
 
 .message-status {
   display: inline-flex;
   align-items: center;
-  margin-left: 4px;
+  margin-left: 2px;
+  flex-shrink: 0;
 }
 
 .message-status svg {
@@ -2805,20 +2814,15 @@
 .message-content p {
   color: var(--message-text);
   font-size: 14.5px;
-  margin: 0 0 4px 0;
+  margin: 0;
   word-wrap: break-word;
   line-height: 1.45;
-  white-space: pre-wrap; /* Preserve line breaks and wrap text */
-  overflow-wrap: anywhere; /* Better wrapping for long URLs / no-space strings */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
   min-width: 0;
-  /* Ensure emojis render correctly */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-  /* Center emoji-only messages vertically */
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
+  display: inline;
 }
 
 /* Bubble comfort on mobile: reduce early wrapping */
