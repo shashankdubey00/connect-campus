@@ -6656,8 +6656,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         return null
                       })()}
                       <p>{message.text}</p>
-                      <div className="message-footer">
-                        <span className="message-time">{message.time}</span>
+                    </div>
+                    <div className="message-footer">
+                      <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
                             // For college chats, always show single tick (sent status)
@@ -6718,9 +6719,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                             })()}
                           </span>
                         )}
-                      </div>
-                    </div>
-                    </div>
                     </div>
                       </div>
                     </div>
@@ -10286,8 +10284,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                         return null
                       })()}
                       <p>{message.text}</p>
-                      <div className="message-footer">
-                        <span className="message-time">{message.time}</span>
+                    </div>
+                    <div className="message-footer">
+                      <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
                             const readBy = message.readBy || []
@@ -10327,7 +10326,6 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                             })()}
                           </span>
                         )}
-                      </div>
                     </div>
                       </div>
                     </div>
