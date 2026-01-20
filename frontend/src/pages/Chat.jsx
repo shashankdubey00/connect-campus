@@ -6612,7 +6612,6 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       </div>
                     )}
                     <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
-                    <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
                     <div 
                       className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
                       style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
@@ -6656,8 +6655,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         return null
                       })()}
                       <p>{message.text}</p>
-                      <div className="message-footer">
-                        <span className="message-time">{message.time}</span>
+                    </div>
+                    <div className="message-footer">
+                      <span className="message-time">{message.time}</span>
                         {message.isOwn && (
                           <span className={`message-status ${(() => {
                             // For college chats, always show single tick (sent status)
@@ -6718,11 +6718,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                             })()}
                           </span>
                         )}
-                      </div>
                     </div>
-                    </div>
-                    </div>
-                      </div>
                     </div>
                   </div>
                 </Fragment>
@@ -8124,14 +8120,15 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     return null
                   })()}
                   <p>{message.text}</p>
-                  <div className="message-footer">
-                    <span className="message-time">
-                      {new Date(message.timestamp).toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true 
-                      })}
-                    </span>
+                </div>
+                <div className="message-footer">
+                  <span className="message-time">
+                    {new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </span>
                     {message.isOwn && (
                       <span className="message-status sent">
                         <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -8139,7 +8136,6 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                         </svg>
                       </span>
                     )}
-                  </div>
                 </div>
                   </div>
                 </div>
