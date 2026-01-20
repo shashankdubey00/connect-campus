@@ -5823,7 +5823,7 @@
     box-sizing: border-box;
     contain: layout paint;
     min-width: 0;
-    width: 100%; /* ensure all rows span full width so right-aligned bubbles share the same edge */
+    width: 100%;
   }
 
   .chat-messages-area .chat-left-col {
@@ -5835,12 +5835,25 @@
 
   .chat-messages-area .chat-main-col {
     min-width: 0;
-    width: 100%; /* give message a full-width alignment context */
+    width: 100%;
+    display: flex;
+    justify-content: inherit;
   }
 
   /* Make the message container fill the row so `justify-content:flex-end` aligns to the same right edge */
   .chat-messages-area .chat-row.message-row .message {
     width: 100%;
+    justify-content: inherit;
+  }
+
+  .chat-messages-area .chat-row.message-row.sent .message {
+    justify-content: flex-end;
+    padding-right: 12px;
+  }
+
+  .chat-messages-area .chat-row.message-row.received .message {
+    justify-content: flex-start;
+    padding-left: 12px;
   }
 
   /* Date rows must respect the grid too */
