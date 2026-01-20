@@ -2656,7 +2656,7 @@
 .message {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 0;
   margin-bottom: 0;
   position: relative;
   transition: background-color 0.2s ease;
@@ -2664,8 +2664,6 @@
   padding: 0;
   box-sizing: border-box;
   min-width: 0;
-  flex-wrap: wrap;
-  justify-content: flex-start;
 }
 
 /* Selection mode - no padding needed since we removed the indicator */
@@ -2680,15 +2678,14 @@
 
 .message.other-message {
   justify-content: flex-start;
-  gap: 4px;
+  gap: 8px;
   padding: 0;
 }
 
 /* Message content should not shift when selection mode activates */
 .message .message-content {
   transition: transform 0.2s ease, margin 0.2s ease;
-  flex-shrink: 0;
-  order: 1;
+  flex-shrink: 1;
 }
 
 .message.selection-mode .message-content {
@@ -2703,7 +2700,7 @@
   position: relative;
   user-select: text;
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -2712,14 +2709,13 @@
 }
 
 .message-footer {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 2px;
   white-space: nowrap;
   flex-shrink: 0;
-  order: 2;
-  font-size: 11px;
 }
 
 .message-time {
@@ -2728,7 +2724,7 @@
   opacity: 0.8;
   white-space: nowrap;
   display: inline;
-  margin-left: 0;
+  margin-left: 4px;
 }
 
 .message-status {
