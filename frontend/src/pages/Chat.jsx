@@ -8129,15 +8129,13 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                       hour12: true 
                     })}
                   </span>
-                    {message.isOwn && (
-                      <span className="message-status sent">
+                  {message.isOwn && (
+                    <span className="message-status sent">
                         <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
                         </svg>
                       </span>
                     )}
-                </div>
-                  </div>
                 </div>
               </div>
             )
