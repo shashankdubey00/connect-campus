@@ -90,7 +90,7 @@ export const joinCollegeRoom = (collegeId) => {
  * @param {string|null} replyToId - Optional message ID to reply to
  * @returns {Promise<boolean>} Promise that resolves to true if sent, rejects on error
  */
-export const sendMessage = (text, collegeId, replyToId = null) => {
+export const sendMessage = (text, collegeId, replyToId = null, clientMessageId = null) => {
   return new Promise((resolve, reject) => {
     if (!socket) {
       reject(new Error('Socket not initialized'));
@@ -126,7 +126,7 @@ export const sendMessage = (text, collegeId, replyToId = null) => {
       }, 10000);
       
       // Listen for successful send (message will be received via receiveMessage)
-      socket.emit('sendMessage', { text, collegeId, replyToId });
+      socket.emit('sendMessage', { text, collegeId, replyToId, clientMessageId });
       
       // Clear timeout and resolve after a short delay to allow server processing
       setTimeout(() => {
@@ -146,7 +146,7 @@ export const sendMessage = (text, collegeId, replyToId = null) => {
           };
           
           newSocket.once('error', errorHandler);
-          newSocket.emit('sendMessage', { text, collegeId, replyToId });
+          newSocket.emit('sendMessage', { text, collegeId, replyToId, clientMessageId });
           
           setTimeout(() => {
             newSocket.off('error', errorHandler);

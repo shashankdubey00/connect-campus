@@ -151,7 +151,7 @@ export const initializeSocket = (server) => {
     // Handle sendMessage event - allow sending to any college room
     socket.on('sendMessage', async (data) => {
       try {
-        const { text, collegeId, replyToId } = data;
+        const { text, collegeId, replyToId, clientMessageId } = data;
 
         // Validate message
         if (!text || !text.trim()) {
@@ -272,6 +272,7 @@ export const initializeSocket = (server) => {
         // Safely map arrays to handle any potential data issues
         const messageToSend = {
           id: savedMessage._id.toString(),
+          clientMessageId: clientMessageId || null,
           senderId: savedMessage.senderId.toString(),
           senderName: savedMessage.senderName,
           collegeId: savedMessage.collegeId,
@@ -310,6 +311,7 @@ export const initializeSocket = (server) => {
           // Also emit confirmation to sender
           socket.emit('messageSent', {
             messageId: savedMessage._id.toString(),
+            clientMessageId: clientMessageId || null,
             collegeId: messageCollegeId,
             replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
             text: savedMessage.text // Include text for better matching
@@ -340,6 +342,7 @@ export const initializeSocket = (server) => {
           // Still emit confirmation to sender since message was saved
           socket.emit('messageSent', {
             messageId: savedMessage._id.toString(),
+            clientMessageId: clientMessageId || null,
             collegeId: messageCollegeId,
             replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
             text: savedMessage.text
@@ -360,6 +363,7 @@ export const initializeSocket = (server) => {
           try {
             socket.emit('messageSent', {
               messageId: savedMessage._id.toString(),
+              clientMessageId: data?.clientMessageId || null,
               collegeId: messageCollegeId,
               replyTo: savedMessage.replyTo ? savedMessage.replyTo.toString() : null,
               text: savedMessage.text

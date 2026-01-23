@@ -116,7 +116,7 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
     // Send message
     try {
       const replyToId = replyingTo ? replyingTo.id : null;
-      const sent = sendMessage(messageText, collegeId, replyToId);
+      const sent = sendMessage(messageText, collegeId, replyToId, optimisticMessage.id);
       
       if (!sent) {
         throw new Error('Failed to send message - socket not connected');
@@ -251,6 +251,9 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
     loadMessages
   };
 };
+
+
+
 
 
 

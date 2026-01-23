@@ -5799,6 +5799,16 @@
   pointer-events: none;
 }
 
+/* When the left gutter is collapsed (not in selection mode), ensure checkbox never affects layout */
+@media (max-width: 768px) {
+  .live-chat-view:not(.selection-mode-active) .message-selection-checkbox {
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
+}
+
 /* Show checkboxes only when selection mode is active (visual layer only) */
 .live-chat-view.selection-mode-active .message-selection-checkbox {
   visibility: visible;
@@ -5829,10 +5839,12 @@
 
 /* Adjust message content to make room for checkbox ONLY in selection mode */
 @media (max-width: 768px) {
-  /* UNIVERSAL ROW WRAPPER (key fix): every row type uses the same 2-col grid */
+  /* Mobile row layout:
+     - Default: no left gutter (messages align like WhatsApp)
+     - Selection mode: add left gutter for checkboxes */
   .chat-messages-area .chat-row {
     display: grid;
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 0px 1fr;
     align-items: flex-start;
     column-gap: 0;
     box-sizing: border-box;
@@ -5842,11 +5854,19 @@
     padding: 0;
   }
 
+  .live-chat-view.selection-mode-active .chat-messages-area .chat-row {
+    grid-template-columns: 44px 1fr;
+  }
+
   .chat-messages-area .chat-left-col {
-    width: 44px;
+    width: 0px;
     display: flex;
     justify-content: center;
     align-items: center;
+  }
+
+  .live-chat-view.selection-mode-active .chat-messages-area .chat-left-col {
+    width: 44px;
   }
 
   .chat-messages-area .chat-main-col {
