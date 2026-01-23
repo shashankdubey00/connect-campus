@@ -100,21 +100,21 @@ const Chat = () => {
         const data = await verifyAuth()
         if (data.success) {
           setUser(data.user)
-
+          
           // Connect Socket.IO after user is loaded (token will be read from cookies)
           try {
             const socketInstance = connectSocket();
-
+            
             if (socketInstance) {
               // Wait for connection to be established
               socketInstance.once('connect', () => {
                 // Set up Socket.IO listeners
-                onJoinedRoom(() => { });
+                onJoinedRoom(() => {});
                 // Error handler will be set up in the college chat useEffect
               })
-
+              
               // Set up listeners even if not connected yet (minimal, specific handlers will be set in useEffects)
-              onJoinedRoom(() => { });
+              onJoinedRoom(() => {});
             } else {
               console.log('Socket.IO connection will be retried when needed')
             }
@@ -167,7 +167,7 @@ const Chat = () => {
       }
     }
     loadUser()
-
+    
     // Cleanup: disconnect socket on unmount
     return () => {
       removeAllListeners();
@@ -261,7 +261,7 @@ const Chat = () => {
 
     // Check if we have navigation state to handle
     const hasNavigationState = location.state?.college && location.state?.openCollegeChat
-
+    
     if (!hasNavigationState) {
       // Reset when there's no navigation state
       navigationStateHandled.current = null
@@ -272,7 +272,7 @@ const Chat = () => {
     const locationKey = location.key || location.pathname
     const collegeId = location.state.college?.aisheCode || location.state.college?.name || 'unknown'
     const navigationKey = `${collegeId}-${locationKey}`
-
+    
     // Only handle if we haven't handled this specific navigation state yet
     if (navigationStateHandled.current === navigationKey) {
       return
@@ -282,15 +282,15 @@ const Chat = () => {
     navigationStateHandled.current = navigationKey
 
     // Don't open chat if we're currently viewing a profile (search or right panel)
-    const isViewingProfile = (activeSection === 'search' && selectedCollegeInSearch) ||
-      (view === 'college-profile' && selectedCollege)
-
+    const isViewingProfile = (activeSection === 'search' && selectedCollegeInSearch) || 
+                             (view === 'college-profile' && selectedCollege)
+    
     if (!isViewingProfile) {
       const college = location.state.college
       console.log('Opening college chat from navigation:', college)
       handleOpenCollegeChat(college)
     }
-
+    
     // Clear the state to prevent reopening on re-render
     window.history.replaceState({}, document.title)
   }, [user, isLoading, location.key, location.pathname]) // Include location.key to detect navigation changes
@@ -330,18 +330,18 @@ const Chat = () => {
     try {
       setLoadingCollegeSearch(true)
       const params = new URLSearchParams({ query, limit: '10' })
-
+      
       if (selectedState) {
         params.append('state', selectedState)
       }
-
+      
       if (selectedDistrict) {
         params.append('district', selectedDistrict)
       }
 
       const response = await fetch(`${API_BASE_URL}/api/colleges/search?${params}`)
       const data = await response.json()
-
+      
       if (data.success) {
         setCollegeSuggestions(data.colleges)
         setShowCollegeSuggestions(data.colleges.length > 0)
@@ -358,13 +358,13 @@ const Chat = () => {
   const handleCollegeSuggestionClick = (college) => {
     // Hide suggestions when a college is selected
     setShowCollegeSuggestions(false)
-
+    
     // If in search view, show profile in search panel (don't save state for this)
     if (activeSection === 'search') {
       setCollegeSearchQuery(college.name)
       setSelectedCollegeInSearch(college)
       setSearchBarAtTop(true)
-
+      
       // Save to recent searches
       const recent = [college, ...recentCollegeSearches.filter(c => c.aisheCode !== college.aisheCode)].slice(0, 5)
       setRecentCollegeSearches(recent)
@@ -407,19 +407,19 @@ const Chat = () => {
       members: [],
       ...college
     }
-
+    
     const collegeId = college.aisheCode || college.name
     const collegeName = college.name || 'College Chat'
     const collegeLogo = getCollegeLogoUrl(college, 50)
-
+    
     // Use functional update to check and create chat atomically
     setChats(prev => {
       // Check if chat already exists
-      const existingChat = prev.find(c =>
-        c.type === 'college' &&
+      const existingChat = prev.find(c => 
+        c.type === 'college' && 
         (c.collegeId === collegeId || c.name === collegeName)
       )
-
+      
       if (existingChat) {
         // Check if user just joined via invite - show profile, otherwise go directly to chat
         const justJoined = location.state?.justJoined || false
@@ -427,7 +427,7 @@ const Chat = () => {
         setSelectedChat(existingChat)
         if (justJoined) {
           // Show profile for invited students
-          setView('college-profile')
+        setView('college-profile')
         } else {
           // Go directly to chat
           setView('live-chat')
@@ -438,7 +438,7 @@ const Chat = () => {
         }
         return prev // Return unchanged
       }
-
+      
       // Chat doesn't exist, create it immediately
       const newChat = {
         id: `college-${collegeId}`,
@@ -453,32 +453,32 @@ const Chat = () => {
         college: collegeData,
         lastMessageTime: null
       }
-
+      
       // Load message history in background and update
       getCollegeChatInfo(collegeId).then(chatInfo => {
         if (chatInfo.success) {
-          setChats(prevChats => prevChats.map(c =>
+          setChats(prevChats => prevChats.map(c => 
             c.id === newChat.id
               ? {
-                ...c,
-                lastMessage: chatInfo.lastMessage || 'No messages yet',
-                timestamp: chatInfo.lastMessageTime ? formatChatTimestamp(chatInfo.lastMessageTime) : '',
-                lastMessageTime: chatInfo.lastMessageTime
-              }
+                  ...c,
+                  lastMessage: chatInfo.lastMessage || 'No messages yet',
+                  timestamp: chatInfo.lastMessageTime ? formatChatTimestamp(chatInfo.lastMessageTime) : '',
+                  lastMessageTime: chatInfo.lastMessageTime
+                }
               : c
           ))
         }
       }).catch(error => {
         console.error('Error loading chat info:', error)
       })
-
+      
       // Check if user just joined via invite - show profile, otherwise go directly to chat
       const justJoined = location.state?.justJoined || false
       setSelectedCollege(collegeData)
       setSelectedChat(newChat)
       if (justJoined) {
         // Show profile for invited students
-        setView('college-profile')
+      setView('college-profile')
       } else {
         // Go directly to chat
         setView('live-chat')
@@ -487,7 +487,7 @@ const Chat = () => {
       if (isMobileView) {
         setShowChatList(false)
       }
-
+      
       // Return updated chats list with new chat
       return [newChat, ...prev]
     })
@@ -511,14 +511,14 @@ const Chat = () => {
     // Calculate from chats (college + direct messages) - for Home icon
     const chatsTotal = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0)
     const chatsWithUnread = chats.filter(chat => (chat.unreadCount || 0) > 0).length
-
+    
     // Calculate from groups - for Community icon
     const groupsTotal = groups.reduce((sum, group) => sum + (group.unreadCount || 0), 0)
     const groupsWithUnread = groups.filter(group => (group.unreadCount || 0) > 0).length
-
+    
     // Combine totals for overall count (if needed elsewhere)
     setTotalUnreadCount(chatsTotal + groupsTotal)
-
+    
     // Keep chats and groups separate
     setChatsWithUnreadCount(chatsWithUnread) // Only chats for Home icon
     setGroupsWithUnreadCount(groupsWithUnread) // Only groups for Community icon
@@ -530,11 +530,11 @@ const Chat = () => {
     if (isLoadingChatsRef.current) {
       return
     }
-
+    
     try {
       isLoadingChatsRef.current = true
       setIsLoadingChats(true)
-
+      
       // Fetch both college chats and direct message conversations in parallel
       const [collegesResponse, directMessagesResponse] = await Promise.all([
         fetchUserCollegesWithMessages().catch(err => {
@@ -555,7 +555,7 @@ const Chat = () => {
           const collegeId = college.aisheCode || college.name
           const collegeName = college.name || 'College Chat'
           const collegeLogo = getCollegeLogoUrl(college, 50)
-
+          
           return {
             id: `college-${collegeId}`,
             type: 'college',
@@ -588,12 +588,12 @@ const Chat = () => {
         const directChats = directMessagesResponse.conversations.map(conversation => {
           const userId = conversation.userId
           const userName = conversation.name || 'User'
-          const userAvatar = conversation.profilePicture
-            ? (conversation.profilePicture.startsWith('/uploads/')
-              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${conversation.profilePicture}`
-              : conversation.profilePicture)
+          const userAvatar = conversation.profilePicture 
+            ? (conversation.profilePicture.startsWith('/uploads/') 
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${conversation.profilePicture}`
+                : conversation.profilePicture)
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+          
           return {
             id: `direct-${userId}`,
             type: 'direct',
@@ -616,7 +616,7 @@ const Chat = () => {
       // Merge with existing chats, updating existing ones and adding new ones
       setChats(prev => {
         const existingMap = new Map(prev.map(c => [c.id, c]))
-
+        
         // Update existing chats or add new ones
         allChats.forEach(newChat => {
           const existing = existingMap.get(newChat.id)
@@ -640,14 +640,14 @@ const Chat = () => {
             existingMap.set(newChat.id, newChat)
           }
         })
-
+        
         // Convert back to array and sort by last message time
         const combined = Array.from(existingMap.values()).sort((a, b) => {
           const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
           const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
           return timeB - timeA // Most recent first
         })
-
+        
         return combined
       })
     } catch (error) {
@@ -697,7 +697,7 @@ const Chat = () => {
   const loadAvailableUsers = useCallback(async () => {
     try {
       const allUsers = new Map() // Use Map to avoid duplicates by userId
-
+      
       // 1. Get users from direct message conversations (people you've chatted with)
       try {
         const dmResponse = await getDirectMessageConversations()
@@ -723,7 +723,7 @@ const Chat = () => {
       } catch (error) {
         console.error('Error loading direct message contacts:', error)
       }
-
+      
       // 2. Get users from ALL colleges the user has joined/followed
       try {
         // Get all colleges the user has joined
@@ -749,10 +749,10 @@ const Chat = () => {
               return null
             }
           })
-
+          
           // Wait for all college member requests to complete
           const collegeResults = await Promise.all(collegePromises)
-
+          
           // Add all members from all colleges
           collegeResults.forEach((result) => {
             if (result && result.members) {
@@ -778,14 +778,14 @@ const Chat = () => {
       } catch (error) {
         console.error('Error loading user colleges:', error)
       }
-
+      
       // Convert Map to array and sort by display name
       const usersArray = Array.from(allUsers.values()).sort((a, b) => {
         const nameA = a.profile.displayName.toLowerCase()
         const nameB = b.profile.displayName.toLowerCase()
         return nameA.localeCompare(nameB)
       })
-
+      
       setAvailableUsers(usersArray)
     } catch (error) {
       console.error('Error loading available users:', error)
@@ -816,7 +816,7 @@ const Chat = () => {
     if (navigationHistory.current.length > 10) {
       navigationHistory.current.shift()
     }
-
+    
     // Push state to browser history so back/forward works within /chat
     // This ensures browser history has /chat entries, not landing page
     window.history.pushState({ appState: currentState }, '', '/chat')
@@ -828,7 +828,7 @@ const Chat = () => {
       // Check if selection mode is active by checking if selection-mode-bar exists in DOM
       const selectionModeBar = document.querySelector('.selection-mode-bar')
       const isInChatView = view === 'live-chat' || view === 'group-chat' || view === 'direct-chat'
-
+      
       // If selection mode is active and we're in a chat view, prevent navigation
       // The back button handler in the chat view will exit selection mode
       if (selectionModeBar && isInChatView) {
@@ -841,26 +841,26 @@ const Chat = () => {
         }
         return
       }
-
+      
       // Check current pathname - if we're being navigated away from /chat, prevent it
       const currentPath = window.location.pathname
-
+      
       // If we have app navigation history, restore app state
       if (navigationHistory.current.length > 0) {
         // Push state back to /chat immediately to prevent navigation away
         if (currentPath !== '/chat') {
           window.history.pushState(null, '', '/chat')
         }
-
+        
         // Use custom navigation to restore app state
         const previousState = navigationHistory.current.pop()
-
+        
         // Use requestAnimationFrame to ensure state updates happen after navigation
         requestAnimationFrame(() => {
           // Restore previous state
           setActiveSection(previousState.activeSection)
           setView(previousState.view)
-
+          
           // Restore selectedChat if it exists in current chats
           if (previousState.selectedChat) {
             const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
@@ -868,10 +868,10 @@ const Chat = () => {
           } else {
             setSelectedChat(null)
           }
-
+          
           // Restore selectedCollege
           if (previousState.selectedCollege) {
-            const chatWithCollege = chats.find(c =>
+            const chatWithCollege = chats.find(c => 
               c.college && (
                 c.college.aisheCode === previousState.selectedCollege.aisheCode ||
                 c.college.name === previousState.selectedCollege.name
@@ -885,17 +885,17 @@ const Chat = () => {
           } else {
             setSelectedCollege(null)
           }
-
+          
           setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
           setIsSearchActive(previousState.isSearchActive || false)
           setSearchBarAtTop(previousState.searchBarAtTop || false)
           setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
-
+          
           // If going back to chats, load messages
           if (previousState.activeSection === 'chats') {
             loadAllCollegesWithMessages()
           }
-
+          
           // Ensure React Router knows we're on /chat
           navigate('/chat', { replace: true })
         })
@@ -913,7 +913,7 @@ const Chat = () => {
     // Add popstate listener to intercept browser navigation
     // Use capture phase to run before React Router
     window.addEventListener('popstate', handlePopState, true)
-
+    
     return () => {
       window.removeEventListener('popstate', handlePopState, true)
     }
@@ -923,11 +923,11 @@ const Chat = () => {
   const navigateBack = () => {
     if (navigationHistory.current.length > 0) {
       const previousState = navigationHistory.current.pop()
-
+      
       // Restore previous state
       setActiveSection(previousState.activeSection)
       setView(previousState.view)
-
+      
       // Restore selectedChat if it exists in current chats
       if (previousState.selectedChat) {
         const restoredChat = chats.find(c => c.id === previousState.selectedChat.id)
@@ -935,11 +935,11 @@ const Chat = () => {
       } else {
         setSelectedChat(null)
       }
-
+      
       // Restore selectedCollege - try to find it from chats or keep the saved reference
       if (previousState.selectedCollege) {
         // Try to find college from chats first
-        const chatWithCollege = chats.find(c =>
+        const chatWithCollege = chats.find(c => 
           c.college && (
             c.college.aisheCode === previousState.selectedCollege.aisheCode ||
             c.college.name === previousState.selectedCollege.name
@@ -954,12 +954,12 @@ const Chat = () => {
       } else {
         setSelectedCollege(null)
       }
-
+      
       setSelectedCollegeInSearch(previousState.selectedCollegeInSearch || null)
       setIsSearchActive(previousState.isSearchActive || false)
       setSearchBarAtTop(previousState.searchBarAtTop || false)
       setShowChatList(previousState.showChatList !== undefined ? previousState.showChatList : true)
-
+      
       // If going back to chats, load messages
       if (previousState.activeSection === 'chats') {
         loadAllCollegesWithMessages()
@@ -993,27 +993,27 @@ const Chat = () => {
     setView('list')
     setSelectedChat(null)
     setSelectedCollege(null)
-
+    
     // Show chat list on mobile when switching to chats or community section
     if ((section === 'chats' || section === 'community') && isMobileView) {
       setShowChatList(true)
     }
-
+    
     // Clear search query when switching to chats section
     if (section === 'chats') {
       setSearchQuery('')
     }
-
+    
     // Load all colleges with messages when switching to chats section
     if (section === 'chats') {
       loadAllCollegesWithMessages()
     }
-
+    
     // Load groups when switching to community section
     if (section === 'community' && user && !isLoading) {
       loadGroups()
     }
-
+    
     if (section !== 'search') {
       setIsSearchActive(false)
       setSearchBarAtTop(false)
@@ -1040,13 +1040,13 @@ const Chat = () => {
       return newSet
     })
   }
-
+  
   // Exit chat selection mode
   const handleExitChatSelectionMode = () => {
     setChatSelectionMode(false)
     setSelectedChatIds(new Set())
   }
-
+  
   // Enter chat selection mode
   const handleEnterChatSelectionMode = () => {
     setChatSelectionMode(true)
@@ -1059,7 +1059,7 @@ const Chat = () => {
       setSelectedChatsFollowStatus({ allFollowing: false, allNotFollowing: false, mixed: false })
       return
     }
-
+    
     try {
       const followStatuses = await Promise.all(
         selectedChats.map(async (chat) => {
@@ -1068,11 +1068,11 @@ const Chat = () => {
           return status.success ? status.isFollowing : false
         })
       )
-
+      
       const allFollowing = followStatuses.every(status => status === true)
       const allNotFollowing = followStatuses.every(status => status === false)
       const mixed = !allFollowing && !allNotFollowing
-
+      
       setSelectedChatsFollowStatus({ allFollowing, allNotFollowing, mixed })
     } catch (error) {
       console.error('Error checking follow status:', error)
@@ -1086,7 +1086,7 @@ const Chat = () => {
       setSelectedChatsBlockStatus({ allBlocked: false, allUnblocked: false, mixed: false })
       return
     }
-
+    
     try {
       const blockStatuses = await Promise.all(
         selectedChats.map(async (chat) => {
@@ -1096,11 +1096,11 @@ const Chat = () => {
           return status.success ? (status.blockedByMe || false) : false
         })
       )
-
+      
       const allBlocked = blockStatuses.every(status => status === true)
       const allUnblocked = blockStatuses.every(status => status === false)
       const mixed = !allBlocked && !allUnblocked
-
+      
       setSelectedChatsBlockStatus({ allBlocked, allUnblocked, mixed })
     } catch (error) {
       console.error('Error checking block status:', error)
@@ -1127,7 +1127,7 @@ const Chat = () => {
       for (const chat of selectedChats) {
         const college = chat.college || { aisheCode: chat.collegeId, name: chat.name }
         const followStatus = await checkFollowStatus(college)
-
+        
         if (followStatus.success) {
           if (followStatus.isFollowing) {
             // Unfollow
@@ -1138,7 +1138,7 @@ const Chat = () => {
           }
         }
       }
-
+      
       // Reload chats to reflect changes
       loadAllCollegesWithMessages()
       handleExitChatSelectionMode()
@@ -1187,7 +1187,7 @@ const Chat = () => {
           console.warn('No collegeId found for chat:', chat)
         }
       }
-
+      
       // Delete direct chats
       for (const chat of directChats) {
         const userId = chat.userId
@@ -1202,13 +1202,13 @@ const Chat = () => {
           console.warn('No userId found for chat:', chat)
         }
       }
-
+      
       // Reload chats to ensure list is updated
       await loadAllCollegesWithMessages()
-
+      
       // Remove selected chats from the chat list
       setChats(prev => prev.filter(chat => !selectedChatIds.has(chat.id)))
-
+      
       // If currently viewing one of the deleted chats, go back to list
       if (selectedChat && selectedChatIds.has(selectedChat.id)) {
         setView('list')
@@ -1216,7 +1216,7 @@ const Chat = () => {
         setSelectedCollege(null)
         setSelectedStudent(null)
       }
-
+      
       handleExitChatSelectionMode()
     } catch (error) {
       console.error('Error deleting chats:', error)
@@ -1246,7 +1246,7 @@ const Chat = () => {
           }
         }
       }
-
+      
       // Reload chats to reflect changes
       loadAllCollegesWithMessages()
       handleExitChatSelectionMode()
@@ -1262,25 +1262,25 @@ const Chat = () => {
       handleToggleChatSelection(chat.id)
       return
     }
-
+    
     saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
-
+    
     // Reset unread count for this chat
     if (chat.collegeId) {
       setUnreadCounts(prev => ({
         ...prev,
         [chat.collegeId]: 0
       }))
-
+      
       // Update chat in list to reset unread count
-      setChats(prev => prev.map(c =>
-        c.collegeId === chat.collegeId
+      setChats(prev => prev.map(c => 
+        c.collegeId === chat.collegeId 
           ? { ...c, unreadCount: 0 }
           : c
       ))
     }
-
+    
     if (chat.type === 'college') {
       const college = chat.college || user?.profile?.college
       setSelectedCollege(college)
@@ -1289,8 +1289,8 @@ const Chat = () => {
       // For direct messages, open direct chat view
       if (chat.userId) {
         // Reset unread count for direct chat
-        setChats(prev => prev.map(c =>
-          c.id === chat.id
+        setChats(prev => prev.map(c => 
+          c.id === chat.id 
             ? { ...c, unreadCount: 0 }
             : c
         ))
@@ -1328,19 +1328,19 @@ const Chat = () => {
           userIdString = String(userId).trim()
         }
       }
-
+      
       if (!userIdString || userIdString === 'undefined' || userIdString === 'null') {
         console.error('No valid userId provided:', userId)
         alert('Invalid user ID. Please try again.')
         return
       }
-
+      
       console.log('Opening student profile for userId:', userIdString, 'Type:', typeof userId)
-
+      
       try {
         const response = await getUserProfile(userIdString)
         console.log('getUserProfile response:', response)
-
+        
         if (response && response.success && response.user) {
           saveNavigationState() // Save current state before navigating
           setSelectedStudent(response.user)
@@ -1362,7 +1362,7 @@ const Chat = () => {
           statusText: apiError.response?.statusText,
           data: apiError.response?.data
         })
-
+        
         // Try to extract a meaningful error message
         let errorMsg = 'Unknown error occurred'
         if (apiError.response?.data?.message) {
@@ -1370,7 +1370,7 @@ const Chat = () => {
         } else if (apiError.message) {
           errorMsg = apiError.message
         }
-
+        
         alert(`Error loading student profile: ${errorMsg}. Please check the console for details.`)
       }
     } catch (error) {
@@ -1386,13 +1386,13 @@ const Chat = () => {
     const collegeId = college.aisheCode || college.name || college.id
     const collegeName = college.name || 'College Chat'
     const collegeLogo = getCollegeLogoUrl(college, 50)
-
+    
     // Find chat in the actual chats state
-    const chat = chats.find(c =>
-      c.type === 'college' &&
+    const chat = chats.find(c => 
+      c.type === 'college' && 
       (c.collegeId === collegeId || c.name === college.name)
     )
-
+    
     if (chat) {
       // Chat exists, open it directly
       setSelectedChat(chat)
@@ -1416,32 +1416,32 @@ const Chat = () => {
         college: college,
         lastMessageTime: null
       }
-
+      
       // Add chat to list
       setChats(prev => {
         const existing = prev.find(c => c.id === newChat.id)
         if (existing) return prev
         return [newChat, ...prev]
       })
-
+      
       // Load message history in background
       getCollegeChatInfo(collegeId).then(chatInfo => {
         if (chatInfo.success) {
-          setChats(prevChats => prevChats.map(c =>
+          setChats(prevChats => prevChats.map(c => 
             c.id === newChat.id
               ? {
-                ...c,
-                lastMessage: chatInfo.lastMessage || 'No messages yet',
-                timestamp: chatInfo.lastMessageTime ? formatChatTimestamp(chatInfo.lastMessageTime) : '',
-                lastMessageTime: chatInfo.lastMessageTime
-              }
+                  ...c,
+                  lastMessage: chatInfo.lastMessage || 'No messages yet',
+                  timestamp: chatInfo.lastMessageTime ? formatChatTimestamp(chatInfo.lastMessageTime) : '',
+                  lastMessageTime: chatInfo.lastMessageTime
+                }
               : c
           ))
         }
       }).catch(error => {
         console.error('Error loading chat info:', error)
       })
-
+      
       // Open live-chat view directly
       setSelectedChat(newChat)
       setSelectedCollege(college)
@@ -1541,7 +1541,7 @@ const Chat = () => {
       }
       // If it's already a full URL, use it as is
       if (user.profile.profilePicture.startsWith('http://') || user.profile.profilePicture.startsWith('https://')) {
-        return user.profile.profilePicture
+      return user.profile.profilePicture
       }
       // Otherwise, treat as relative path
       const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -1606,7 +1606,7 @@ const Chat = () => {
     try {
       // Fetch last message for preview
       const chatInfo = await getCollegeChatInfo(collegeId)
-
+      
       const chat = {
         id: `college-${collegeId}`,
         type: 'college',
@@ -1642,12 +1642,12 @@ const Chat = () => {
     setChats(prev => {
       const chatId = `direct-${userId}`
       const chatIndex = prev.findIndex(c => c.id === chatId)
-
+      
       // Format message preview with status
-      const messagePreview = isOwnMessage
+      const messagePreview = isOwnMessage 
         ? truncateMessage(messageText)
         : truncateMessage(messageText)
-
+      
       if (chatIndex === -1) {
         // Chat doesn't exist, create new one
         const newChat = {
@@ -1664,7 +1664,7 @@ const Chat = () => {
           lastMessageTime: messageTimestamp,
           unreadCount: 0
         }
-
+        
         // Add to top of list
         return [newChat, ...prev].sort((a, b) => {
           const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
@@ -1672,11 +1672,11 @@ const Chat = () => {
           return timeB - timeA
         })
       }
-
+      
       // Update existing chat
       const updatedChats = [...prev]
       const chat = { ...updatedChats[chatIndex] }
-
+      
       // Update last message and timestamp
       // If messageText is "No messages yet" or messageTimestamp is null, it means chat was cleared
       if (messageText !== 'No messages yet' && messageTimestamp) {
@@ -1684,8 +1684,8 @@ const Chat = () => {
         chat.lastMessageIsOwn = isOwnMessage
         chat.lastMessageDeliveredTo = deliveredTo || []
         chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
+      chat.timestamp = formatChatTimestamp(messageTimestamp)
+      chat.lastMessageTime = messageTimestamp
       } else {
         // When clearing chat, update the message text and set timestamp to now
         chat.lastMessage = 'No messages yet'
@@ -1697,18 +1697,18 @@ const Chat = () => {
         chat.timestamp = formatChatTimestamp(clearTime)
         chat.lastMessageTime = clearTime
       }
-
+      
       // Only increment unread count if message is not from current user and chat is not open
       if (!isOwnMessage && selectedChat?.id !== chatId) {
         chat.unreadCount = (chat.unreadCount || 0) + 1
       } else {
         chat.unreadCount = 0
       }
-
+      
       // Move chat to top (most recent first)
       updatedChats.splice(chatIndex, 1)
       updatedChats.unshift(chat)
-
+      
       // Sort by last message time
       return updatedChats.sort((a, b) => {
         const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
@@ -1722,7 +1722,7 @@ const Chat = () => {
   const updateChatListOnMessage = useCallback((collegeId, messageText, messageTimestamp, isOwnMessage = false, deliveredTo = [], readBy = []) => {
     setChats(prev => {
       const chatIndex = prev.findIndex(c => c.collegeId === collegeId)
-
+      
       if (chatIndex === -1) {
         // Chat doesn't exist, try to find college data
         const existingChat = prev.find(c => c.college?.aisheCode === collegeId || c.college?.name === collegeId)
@@ -1737,19 +1737,19 @@ const Chat = () => {
           chat.timestamp = formatChatTimestamp(messageTimestamp)
           chat.lastMessageTime = messageTimestamp
           chat.unreadCount = isOwnMessage || selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0)
-
+          
           // Move to top
           updatedChats.splice(prev.findIndex(c => c.id === existingChat.id), 1)
           updatedChats.unshift(chat)
           return updatedChats
         }
-
+        
         // If chat doesn't exist and message is sent, create new chat entry
         // This happens when user sends first message without following
         if (isOwnMessage && selectedCollege) {
           const collegeName = selectedCollege.name || 'College Chat'
           const collegeLogo = getCollegeLogoUrl(selectedCollege, 50)
-
+          
           const newChat = {
             id: `college-${collegeId}`,
             type: 'college',
@@ -1765,28 +1765,28 @@ const Chat = () => {
             unreadCount: 0,
             college: selectedCollege
           }
-
+          
           // Add to top of list
           return [newChat, ...prev]
         }
-
+        
         // If still not found, return unchanged
         return prev
       }
-
+      
       // Update existing chat
       const updatedChats = [...prev]
       const chat = { ...updatedChats[chatIndex] }
-
+      
       // Update last message and timestamp
       // If messageText is "No messages yet" or messageTimestamp is null, it means chat was cleared
       if (messageText !== 'No messages yet' && messageTimestamp) {
-        chat.lastMessage = truncateMessage(messageText)
+      chat.lastMessage = truncateMessage(messageText)
         chat.lastMessageIsOwn = isOwnMessage
         chat.lastMessageDeliveredTo = deliveredTo || []
         chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
+      chat.timestamp = formatChatTimestamp(messageTimestamp)
+      chat.lastMessageTime = messageTimestamp
       } else {
         // When clearing chat, update the message text and set timestamp to now
         chat.lastMessage = 'No messages yet'
@@ -1798,7 +1798,7 @@ const Chat = () => {
         chat.timestamp = formatChatTimestamp(clearTime)
         chat.lastMessageTime = clearTime
       }
-
+      
       // Only increment unread count if:
       // 1. Message is not from current user
       // 2. Chat is not currently open
@@ -1816,11 +1816,11 @@ const Chat = () => {
           [collegeId]: 0
         }))
       }
-
+      
       // Move chat to top (most recent first)
       updatedChats.splice(chatIndex, 1)
       updatedChats.unshift(chat)
-
+      
       // Sort by last message time to ensure correct order
       return updatedChats.sort((a, b) => {
         const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
@@ -1834,12 +1834,12 @@ const Chat = () => {
   const handleNewMessage = useCallback((message) => {
     const collegeId = message.collegeId
     const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
-
+    
     // Update chat list with delivery and read status
     updateChatListOnMessage(
-      collegeId,
-      message.text,
-      message.timestamp,
+      collegeId, 
+      message.text, 
+      message.timestamp, 
       isOwnMessage,
       message.deliveredTo || [],
       message.readBy || []
@@ -1851,7 +1851,7 @@ const Chat = () => {
     const socketInstance = getSocket()
     if (socketInstance) {
       onReceiveMessage(handleNewMessage)
-
+      
       // Listen for global chat list updates (for real-time updates across all systems)
       const handleChatListUpdate = (data) => {
         if (data.type === 'college') {
@@ -1866,7 +1866,7 @@ const Chat = () => {
           )
         }
       }
-
+      
       const handleDirectChatListUpdate = (data) => {
         if (data.type === 'direct') {
           // Get user info for the other user
@@ -1874,7 +1874,7 @@ const Chat = () => {
           const otherUserChat = chats.find(c => c.id === `direct-${otherUserId}`)
           const userName = otherUserChat?.name || data.senderName || 'User'
           const userAvatar = otherUserChat?.avatar || null
-
+          
           updateChatListOnDirectMessage(
             otherUserId,
             userName,
@@ -1887,29 +1887,29 @@ const Chat = () => {
           )
         }
       }
-
+      
       socketInstance.on('chatListUpdate', handleChatListUpdate)
       socketInstance.on('directChatListUpdate', handleDirectChatListUpdate)
-
+      
       // Listen for group message updates to update groups list in real-time
       const handleGroupChatListUpdate = (data) => {
         if (data.type === 'group' && data.groupId) {
           const isOwnMessage = String(data.senderId) === String(user?.id || user?._id || '')
           const isGroupOpen = selectedChat?.type === 'group' && String(selectedChat?.groupId) === String(data.groupId)
-
+          
           // Update groups list with latest message
           setGroups(prev => {
             const updated = prev.map(g => {
               if (String(g.id) === String(data.groupId)) {
                 // Only increment unread count if message is not from current user and group is not open
                 let newUnreadCount = g.unreadCount || 0
-
+                
                 if (!isOwnMessage && !isGroupOpen) {
                   newUnreadCount = (newUnreadCount || 0) + 1
                 } else if (isGroupOpen || isOwnMessage) {
                   newUnreadCount = 0
                 }
-
+                
                 return {
                   ...g,
                   lastMessage: data.messageText || data.text || '',
@@ -1929,9 +1929,9 @@ const Chat = () => {
           })
         }
       }
-
+      
       socketInstance.on('groupChatListUpdate', handleGroupChatListUpdate)
-
+      
       // Listen for groupMessage socket events (for messages in open group chat view)
       onGroupMessage((message) => {
         // This handles messages in the open group chat view
@@ -1939,7 +1939,7 @@ const Chat = () => {
         if (message.groupId) {
           const isOwnMessage = String(message.message?.senderId || message.senderId) === String(user?.id || user?._id || '')
           const isGroupOpen = selectedChat?.type === 'group' && String(selectedChat?.groupId) === String(message.groupId)
-
+          
           setGroups(prev => {
             const updated = prev.map(g => {
               if (String(g.id) === String(message.groupId)) {
@@ -1948,7 +1948,7 @@ const Chat = () => {
                 if (isGroupOpen || isOwnMessage) {
                   newUnreadCount = 0
                 }
-
+                
                 return {
                   ...g,
                   lastMessage: message.message?.text || message.text || '',
@@ -1968,7 +1968,7 @@ const Chat = () => {
           })
         }
       })
-
+      
       // Listen for typing indicators in chat list
       const handleTypingInChat = (data) => {
         if (data.type === 'college' && data.collegeId) {
@@ -2009,7 +2009,7 @@ const Chat = () => {
           }
         }
       }
-
+      
       // Listen for user typing events and update chat list
       const handleUserTypingForList = (data) => {
         if (data.collegeId) {
@@ -2022,7 +2022,7 @@ const Chat = () => {
           })
         }
       }
-
+      
       const handleUserTypingDirectForList = (data) => {
         handleTypingInChat({
           type: 'direct',
@@ -2031,7 +2031,7 @@ const Chat = () => {
           isTyping: data.isTyping
         })
       }
-
+      
       // Listen for online/offline status updates
       const handleUserOnlineForList = (data) => {
         if (data.userId) {
@@ -2042,7 +2042,7 @@ const Chat = () => {
           })
         }
       }
-
+      
       const handleUserOfflineForList = (data) => {
         if (data.userId) {
           setOnlineStatuses(prev => {
@@ -2052,12 +2052,12 @@ const Chat = () => {
           })
         }
       }
-
+      
       socketInstance.on('userTyping', handleUserTypingForList)
       socketInstance.on('userTypingDirect', handleUserTypingDirectForList)
       socketInstance.on('userOnline', handleUserOnlineForList)
       socketInstance.on('userOffline', handleUserOfflineForList)
-
+      
       return () => {
         if (socketInstance) {
           socketInstance.off('chatListUpdate', handleChatListUpdate)
@@ -2069,7 +2069,7 @@ const Chat = () => {
         }
       }
     }
-
+    
     return () => {
       // Cleanup handled by removeAllListeners
     }
@@ -2082,18 +2082,18 @@ const Chat = () => {
       // Sort by last message time (most recent first)
       // If both have lastMessageTime, use that
       // Otherwise fall back to timestamp or 0
-      const timeA = a.lastMessageTime
-        ? new Date(a.lastMessageTime).getTime()
+      const timeA = a.lastMessageTime 
+        ? new Date(a.lastMessageTime).getTime() 
         : (a.timestamp ? new Date(a.timestamp).getTime() : 0)
-      const timeB = b.lastMessageTime
-        ? new Date(b.lastMessageTime).getTime()
+      const timeB = b.lastMessageTime 
+        ? new Date(b.lastMessageTime).getTime() 
         : (b.timestamp ? new Date(b.timestamp).getTime() : 0)
-
+      
       // Most recent first
       if (timeB !== timeA) {
         return timeB - timeA
       }
-
+      
       // If times are equal, prioritize chats with unread messages
       return (b.unreadCount || 0) - (a.unreadCount || 0)
     })
@@ -2113,7 +2113,7 @@ const Chat = () => {
           {!searchBarAtTop && (
             <div className="search-center-container">
               <div className="search-center-form">
-                <form
+                <form 
                   className="search-center-form-wrapper"
                   onSubmit={handleCollegeSearch}
                 >
@@ -2146,16 +2146,16 @@ const Chat = () => {
               </div>
             </div>
           )}
-
+          
           {searchBarAtTop && (
             <>
               <div className="search-top-bar">
-                <form
+                <form 
                   className="search-top-form"
                   onSubmit={handleCollegeSearch}
                 >
-                  <button
-                    type="button"
+                  <button 
+                    type="button" 
                     className="search-back-btn"
                     onClick={() => {
                       if (selectedCollegeInSearch) {
@@ -2191,8 +2191,8 @@ const Chat = () => {
                     autoFocus
                   />
                   {collegeSearchQuery && (
-                    <button
-                      type="button"
+                    <button 
+                      type="button" 
                       className="search-clear-btn"
                       onClick={() => {
                         setCollegeSearchQuery('')
@@ -2205,13 +2205,13 @@ const Chat = () => {
                   )}
                 </form>
               </div>
-
+              
               <div className="search-results-container">
                 {selectedCollegeInSearch ? (
                   // Show college profile in search panel
                   <div className="search-college-profile">
-                    <CollegeProfileView
-                      college={selectedCollegeInSearch}
+                    <CollegeProfileView 
+                      college={selectedCollegeInSearch} 
                       user={user}
                       onBack={navigateBack}
                       showBackButton={true}
@@ -2230,14 +2230,14 @@ const Chat = () => {
                         try {
                           // Clear navigation state immediately to prevent auto-opening chat
                           window.history.replaceState({}, document.title)
-
+                          
                           // Follow the college
                           const response = await followCollege(college)
                           if (response.success) {
                             // Get updated followers count
                             const followersResponse = await getCollegeFollowersCount(college)
                             const followersCount = followersResponse.count || 0
-
+                            
                             // Update selected college in search with followers count
                             const updatedCollege = {
                               ...college,
@@ -2245,15 +2245,15 @@ const Chat = () => {
                             }
                             setActiveSection('search')
                             setSelectedCollegeInSearch(updatedCollege)
-
+                            
                             // Add college to chats list in home section if not already there
                             const collegeId = college.aisheCode || college.name
                             const collegeName = college.name || 'College Chat'
                             const collegeLogo = getCollegeLogoUrl(college, 50)
-
+                            
                             setChats(prev => {
-                              const exists = prev.find(c =>
-                                c.type === 'college' &&
+                              const exists = prev.find(c => 
+                                c.type === 'college' && 
                                 (c.collegeId === collegeId || c.name === collegeName)
                               )
                               if (!exists) {
@@ -2272,7 +2272,7 @@ const Chat = () => {
                               }
                               return prev
                             })
-
+                            
                             // Reload all chats
                             loadAllCollegesWithMessages()
                           }
@@ -2283,36 +2283,36 @@ const Chat = () => {
                         }
                       }}
                       onUnfollowCollege={async (college) => {
-                        try {
-                          // Clear navigation state immediately to prevent auto-opening chat
-                          window.history.replaceState({}, document.title)
-
-                          const response = await unfollowCollege(college)
-                          if (response.success) {
-                            // Get updated followers count
-                            const followersResponse = await getCollegeFollowersCount(college)
-                            const followersCount = followersResponse.count || 0
-
-                            // Update selected college in search with followers count
-                            const updatedCollege = {
-                              ...college,
-                              totalMembers: followersCount
+                          try {
+                            // Clear navigation state immediately to prevent auto-opening chat
+                            window.history.replaceState({}, document.title)
+                            
+                            const response = await unfollowCollege(college)
+                            if (response.success) {
+                              // Get updated followers count
+                              const followersResponse = await getCollegeFollowersCount(college)
+                              const followersCount = followersResponse.count || 0
+                              
+                              // Update selected college in search with followers count
+                              const updatedCollege = {
+                                ...college,
+                                totalMembers: followersCount
+                              }
+                              setActiveSection('search')
+                              setSelectedCollegeInSearch(updatedCollege)
+                              
+                              // Don't remove college from chats list - keep it so user can still access the chat
+                              // College will remain in chats if they've sent messages
+                              
+                              // Reload all chats
+                              loadAllCollegesWithMessages()
                             }
-                            setActiveSection('search')
-                            setSelectedCollegeInSearch(updatedCollege)
-
-                            // Don't remove college from chats list - keep it so user can still access the chat
-                            // College will remain in chats if they've sent messages
-
-                            // Reload all chats
-                            loadAllCollegesWithMessages()
+                            return response
+                          } catch (error) {
+                            console.error('Error unfollowing college:', error)
+                            return { success: false, message: error.message }
                           }
-                          return response
-                        } catch (error) {
-                          console.error('Error unfollowing college:', error)
-                          return { success: false, message: error.message }
-                        }
-                      }}
+                        }}
                     />
                   </div>
                 ) : loadingCollegeSearch ? (
@@ -2386,23 +2386,23 @@ const Chat = () => {
         </div>
       )
     }
-
+    
     if (activeSection === 'chats') {
       return (
         <>
           <div className="panel-header panel-header-with-search">
             <h2>all chats</h2>
             {!chatSelectionMode ? (
-              <div className="panel-header-search">
-                <input
-                  type="text"
-                  className="panel-search-input"
-                  placeholder="Search chats..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <span className="panel-search-icon">🔍</span>
-              </div>
+            <div className="panel-header-search">
+              <input
+                type="text"
+                className="panel-search-input"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <span className="panel-search-icon">🔍</span>
+            </div>
             ) : (
               (() => {
                 const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id))
@@ -2413,15 +2413,15 @@ const Chat = () => {
                 const isHybrid = hasCollegeChats && hasDirectChats
                 const isOnlyCollege = hasCollegeChats && !hasDirectChats
                 const isOnlyDirect = hasDirectChats && !hasCollegeChats
-
+                
                 return (
-                  <div className="chat-selection-mode-header">
-                    <span>{selectedChatIds.size} selected</span>
+              <div className="chat-selection-mode-header">
+                <span>{selectedChatIds.size} selected</span>
                     <div className="chat-selection-actions">
                       {/* Show buttons based on selection type */}
                       {isOnlyCollege && (
                         <>
-                          <button
+                          <button 
                             className="chat-selection-action-btn"
                             onClick={handleFollowUnfollowSelected}
                             title="Follow/Unfollow"
@@ -2433,14 +2433,14 @@ const Chat = () => {
                               <line x1="23" y1="11" x2="17" y2="11"></line>
                             </svg>
                             <span>
-                              {selectedChatsFollowStatus.allFollowing
-                                ? 'Unfollow'
-                                : selectedChatsFollowStatus.allNotFollowing
-                                  ? 'Follow'
+                              {selectedChatsFollowStatus.allFollowing 
+                                ? 'Unfollow' 
+                                : selectedChatsFollowStatus.allNotFollowing 
+                                  ? 'Follow' 
                                   : 'Follow/Unfollow'}
                             </span>
                           </button>
-                          <button
+                          <button 
                             className="chat-selection-action-btn chat-selection-delete-btn"
                             onClick={handleDeleteSelectedChats}
                             title="Delete"
@@ -2455,7 +2455,7 @@ const Chat = () => {
                       )}
                       {isOnlyDirect && (
                         <>
-                          <button
+                          <button 
                             className="chat-selection-action-btn chat-selection-delete-btn"
                             onClick={handleDeleteSelectedChats}
                             title="Delete"
@@ -2466,7 +2466,7 @@ const Chat = () => {
                             </svg>
                             <span>Delete</span>
                           </button>
-                          <button
+                          <button 
                             className="chat-selection-action-btn"
                             onClick={handleBlockUnblockSelected}
                             title="Block/Unblock"
@@ -2475,17 +2475,17 @@ const Chat = () => {
                               <path d="M18 6L6 18M6 6l12 12"></path>
                             </svg>
                             <span>
-                              {selectedChatsBlockStatus.allBlocked
-                                ? 'Unblock'
-                                : selectedChatsBlockStatus.allUnblocked
-                                  ? 'Block'
+                              {selectedChatsBlockStatus.allBlocked 
+                                ? 'Unblock' 
+                                : selectedChatsBlockStatus.allUnblocked 
+                                  ? 'Block' 
                                   : 'Block/Unblock'}
                             </span>
                           </button>
                         </>
                       )}
                       {isHybrid && (
-                        <button
+                        <button 
                           className="chat-selection-action-btn chat-selection-delete-btn"
                           onClick={handleDeleteSelectedChats}
                           title="Delete"
@@ -2498,17 +2498,17 @@ const Chat = () => {
                         </button>
                       )}
                     </div>
-                    <button
-                      className="chat-selection-cancel-btn"
-                      onClick={handleExitChatSelectionMode}
-                      title="Cancel"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
+                <button 
+                  className="chat-selection-cancel-btn"
+                  onClick={handleExitChatSelectionMode}
+                  title="Cancel"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
                 )
               })()
             )}
@@ -2552,16 +2552,16 @@ const Chat = () => {
                       const startTime = Date.now()
                       const startX = touch.clientX
                       const startY = touch.clientY
-
+                      
                       const handleTouchEnd = (endEvent) => {
                         const endTime = Date.now()
                         const endTouch = endEvent.changedTouches[0]
                         const endX = endTouch.clientX
                         const endY = endTouch.clientY
-
+                        
                         const timeDiff = endTime - startTime
                         const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))
-
+                        
                         // Long press: > 500ms and minimal movement
                         if (timeDiff > 500 && distance < 10) {
                           if (!chatSelectionMode) {
@@ -2569,18 +2569,18 @@ const Chat = () => {
                             handleToggleChatSelection(chat.id)
                           }
                         }
-
+                        
                         document.removeEventListener('touchend', handleTouchEnd)
                       }
-
+                      
                       document.addEventListener('touchend', handleTouchEnd, { once: true })
                     }
                   }}
                 >
                   {chatSelectionMode && (
                     <div className="chat-selection-checkbox">
-                      <input
-                        type="checkbox"
+                      <input 
+                        type="checkbox" 
                         checked={selectedChatIds.has(chat.id)}
                         onChange={() => handleToggleChatSelection(chat.id)}
                         onClick={(e) => e.stopPropagation()}
@@ -2602,7 +2602,7 @@ const Chat = () => {
                     <div className="panel-item-header">
                       <span className="panel-item-name">{chat.name}</span>
                       <span className="panel-item-time">
-                        {chat.lastMessageTime
+                        {chat.lastMessageTime 
                           ? formatChatTimestamp(chat.lastMessageTime)
                           : chat.timestamp || ''}
                       </span>
@@ -2613,7 +2613,7 @@ const Chat = () => {
                           const readBy = chat.lastMessageReadBy || []
                           const deliveredTo = chat.lastMessageDeliveredTo || []
                           const currentUserId = String(user?.id || user?._id || '')
-
+                          
                           // For college messages, always show single tick (matching chat view)
                           if (chat.type === 'college') {
                             return (
@@ -2623,12 +2623,12 @@ const Chat = () => {
                               </>
                             )
                           }
-
+                          
                           // For direct messages, check if other user read/delivered
                           const otherUserId = chat.userId
                           const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
                           const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
-
+                          
                           let statusIcon = ''
                           if (isRead) {
                             // Blue double checkmark (read)
@@ -2640,7 +2640,7 @@ const Chat = () => {
                             // Gray single checkmark (sent)
                             statusIcon = '✓'
                           }
-
+                          
                           return (
                             <>
                               <span style={{ color: isRead ? '#4FC3F7' : '#8696A0', marginRight: '4px' }}>{statusIcon}</span>
@@ -2655,7 +2655,7 @@ const Chat = () => {
                             return (
                               <span style={{ fontStyle: 'italic', color: '#8696A0' }}>
                                 {typingInfo.userName} is typing...
-                              </span>
+                      </span>
                             )
                           }
                           return truncateMessage(chat.lastMessage) || 'No messages yet'
@@ -2734,32 +2734,32 @@ const Chat = () => {
                       setSelectedChat(groupChat)
                       setSelectedGroup(group)
                       setView('group-chat')
-
+                      
                       // Reset unread count when opening group chat
-                      setGroups(prev => prev.map(g =>
-                        String(g.id) === String(group.id)
+                      setGroups(prev => prev.map(g => 
+                        String(g.id) === String(group.id) 
                           ? { ...g, unreadCount: 0 }
                           : g
                       ))
-
+                      
                       if (isMobileView) {
                         setShowChatList(false)
                       }
                     }}
-                  >
-                    <div className="panel-item-avatar">
+              >
+                <div className="panel-item-avatar">
                       <img src={groupAvatar} alt={group.name} />
-                    </div>
-                    <div className="panel-item-info">
-                      <div className="panel-item-header">
+                </div>
+                <div className="panel-item-info">
+                  <div className="panel-item-header">
                         <span className="panel-item-name">{group.name}</span>
                         <span className="panel-item-time">
-                          {group.lastMessageTime
+                          {group.lastMessageTime 
                             ? formatChatTimestamp(group.lastMessageTime)
                             : ''}
                         </span>
-                      </div>
-                      <div className="panel-item-preview">
+                  </div>
+                  <div className="panel-item-preview">
                         <span className="panel-item-message">
                           {group.lastMessageIsOwn && (
                             <>
@@ -2772,9 +2772,9 @@ const Chat = () => {
                         {group.unreadCount > 0 && (
                           <span className="panel-item-unread">{group.unreadCount > 99 ? '99+' : group.unreadCount}</span>
                         )}
-                      </div>
-                    </div>
                   </div>
+                </div>
+              </div>
                 )
               })
             )}
@@ -2810,16 +2810,16 @@ const Chat = () => {
           <div className="panel-header panel-header-with-search">
             <h2>all chats</h2>
             {!chatSelectionMode ? (
-              <div className="panel-header-search">
-                <input
-                  type="text"
-                  className="panel-search-input"
-                  placeholder="Search chats..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <span className="panel-search-icon">🔍</span>
-              </div>
+            <div className="panel-header-search">
+              <input
+                type="text"
+                className="panel-search-input"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <span className="panel-search-icon">🔍</span>
+            </div>
             ) : (
               (() => {
                 const selectedChats = chats.filter(chat => selectedChatIds.has(chat.id))
@@ -2830,15 +2830,15 @@ const Chat = () => {
                 const isHybrid = hasCollegeChats && hasDirectChats
                 const isOnlyCollege = hasCollegeChats && !hasDirectChats
                 const isOnlyDirect = hasDirectChats && !hasCollegeChats
-
+                
                 return (
-                  <div className="chat-selection-mode-header">
-                    <span>{selectedChatIds.size} selected</span>
+              <div className="chat-selection-mode-header">
+                <span>{selectedChatIds.size} selected</span>
                     <div className="chat-selection-actions">
                       {/* Show buttons based on selection type */}
                       {isOnlyCollege && (
                         <>
-                          <button
+                          <button 
                             className="chat-selection-action-btn"
                             onClick={handleFollowUnfollowSelected}
                             title="Follow/Unfollow"
@@ -2850,14 +2850,14 @@ const Chat = () => {
                               <line x1="23" y1="11" x2="17" y2="11"></line>
                             </svg>
                             <span>
-                              {selectedChatsFollowStatus.allFollowing
-                                ? 'Unfollow'
-                                : selectedChatsFollowStatus.allNotFollowing
-                                  ? 'Follow'
+                              {selectedChatsFollowStatus.allFollowing 
+                                ? 'Unfollow' 
+                                : selectedChatsFollowStatus.allNotFollowing 
+                                  ? 'Follow' 
                                   : 'Follow/Unfollow'}
                             </span>
                           </button>
-                          <button
+                          <button 
                             className="chat-selection-action-btn chat-selection-delete-btn"
                             onClick={handleDeleteSelectedChats}
                             title="Delete"
@@ -2872,7 +2872,7 @@ const Chat = () => {
                       )}
                       {isOnlyDirect && (
                         <>
-                          <button
+                          <button 
                             className="chat-selection-action-btn chat-selection-delete-btn"
                             onClick={handleDeleteSelectedChats}
                             title="Delete"
@@ -2883,7 +2883,7 @@ const Chat = () => {
                             </svg>
                             <span>Delete</span>
                           </button>
-                          <button
+                          <button 
                             className="chat-selection-action-btn"
                             onClick={handleBlockUnblockSelected}
                             title="Block/Unblock"
@@ -2892,17 +2892,17 @@ const Chat = () => {
                               <path d="M18 6L6 18M6 6l12 12"></path>
                             </svg>
                             <span>
-                              {selectedChatsBlockStatus.allBlocked
-                                ? 'Unblock'
-                                : selectedChatsBlockStatus.allUnblocked
-                                  ? 'Block'
+                              {selectedChatsBlockStatus.allBlocked 
+                                ? 'Unblock' 
+                                : selectedChatsBlockStatus.allUnblocked 
+                                  ? 'Block' 
                                   : 'Block/Unblock'}
                             </span>
                           </button>
                         </>
                       )}
                       {isHybrid && (
-                        <button
+                        <button 
                           className="chat-selection-action-btn chat-selection-delete-btn"
                           onClick={handleDeleteSelectedChats}
                           title="Delete"
@@ -2915,17 +2915,17 @@ const Chat = () => {
                         </button>
                       )}
                     </div>
-                    <button
-                      className="chat-selection-cancel-btn"
-                      onClick={handleExitChatSelectionMode}
-                      title="Cancel"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
+                <button 
+                  className="chat-selection-cancel-btn"
+                  onClick={handleExitChatSelectionMode}
+                  title="Cancel"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
                 )
               })()
             )}
@@ -2969,16 +2969,16 @@ const Chat = () => {
                       const startTime = Date.now()
                       const startX = touch.clientX
                       const startY = touch.clientY
-
+                      
                       const handleTouchEnd = (endEvent) => {
                         const endTime = Date.now()
                         const endTouch = endEvent.changedTouches[0]
                         const endX = endTouch.clientX
                         const endY = endTouch.clientY
-
+                        
                         const timeDiff = endTime - startTime
                         const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2))
-
+                        
                         // Long press: > 500ms and minimal movement
                         if (timeDiff > 500 && distance < 10) {
                           if (!chatSelectionMode) {
@@ -2986,18 +2986,18 @@ const Chat = () => {
                             handleToggleChatSelection(chat.id)
                           }
                         }
-
+                        
                         document.removeEventListener('touchend', handleTouchEnd)
                       }
-
+                      
                       document.addEventListener('touchend', handleTouchEnd, { once: true })
                     }
                   }}
                 >
                   {chatSelectionMode && (
                     <div className="chat-selection-checkbox">
-                      <input
-                        type="checkbox"
+                      <input 
+                        type="checkbox" 
                         checked={selectedChatIds.has(chat.id)}
                         onChange={() => handleToggleChatSelection(chat.id)}
                         onClick={(e) => e.stopPropagation()}
@@ -3019,7 +3019,7 @@ const Chat = () => {
                     <div className="panel-item-header">
                       <span className="panel-item-name">{chat.name}</span>
                       <span className="panel-item-time">
-                        {chat.lastMessageTime
+                        {chat.lastMessageTime 
                           ? formatChatTimestamp(chat.lastMessageTime)
                           : chat.timestamp || ''}
                       </span>
@@ -3030,7 +3030,7 @@ const Chat = () => {
                           const readBy = chat.lastMessageReadBy || []
                           const deliveredTo = chat.lastMessageDeliveredTo || []
                           const currentUserId = String(user?.id || user?._id || '')
-
+                          
                           // For college messages, always show single tick (matching chat view)
                           if (chat.type === 'college') {
                             return (
@@ -3040,12 +3040,12 @@ const Chat = () => {
                               </>
                             )
                           }
-
+                          
                           // For direct messages, check if other user read/delivered
                           const otherUserId = chat.userId
                           const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
                           const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
-
+                          
                           let statusIcon = ''
                           if (isRead) {
                             // Blue double checkmark (read)
@@ -3057,7 +3057,7 @@ const Chat = () => {
                             // Gray single checkmark (sent)
                             statusIcon = '✓'
                           }
-
+                          
                           return (
                             <>
                               <span style={{ color: isRead ? '#4FC3F7' : '#8696A0', marginRight: '4px' }}>{statusIcon}</span>
@@ -3085,24 +3085,24 @@ const Chat = () => {
   // Render right panel content
   const renderRightPanel = () => {
     if (view === 'college-profile' && selectedCollege) {
-      return <CollegeProfileView
-        college={selectedCollege}
+      return <CollegeProfileView 
+        college={selectedCollege} 
         user={user}
         onBack={navigateBack}
         onViewStudentProfile={handleViewStudentProfile}
-        onJoinChat={() => handleJoinLiveChat(selectedCollege)}
+        onJoinChat={() => handleJoinLiveChat(selectedCollege)} 
         onFollowCollege={async (college) => {
           try {
             // Clear navigation state immediately to prevent auto-opening chat
             window.history.replaceState({}, document.title)
-
+            
             // Follow the college
             const response = await followCollege(college)
             if (response.success) {
               // Get updated followers count
               const followersResponse = await getCollegeFollowersCount(college)
               const followersCount = followersResponse.count || 0
-
+              
               // Update selectedCollege with followers count
               const updatedCollege = {
                 ...college,
@@ -3110,15 +3110,15 @@ const Chat = () => {
               }
               setView('college-profile')
               setSelectedCollege(updatedCollege)
-
+              
               // Add college to chats list in home section if not already there
               const collegeId = college.aisheCode || college.name
               const collegeName = college.name || 'College Chat'
               const collegeLogo = getCollegeLogoUrl(college, 50)
-
+              
               setChats(prev => {
-                const exists = prev.find(c =>
-                  c.type === 'college' &&
+                const exists = prev.find(c => 
+                  c.type === 'college' && 
                   (c.collegeId === collegeId || c.name === collegeName)
                 )
                 if (!exists) {
@@ -3137,7 +3137,7 @@ const Chat = () => {
                 }
                 return prev
               })
-
+              
               // Reload all chats to ensure followed colleges appear
               loadAllCollegesWithMessages()
             }
@@ -3151,13 +3151,13 @@ const Chat = () => {
           try {
             // Clear navigation state immediately to prevent auto-opening chat
             window.history.replaceState({}, document.title)
-
+            
             const response = await unfollowCollege(college)
             if (response.success) {
               // Get updated followers count
               const followersResponse = await getCollegeFollowersCount(college)
               const followersCount = followersResponse.count || 0
-
+              
               // Update selectedCollege with followers count
               const updatedCollege = {
                 ...college,
@@ -3165,10 +3165,10 @@ const Chat = () => {
               }
               setView('college-profile')
               setSelectedCollege(updatedCollege)
-
+              
               // Don't remove college from chats list - keep it so user can still access the chat
               // College will remain in chats if they've sent messages
-
+              
               // Reload all chats
               loadAllCollegesWithMessages()
             }
@@ -3181,8 +3181,8 @@ const Chat = () => {
       />
     }
     if (view === 'group-profile' && selectedGroup) {
-      return <GroupProfileView
-        group={selectedGroup}
+      return <GroupProfileView 
+        group={selectedGroup} 
         user={user}
         onBack={navigateBack}
         onViewStudentProfile={handleViewStudentProfile}
@@ -3202,14 +3202,14 @@ const Chat = () => {
           }
           setSelectedChat(groupChat)
           setView('group-chat')
-
+          
           // Reset unread count when opening group chat
-          setGroups(prev => prev.map(g =>
-            String(g.id) === String(selectedGroup.id)
+          setGroups(prev => prev.map(g => 
+            String(g.id) === String(selectedGroup.id) 
               ? { ...g, unreadCount: 0 }
               : g
           ))
-
+          
           if (isMobileView) {
             setShowChatList(false)
           }
@@ -3226,20 +3226,20 @@ const Chat = () => {
       />
     }
     if (view === 'group-chat' && selectedChat && selectedChat.type === 'group') {
-      return <GroupChatView
-        chat={selectedChat}
-        group={selectedChat.group || selectedGroup}
-        user={user}
+      return <GroupChatView 
+        chat={selectedChat} 
+        group={selectedChat.group || selectedGroup} 
+        user={user} 
         onBack={() => {
           setView('list')
           if (isMobileView) setShowChatList(true)
-        }}
+        }} 
         onViewProfile={() => {
           if (selectedGroup) {
             setView('group-profile')
           }
-        }}
-        onViewStudentProfile={handleViewStudentProfile}
+        }} 
+        onViewStudentProfile={handleViewStudentProfile} 
         onMessageSent={(groupId, messageText, timestamp, isOwnMessage, deliveredTo, readBy) => {
           // Update groups list with latest message and sort by last message time
           setGroups(prev => {
@@ -3271,10 +3271,10 @@ const Chat = () => {
       />
     }
     if (view === 'live-chat' && selectedChat) {
-      const college = selectedChat.type === 'college'
+      const college = selectedChat.type === 'college' 
         ? selectedChat.college
         : null
-
+      
       // Ensure we have required data
       if (!selectedChat && !college) {
         console.error('LiveChatView: Missing chat or college data', { selectedChat, college })
@@ -3283,7 +3283,7 @@ const Chat = () => {
             <div className="chat-header-bar">
               <button className="chat-header-back-btn" onClick={() => { setView('list'); if (isMobileView) setShowChatList(true) }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
@@ -3293,7 +3293,7 @@ const Chat = () => {
           </div>
         )
       }
-
+      
       return <LiveChatView chat={selectedChat} college={college} user={user} verificationStatus={verificationStatus} onBack={() => { setView('list'); if (isMobileView) setShowChatList(true) }} onViewProfile={() => college && handleViewCollegeProfile(college)} onViewStudentProfile={handleViewStudentProfile} onMessageSent={updateChatListOnMessage} />
     }
     if (view === 'student-profile') {
@@ -3316,11 +3316,11 @@ const Chat = () => {
           return { success: false, message: error.message }
         }
       })
-
+      
       // Determine if viewing own profile by comparing user IDs
       const viewingUser = selectedStudent || user
       let isViewingOwnProfile = true // Default to own profile
-
+      
       if (selectedStudent && user) {
         // Compare IDs to determine if viewing own profile
         // Convert both to strings for comparison (user.id might be ObjectId, selectedStudent.id is string)
@@ -3340,15 +3340,15 @@ const Chat = () => {
           }
           return ''
         }
-
+        
         const selectedId = getUserId(selectedStudent)
         const currentId = getUserId(user)
-
+        
         isViewingOwnProfile = selectedId !== '' && currentId !== '' && selectedId === currentId
-
-        console.log('🔍 Profile comparison:', {
-          selectedId,
-          currentId,
+        
+        console.log('🔍 Profile comparison:', { 
+          selectedId, 
+          currentId, 
           isViewingOwnProfile,
           selectedStudentIdType: typeof selectedStudent.id,
           userIdType: typeof user.id
@@ -3362,20 +3362,20 @@ const Chat = () => {
         isViewingOwnProfile = false
         console.log('✅ selectedStudent exists but no current user - viewing other profile')
       }
-
-      console.log('📋 Rendering StudentProfileView:', {
-        hasSelectedStudent: !!selectedStudent,
+      
+      console.log('📋 Rendering StudentProfileView:', { 
+        hasSelectedStudent: !!selectedStudent, 
         isViewingOwnProfile,
         viewingUserId: viewingUser?.id?.toString ? viewingUser.id.toString() : viewingUser?.id,
         currentUserId: user?.id?.toString ? user.id.toString() : user?.id
       })
-
-      return <StudentProfileView
-        user={viewingUser}
-        verificationStatus={isViewingOwnProfile ? verificationStatus : null}
+      
+      return <StudentProfileView 
+        user={viewingUser} 
+        verificationStatus={isViewingOwnProfile ? verificationStatus : null} 
         isOwnProfile={isViewingOwnProfile}
         currentUser={user}
-        onBack={navigateBack}
+        onBack={navigateBack} 
         onVerificationUpdate={loadVerificationStatus}
         onProfileUpdate={async () => {
           try {
@@ -3401,9 +3401,9 @@ const Chat = () => {
       />
     }
     if (view === 'direct-chat' && selectedStudent?.id) {
-      return <DirectChatView
-        otherUserId={selectedStudent.id}
-        user={user}
+      return <DirectChatView 
+        otherUserId={selectedStudent.id} 
+        user={user} 
         onBack={() => {
           setView('list')
           if (isMobileView) setShowChatList(true)
@@ -3421,26 +3421,26 @@ const Chat = () => {
           <div className="animated-chat-icon">
             <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
               {/* Main chat bubble */}
-              <path
-                d="M30 20C30 15.5817 33.5817 12 38 12H82C86.4183 12 90 15.5817 90 20V60C90 64.4183 86.4183 68 82 68H50L30 88V20Z"
-                fill="url(#chatGradient)"
+              <path 
+                d="M30 20C30 15.5817 33.5817 12 38 12H82C86.4183 12 90 15.5817 90 20V60C90 64.4183 86.4183 68 82 68H50L30 88V20Z" 
+                fill="url(#chatGradient)" 
                 className="chat-bubble-main"
               />
               {/* Chat bubble tail */}
-              <path
-                d="M30 68L20 78L30 88V68Z"
-                fill="url(#chatGradient)"
+              <path 
+                d="M30 68L20 78L30 88V68Z" 
+                fill="url(#chatGradient)" 
                 className="chat-bubble-tail"
               />
               {/* Typing dots */}
-              <circle cx="45" cy="40" r="4" fill="white" className="typing-dot typing-dot-1" opacity="0.6" />
-              <circle cx="60" cy="40" r="4" fill="white" className="typing-dot typing-dot-2" opacity="0.6" />
-              <circle cx="75" cy="40" r="4" fill="white" className="typing-dot typing-dot-3" opacity="0.6" />
+              <circle cx="45" cy="40" r="4" fill="white" className="typing-dot typing-dot-1" opacity="0.6"/>
+              <circle cx="60" cy="40" r="4" fill="white" className="typing-dot typing-dot-2" opacity="0.6"/>
+              <circle cx="75" cy="40" r="4" fill="white" className="typing-dot typing-dot-3" opacity="0.6"/>
               {/* Gradient definition */}
               <defs>
                 <linearGradient id="chatGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00a884" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#06cf9c" stopOpacity="0.9" />
+                  <stop offset="0%" stopColor="#00a884" stopOpacity="0.8"/>
+                  <stop offset="100%" stopColor="#06cf9c" stopOpacity="0.9"/>
                 </linearGradient>
               </defs>
             </svg>
@@ -3483,8 +3483,8 @@ const Chat = () => {
       {(() => {
         // Check if we're in a chat view on mobile - use view state as primary indicator
         const isInChatView = isMobileView && (
-          view === 'direct-chat' ||
-          view === 'group-chat' ||
+          view === 'direct-chat' || 
+          view === 'group-chat' || 
           view === 'live-chat'
         );
         // Debug logging
@@ -3503,106 +3503,106 @@ const Chat = () => {
           return null;
         }
         return (
-          <div className="chat-top-header">
-            <div className="header-left-section">
-              <button
-                className="navbar-back-to-home-btn"
-                onClick={() => navigate('/')}
-                title="Back to Home"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+      <div className="chat-top-header">
+        <div className="header-left-section">
+          <button 
+            className="navbar-back-to-home-btn"
+            onClick={() => navigate('/')}
+            title="Back to Home"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <div className="header-logo">
+            <h1 className="app-title">connect campus</h1>
+          </div>
+        </div>
+        {/* Search bar on the right side - same as landing page */}
+        {!isMobileView && (
+          <div className="header-search-wrapper">
+            <form 
+              className="header-search-form"
+              onSubmit={handleCollegeSearch}
+            >
+              <input
+                type="text"
+                className="header-search-input"
+                placeholder="search you college...."
+                value={collegeSearchQuery}
+                onChange={(e) => {
+                  setCollegeSearchQuery(e.target.value)
+                }}
+                onFocus={() => {
+                  if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
+                    setShowCollegeSuggestions(true)
+                  }
+                }}
+                ref={collegeSearchRef}
+                autoComplete="off"
+              />
+              <button type="submit" className="header-search-button">
+                {loadingCollegeSearch ? (
+                  <svg className="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">
+                      <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
+                      <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite"/>
+                    </circle>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
               </button>
-              <div className="header-logo">
-                <h1 className="app-title">connect campus</h1>
-              </div>
-            </div>
-            {/* Search bar on the right side - same as landing page */}
-            {!isMobileView && (
-              <div className="header-search-wrapper">
-                <form
-                  className="header-search-form"
-                  onSubmit={handleCollegeSearch}
-                >
-                  <input
-                    type="text"
-                    className="header-search-input"
-                    placeholder="search you college...."
-                    value={collegeSearchQuery}
-                    onChange={(e) => {
-                      setCollegeSearchQuery(e.target.value)
-                    }}
-                    onFocus={() => {
-                      if (recentCollegeSearches.length > 0 || collegeSuggestions.length > 0) {
-                        setShowCollegeSuggestions(true)
-                      }
-                    }}
-                    ref={collegeSearchRef}
-                    autoComplete="off"
-                  />
-                  <button type="submit" className="header-search-button">
-                    {loadingCollegeSearch ? (
-                      <svg className="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="32">
-                          <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite" />
-                          <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite" />
-                        </circle>
-                      </svg>
-                    ) : (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
-                </form>
-                {showCollegeSuggestions && (collegeSuggestions.length > 0 || recentCollegeSearches.length > 0) && (
-                  <div className="header-suggestions-dropdown" ref={collegeSuggestionsRef}>
-                    {collegeSuggestions.length > 0 ? (
-                      collegeSuggestions.map((college) => (
-                        <div
-                          key={college.aisheCode || college.id}
-                          className="suggestion-item"
-                          onClick={() => handleCollegeSuggestionClick(college)}
-                        >
-                          <div className="suggestion-avatar">
-                            <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
-                            <span className="verified-badge-small">
-                              <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
-                            </span>
-                          </div>
-                          <div className="suggestion-info">
-                            <div className="suggestion-name">{college.name}</div>
-                            <div className="suggestion-location">{college.district}, {college.state}</div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      recentCollegeSearches.slice(0, 5).map((college) => (
-                        <div
-                          key={college.aisheCode || college.id}
-                          className="suggestion-item"
-                          onClick={() => handleCollegeSuggestionClick(college)}
-                        >
-                          <div className="suggestion-avatar">
-                            <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
-                            <span className="verified-badge-small">
-                              <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
-                            </span>
-                          </div>
-                          <div className="suggestion-info">
-                            <div className="suggestion-name">{college.name}</div>
-                            <div className="suggestion-location">{college.district}, {college.state}</div>
-                          </div>
-                          <span className="history-badge">Recent</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+            </form>
+            {showCollegeSuggestions && (collegeSuggestions.length > 0 || recentCollegeSearches.length > 0) && (
+              <div className="header-suggestions-dropdown" ref={collegeSuggestionsRef}>
+                {collegeSuggestions.length > 0 ? (
+                  collegeSuggestions.map((college) => (
+                    <div
+                      key={college.aisheCode || college.id}
+                      className="suggestion-item"
+                      onClick={() => handleCollegeSuggestionClick(college)}
+                    >
+                      <div className="suggestion-avatar">
+                        <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
+                        <span className="verified-badge-small">
+                          <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                        </span>
+                      </div>
+                      <div className="suggestion-info">
+                        <div className="suggestion-name">{college.name}</div>
+                        <div className="suggestion-location">{college.district}, {college.state}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  recentCollegeSearches.slice(0, 5).map((college) => (
+                    <div
+                      key={college.aisheCode || college.id}
+                      className="suggestion-item"
+                      onClick={() => handleCollegeSuggestionClick(college)}
+                    >
+                      <div className="suggestion-avatar">
+                        <img src={getCollegeLogoUrl(college, 50)} alt={college.name} />
+                        <span className="verified-badge-small">
+                          <img src="/blutick.jpg" alt="Verified" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                        </span>
+                      </div>
+                      <div className="suggestion-info">
+                        <div className="suggestion-name">{college.name}</div>
+                        <div className="suggestion-location">{college.district}, {college.state}</div>
+                      </div>
+                      <span className="history-badge">Recent</span>
+                    </div>
+                  ))
                 )}
               </div>
             )}
           </div>
+        )}
+      </div>
         );
       })()}
 
@@ -3610,8 +3610,8 @@ const Chat = () => {
       <div className="chat-sidebar">
         <div className="sidebar-header">
           <div className="profile-icon" onClick={handleProfileClick} title="Profile">
-            <img
-              src={getUserAvatar()}
+            <img 
+              src={getUserAvatar()} 
               alt="Profile"
               onError={(e) => {
                 // Fallback to ui-avatars if image fails to load
@@ -3623,14 +3623,14 @@ const Chat = () => {
           </div>
           <div className="profile-name-sidebar">{getUserDisplayName()}</div>
         </div>
-
+        
         <div className="sidebar-divider"></div>
-
+        
         {/* Chat List / Content */}
         <div className="sidebar-content">
           {/* Content will be rendered in middle panel */}
         </div>
-
+        
         {/* Bottom Menu - Professional Icons */}
         <div className="sidebar-bottom-menu">
           <button
@@ -3640,10 +3640,10 @@ const Chat = () => {
             style={{ position: 'relative' }}
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             {groupsWithUnreadCount > 0 && (
               <span className="sidebar-notification-badge">
@@ -3660,8 +3660,8 @@ const Chat = () => {
             style={{ position: 'relative' }}
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             {chatsWithUnreadCount > 0 && (
               <span className="sidebar-notification-badge">
@@ -3671,7 +3671,7 @@ const Chat = () => {
           </button>
           <button
             className={`sidebar-bottom-item ${view === 'settings' ? 'active' : ''}`}
-            onClick={() => {
+            onClick={() => { 
               saveNavigationState()
               setActiveSection('chats') // Ensure chats section is active
               setView('settings') // Settings shows in right panel
@@ -3680,8 +3680,8 @@ const Chat = () => {
             title="Settings"
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9857C9.5799 19.7134 9.31074 19.5014 9 19.37C8.69838 19.2338 8.36295 19.1931 8.03797 19.2527C7.71299 19.3123 7.41308 19.4692 7.18 19.71L7.12 19.77C6.93425 19.956 6.71368 20.1035 6.47088 20.2041C6.22808 20.3048 5.96783 20.3566 5.705 20.3566C5.44217 20.3566 5.18192 20.3048 4.93912 20.2041C4.69632 20.1035 4.47575 19.956 4.29 19.77C4.10405 19.5843 3.95653 19.3637 3.85588 19.1209C3.75523 18.8781 3.70343 18.6178 3.70343 18.355C3.70343 18.0922 3.75523 17.8319 3.85588 17.5891C3.95653 17.3463 4.10405 17.1257 4.29 16.94L4.35 16.88C4.58054 16.6495 4.73519 16.3502 4.794 16.0258C4.85282 15.7014 4.81252 15.3668 4.678 15.065C4.54924 14.7692 4.33876 14.517 4.07047 14.3393C3.80218 14.1616 3.48779 14.0663 3.165 14.065H3C2.46957 14.065 1.96086 13.8543 1.58579 13.4792C1.21071 13.1041 1 12.5954 1 12.065C1 11.5346 1.21071 11.0259 1.58579 10.6508C1.96086 10.2757 2.46957 10.065 3 10.065H3.09C3.42099 10.0573 3.74198 9.95012 4.01428 9.75751C4.28658 9.5649 4.49858 9.29574 4.63 8.985C4.76619 8.68338 4.80693 8.34795 4.74732 8.02297C4.68772 7.69799 4.53081 7.39808 4.29 7.165L4.23 7.105C4.04405 6.91925 3.89653 6.69868 3.79588 6.45588C3.69523 6.21308 3.64343 5.95283 3.64343 5.69C3.64343 5.42717 3.69523 5.16692 3.79588 4.92412C3.89653 4.68132 4.04405 4.46075 4.23 4.275C4.41575 4.08905 4.63632 3.94153 4.87912 3.84088C5.12192 3.74023 5.38217 3.68843 5.645 3.68843C5.90783 3.68843 6.16808 3.74023 6.41088 3.84088C6.65368 3.94153 6.87425 4.08905 7.06 4.275L7.12 4.335C7.35054 4.56554 7.64982 4.72019 7.97422 4.779C8.29862 4.83782 8.63319 4.79752 8.935 4.663H9C9.53043 4.663 10.0391 4.45229 10.4142 4.07722C10.7893 3.70214 11 3.19343 11 2.663C11 2.13257 10.7893 1.62386 10.4142 1.24878C10.0391 0.873715 9.53043 0.663 9 0.663H8.91C8.57901 0.655343 8.25802 0.54812 7.98572 0.355509C7.71342 0.162898 7.50142 -0.106258 7.37 -0.417C7.23381 -0.718619 7.19307 -1.05405 7.25268 -1.37903C7.31228 -1.70401 7.46919 -2.00392 7.71 -2.237L7.77 -2.297C7.95575 -2.48295 8.10327 -2.70352 8.20392 -2.94632C8.30457 -3.18912 8.35637 -3.44937 8.35637 -3.7122C8.35637 -3.97503 8.30457 -4.23528 8.20392 -4.47808C8.10327 -4.72088 7.95575 -4.94145 7.77 -5.1272C7.58425 -5.31315 7.36368 -5.46067 7.12088 -5.56132C6.87808 -5.66197 6.61783 -5.71377 6.355 -5.71377C6.09217 -5.71377 5.83192 -5.66197 5.58912 -5.56132C5.34632 -5.46067 5.12575 -5.31315 4.94 -5.1272L4.88 -5.0672C4.64946 -4.83666 4.35018 -4.68201 4.02578 -4.6232C3.70138 -4.56438 3.36681 -4.60468 3.065 -4.7382H3C2.46957 -4.7382 1.96086 -4.52749 1.58579 -4.15241C1.21071 -3.77734 1 -3.26863 1 -2.7382C1 -2.20777 1.21071 -1.69906 1.58579 -1.32398C1.96086 -0.948915 2.46957 -0.7382 3 -0.7382H3.09C3.42099 -0.745857 3.74198 -0.85308 4.01428 -1.04569C4.28658 -1.2383 4.49858 -1.50746 4.63 -1.8182C4.76619 -2.11982 4.80693 -2.45525 4.74732 -2.78023C4.68772 -3.10521 4.53081 -3.40512 4.29 -3.6382L4.23 -3.6982C4.04405 -3.88395 3.89653 -4.10452 3.79588 -4.34732C3.69523 -4.59012 3.64343 -4.85037 3.64343 -5.1132C3.64343 -5.37603 3.69523 -5.63628 3.79588 -5.87908C3.89653 -6.12188 4.04405 -6.34245 4.23 -6.5282C4.41575 -6.71415 4.63632 -6.86167 4.87912 -6.96232C5.12192 -7.06297 5.38217 -7.11477 5.645 -7.11477C5.90783 -7.11477 6.16808 -7.06297 6.41088 -6.96232C6.65368 -6.86167 6.87425 -6.71415 7.06 -6.5282L7.12 -6.4682C7.35054 -6.23766 7.64982 -6.08301 7.97422 -6.0242C8.29862 -5.96538 8.63319 -6.00568 8.935 -6.1392H9C9.53043 -6.1392 10.0391 -5.92849 10.4142 -5.55341C10.7893 -5.17834 11 -4.66963 11 -4.1392C11 -3.60877 10.7893 -3.10006 10.4142 -2.72498C10.0391 -2.34992 9.53043 -2.1392 9 -2.1392Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9857C9.5799 19.7134 9.31074 19.5014 9 19.37C8.69838 19.2338 8.36295 19.1931 8.03797 19.2527C7.71299 19.3123 7.41308 19.4692 7.18 19.71L7.12 19.77C6.93425 19.956 6.71368 20.1035 6.47088 20.2041C6.22808 20.3048 5.96783 20.3566 5.705 20.3566C5.44217 20.3566 5.18192 20.3048 4.93912 20.2041C4.69632 20.1035 4.47575 19.956 4.29 19.77C4.10405 19.5843 3.95653 19.3637 3.85588 19.1209C3.75523 18.8781 3.70343 18.6178 3.70343 18.355C3.70343 18.0922 3.75523 17.8319 3.85588 17.5891C3.95653 17.3463 4.10405 17.1257 4.29 16.94L4.35 16.88C4.58054 16.6495 4.73519 16.3502 4.794 16.0258C4.85282 15.7014 4.81252 15.3668 4.678 15.065C4.54924 14.7692 4.33876 14.517 4.07047 14.3393C3.80218 14.1616 3.48779 14.0663 3.165 14.065H3C2.46957 14.065 1.96086 13.8543 1.58579 13.4792C1.21071 13.1041 1 12.5954 1 12.065C1 11.5346 1.21071 11.0259 1.58579 10.6508C1.96086 10.2757 2.46957 10.065 3 10.065H3.09C3.42099 10.0573 3.74198 9.95012 4.01428 9.75751C4.28658 9.5649 4.49858 9.29574 4.63 8.985C4.76619 8.68338 4.80693 8.34795 4.74732 8.02297C4.68772 7.69799 4.53081 7.39808 4.29 7.165L4.23 7.105C4.04405 6.91925 3.89653 6.69868 3.79588 6.45588C3.69523 6.21308 3.64343 5.95283 3.64343 5.69C3.64343 5.42717 3.69523 5.16692 3.79588 4.92412C3.89653 4.68132 4.04405 4.46075 4.23 4.275C4.41575 4.08905 4.63632 3.94153 4.87912 3.84088C5.12192 3.74023 5.38217 3.68843 5.645 3.68843C5.90783 3.68843 6.16808 3.74023 6.41088 3.84088C6.65368 3.94153 6.87425 4.08905 7.06 4.275L7.12 4.335C7.35054 4.56554 7.64982 4.72019 7.97422 4.779C8.29862 4.83782 8.63319 4.79752 8.935 4.663H9C9.53043 4.663 10.0391 4.45229 10.4142 4.07722C10.7893 3.70214 11 3.19343 11 2.663C11 2.13257 10.7893 1.62386 10.4142 1.24878C10.0391 0.873715 9.53043 0.663 9 0.663H8.91C8.57901 0.655343 8.25802 0.54812 7.98572 0.355509C7.71342 0.162898 7.50142 -0.106258 7.37 -0.417C7.23381 -0.718619 7.19307 -1.05405 7.25268 -1.37903C7.31228 -1.70401 7.46919 -2.00392 7.71 -2.237L7.77 -2.297C7.95575 -2.48295 8.10327 -2.70352 8.20392 -2.94632C8.30457 -3.18912 8.35637 -3.44937 8.35637 -3.7122C8.35637 -3.97503 8.30457 -4.23528 8.20392 -4.47808C8.10327 -4.72088 7.95575 -4.94145 7.77 -5.1272C7.58425 -5.31315 7.36368 -5.46067 7.12088 -5.56132C6.87808 -5.66197 6.61783 -5.71377 6.355 -5.71377C6.09217 -5.71377 5.83192 -5.66197 5.58912 -5.56132C5.34632 -5.46067 5.12575 -5.31315 4.94 -5.1272L4.88 -5.0672C4.64946 -4.83666 4.35018 -4.68201 4.02578 -4.6232C3.70138 -4.56438 3.36681 -4.60468 3.065 -4.7382H3C2.46957 -4.7382 1.96086 -4.52749 1.58579 -4.15241C1.21071 -3.77734 1 -3.26863 1 -2.7382C1 -2.20777 1.21071 -1.69906 1.58579 -1.32398C1.96086 -0.948915 2.46957 -0.7382 3 -0.7382H3.09C3.42099 -0.745857 3.74198 -0.85308 4.01428 -1.04569C4.28658 -1.2383 4.49858 -1.50746 4.63 -1.8182C4.76619 -2.11982 4.80693 -2.45525 4.74732 -2.78023C4.68772 -3.10521 4.53081 -3.40512 4.29 -3.6382L4.23 -3.6982C4.04405 -3.88395 3.89653 -4.10452 3.79588 -4.34732C3.69523 -4.59012 3.64343 -4.85037 3.64343 -5.1132C3.64343 -5.37603 3.69523 -5.63628 3.79588 -5.87908C3.89653 -6.12188 4.04405 -6.34245 4.23 -6.5282C4.41575 -6.71415 4.63632 -6.86167 4.87912 -6.96232C5.12192 -7.06297 5.38217 -7.11477 5.645 -7.11477C5.90783 -7.11477 6.16808 -7.06297 6.41088 -6.96232C6.65368 -6.86167 6.87425 -6.71415 7.06 -6.5282L7.12 -6.4682C7.35054 -6.23766 7.64982 -6.08301 7.97422 -6.0242C8.29862 -5.96538 8.63319 -6.00568 8.935 -6.1392H9C9.53043 -6.1392 10.0391 -5.92849 10.4142 -5.55341C10.7893 -5.17834 11 -4.66963 11 -4.1392C11 -3.60877 10.7893 -3.10006 10.4142 -2.72498C10.0391 -2.34992 9.53043 -2.1392 9 -2.1392Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
           <button
@@ -3692,20 +3692,20 @@ const Chat = () => {
             title="Toggle Theme"
           >
             {theme === 'dark' ? (
-              <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             ) : (
               <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </button>
@@ -3715,16 +3715,16 @@ const Chat = () => {
             title="Logout"
           >
             <svg className="sidebar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M16 17L21 12L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 17L21 12L16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
       </div>
 
       {/* Middle Panel - Dynamic List */}
-      <div
+      <div 
         className={`middle-panel ${!showChatList && isMobileView ? 'hidden' : ''} ${isResizing ? 'resizing' : ''}`}
         style={{ width: isMobileView ? '100%' : `${middlePanelWidth}px` }}
       >
@@ -3733,19 +3733,19 @@ const Chat = () => {
 
       {/* Resizable Divider - Only on desktop */}
       {!isMobileView && (
-        <div
+        <div 
           className={`panel-resizer ${isResizing ? 'resizing' : ''}`}
           onMouseDown={handleResizeStart}
           onTouchStart={handleResizeStart}
-          style={{
+          style={{ 
             left: `${80 + middlePanelWidth}px`,
-            cursor: isResizing ? 'col-resize' : 'col-resize'
+            cursor: isResizing ? 'col-resize' : 'col-resize' 
           }}
         />
       )}
 
       {/* Right Panel - Main Content */}
-      <div
+      <div 
         className={`right-panel ${(showChatList && isMobileView && view === 'list') || (isMobileView && activeSection === 'search' && !selectedChat) ? 'hidden' : ''} ${isResizing ? 'resizing' : ''}`}
         style={{ left: isMobileView ? '0' : `${80 + middlePanelWidth}px` }}
       >
@@ -3756,8 +3756,8 @@ const Chat = () => {
       {(() => {
         // Check if we're in a chat view on mobile - use view state as primary indicator
         const isInChatView = isMobileView && (
-          view === 'direct-chat' ||
-          view === 'group-chat' ||
+          view === 'direct-chat' || 
+          view === 'group-chat' || 
           view === 'live-chat'
         );
         // Debug logging
@@ -3772,92 +3772,92 @@ const Chat = () => {
         // Only show bottom nav if NOT in chat view and on mobile
         return !isInChatView && isMobileView;
       })() && (
-          <div className="mobile-bottom-nav">
-            <button
-              className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
-              onClick={() => {
-                handleSectionChange('chats')
-              }}
-              title="Home"
-              style={{ position: 'relative' }}
-            >
-              <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {chatsWithUnreadCount > 0 && (
-                <span className="mobile-nav-notification-badge">
-                  {chatsWithUnreadCount > 99 ? '99+' : chatsWithUnreadCount}
-                </span>
-              )}
-              <span className="mobile-nav-label">Home</span>
-            </button>
-            <button
-              className={`mobile-nav-item ${isSearchActive ? 'active' : ''}`}
-              onClick={() => {
-                saveNavigationState() // Save current state before navigating
-                setIsSearchActive(true)
-                setShowChatList(true)
-                setView('list')
-                setActiveSection('search')
-                setCollegeSearchQuery('')
-                setSearchBarAtTop(false)
-                setSelectedCollegeInSearch(null)
-              }}
-              title="Search"
-            >
-              <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="mobile-nav-label">Search</span>
-            </button>
-            <button
-              className={`mobile-nav-item ${activeSection === 'community' ? 'active' : ''}`}
-              onClick={() => handleSectionChange('community')}
-              title="Community"
-              style={{ position: 'relative' }}
-            >
-              <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {groupsWithUnreadCount > 0 && (
-                <span className="mobile-nav-notification-badge">
-                  {groupsWithUnreadCount > 99 ? '99+' : groupsWithUnreadCount}
-                </span>
-              )}
-              <span className="mobile-nav-label">Community</span>
-            </button>
-            <button
-              className={`mobile-nav-item ${view === 'student-profile' ? 'active' : ''}`}
-              onClick={handleProfileClick}
-              title="Profile"
-            >
-              <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="mobile-nav-label">Profile</span>
-            </button>
-            <button
-              className={`mobile-nav-item ${view === 'settings' || activeSection === 'settings' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveSection('chats') // Keep chats visible
-                setView('settings')
-                setShowChatList(false)
-              }}
-              title="Settings"
-            >
-              <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9857C9.5799 19.7134 9.31074 19.5014 9 19.37C8.69838 19.2338 8.36295 19.1931 8.03797 19.2527C7.71299 19.3123 7.41308 19.4692 7.18 19.71L7.12 19.77C6.93425 19.956 6.71368 20.1035 6.47088 20.2041C6.22808 20.3048 5.96783 20.3566 5.705 20.3566C5.44217 20.3566 5.18192 20.3048 4.93912 20.2041C4.69632 20.1035 4.47575 19.956 4.29 19.77C4.10405 19.5843 3.95653 19.3637 3.85588 19.1209C3.75523 18.8781 3.70343 18.6178 3.70343 18.355C3.70343 18.0922 3.75523 17.8319 3.85588 17.5891C3.95653 17.3463 4.10405 17.1257 4.29 16.94L4.35 16.88C4.58054 16.6495 4.73519 16.3502 4.794 16.0258C4.85282 15.7014 4.81252 15.3668 4.678 15.065C4.54924 14.7692 4.33876 14.517 4.07047 14.3393C3.80218 14.1616 3.48779 14.0663 3.165 14.065H3C2.46957 14.065 1.96086 13.8543 1.58579 13.4792C1.21071 13.1041 1 12.5954 1 12.065C1 11.5346 1.21071 11.0259 1.58579 10.6508C1.96086 10.2757 2.46957 10.065 3 10.065H3.09C3.42099 10.0573 3.74198 9.95012 4.01428 9.75751C4.28658 9.5649 4.49858 9.29574 4.63 8.985C4.76619 8.68338 4.80693 8.34795 4.74732 8.02297C4.68772 7.69799 4.53081 7.39808 4.29 7.165L4.23 7.105C4.04405 6.91925 3.89653 6.69868 3.79588 6.45588C3.69523 6.21308 3.64343 5.95283 3.64343 5.69C3.64343 5.42717 3.69523 5.16692 3.79588 4.92412C3.89653 4.68132 4.04405 4.46075 4.23 4.275C4.41575 4.08905 4.63632 3.94153 4.87912 3.84088C5.12192 3.74023 5.38217 3.68843 5.645 3.68843C5.90783 3.68843 6.16808 3.74023 6.41088 3.84088C6.65368 3.94153 6.87425 4.08905 7.06 4.275L7.12 4.335C7.35054 4.56554 7.64982 4.72019 7.97422 4.779C8.29862 4.83782 8.63319 4.79752 8.935 4.663H9C9.53043 4.663 10.0391 4.45229 10.4142 4.07722C10.7893 3.70214 11 3.19343 11 2.663C11 2.13257 10.7893 1.62386 10.4142 1.24878C10.0391 0.873715 9.53043 0.663 9 0.663H8.91C8.57901 0.655343 8.25802 0.54812 7.98572 0.355509C7.71342 0.162898 7.50142 -0.106258 7.37 -0.417C7.23381 -0.718619 7.19307 -1.05405 7.25268 -1.37903C7.31228 -1.70401 7.46919 -2.00392 7.71 -2.237L7.77 -2.297C7.95575 -2.48295 8.10327 -2.70352 8.20392 -2.94632C8.30457 -3.18912 8.35637 -3.44937 8.35637 -3.7122C8.35637 -3.97503 8.30457 -4.23528 8.20392 -4.47808C8.10327 -4.72088 7.95575 -4.94145 7.77 -5.1272C7.58425 -5.31315 7.36368 -5.46067 7.12088 -5.56132C6.87808 -5.66197 6.61783 -5.71377 6.355 -5.71377C6.09217 -5.71377 5.83192 -5.66197 5.58912 -5.56132C5.34632 -5.46067 5.12575 -5.31315 4.94 -5.1272L4.88 -5.0672C4.64946 -4.83666 4.35018 -4.68201 4.02578 -4.6232C3.70138 -4.56438 3.36681 -4.60468 3.065 -4.7382H3C2.46957 -4.7382 1.96086 -4.52749 1.58579 -4.15241C1.21071 -3.77734 1 -3.26863 1 -2.7382C1 -2.20777 1.21071 -1.69906 1.58579 -1.32398C1.96086 -0.948915 2.46957 -0.7382 3 -0.7382H3.09C3.42099 -0.745857 3.74198 -0.85308 4.01428 -1.04569C4.28658 -1.2383 4.49858 -1.50746 4.63 -1.8182C4.76619 -2.11982 4.80693 -2.45525 4.74732 -2.78023C4.68772 -3.10521 4.53081 -3.40512 4.29 -3.6382L4.23 -3.6982C4.04405 -3.88395 3.89653 -4.10452 3.79588 -4.34732C3.69523 -4.59012 3.64343 -4.85037 3.64343 -5.1132C3.64343 -5.37603 3.69523 -5.63628 3.79588 -5.87908C3.89653 -6.12188 4.04405 -6.34245 4.23 -6.5282C4.41575 -6.71415 4.63632 -6.86167 4.87912 -6.96232C5.12192 -7.06297 5.38217 -7.11477 5.645 -7.11477C5.90783 -7.11477 6.16808 -7.06297 6.41088 -6.96232C6.65368 -6.86167 6.87425 -6.71415 7.06 -6.5282L7.12 -6.4682C7.35054 -6.23766 7.64982 -6.08301 7.97422 -6.0242C8.29862 -5.96538 8.63319 -6.00568 8.935 -6.1392H9C9.53043 -6.1392 10.0391 -5.92849 10.4142 -5.55341C10.7893 -5.17834 11 -4.66963 11 -4.1392C11 -3.60877 10.7893 -3.10006 10.4142 -2.72498C10.0391 -2.34992 9.53043 -2.1392 9 -2.1392Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="mobile-nav-label">Settings</span>
-            </button>
-          </div>
-        )}
+        <div className="mobile-bottom-nav">
+          <button
+            className={`mobile-nav-item ${activeSection === 'chats' && view === 'list' ? 'active' : ''}`}
+            onClick={() => { 
+              handleSectionChange('chats')
+            }}
+            title="Home"
+            style={{ position: 'relative' }}
+          >
+            <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 22V12H15V22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {chatsWithUnreadCount > 0 && (
+              <span className="mobile-nav-notification-badge">
+                {chatsWithUnreadCount > 99 ? '99+' : chatsWithUnreadCount}
+              </span>
+            )}
+            <span className="mobile-nav-label">Home</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${isSearchActive ? 'active' : ''}`}
+            onClick={() => {
+              saveNavigationState() // Save current state before navigating
+              setIsSearchActive(true)
+              setShowChatList(true)
+              setView('list')
+              setActiveSection('search')
+              setCollegeSearchQuery('')
+              setSearchBarAtTop(false)
+              setSelectedCollegeInSearch(null)
+            }}
+            title="Search"
+          >
+            <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="mobile-nav-label">Search</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${activeSection === 'community' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('community')}
+            title="Community"
+            style={{ position: 'relative' }}
+          >
+            <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {groupsWithUnreadCount > 0 && (
+              <span className="mobile-nav-notification-badge">
+                {groupsWithUnreadCount > 99 ? '99+' : groupsWithUnreadCount}
+              </span>
+            )}
+            <span className="mobile-nav-label">Community</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${view === 'student-profile' ? 'active' : ''}`}
+            onClick={handleProfileClick}
+            title="Profile"
+          >
+            <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="mobile-nav-label">Profile</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${view === 'settings' || activeSection === 'settings' ? 'active' : ''}`}
+            onClick={() => { 
+              setActiveSection('chats') // Keep chats visible
+              setView('settings')
+              setShowChatList(false)
+            }}
+            title="Settings"
+          >
+            <svg className="mobile-nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9857C9.5799 19.7134 9.31074 19.5014 9 19.37C8.69838 19.2338 8.36295 19.1931 8.03797 19.2527C7.71299 19.3123 7.41308 19.4692 7.18 19.71L7.12 19.77C6.93425 19.956 6.71368 20.1035 6.47088 20.2041C6.22808 20.3048 5.96783 20.3566 5.705 20.3566C5.44217 20.3566 5.18192 20.3048 4.93912 20.2041C4.69632 20.1035 4.47575 19.956 4.29 19.77C4.10405 19.5843 3.95653 19.3637 3.85588 19.1209C3.75523 18.8781 3.70343 18.6178 3.70343 18.355C3.70343 18.0922 3.75523 17.8319 3.85588 17.5891C3.95653 17.3463 4.10405 17.1257 4.29 16.94L4.35 16.88C4.58054 16.6495 4.73519 16.3502 4.794 16.0258C4.85282 15.7014 4.81252 15.3668 4.678 15.065C4.54924 14.7692 4.33876 14.517 4.07047 14.3393C3.80218 14.1616 3.48779 14.0663 3.165 14.065H3C2.46957 14.065 1.96086 13.8543 1.58579 13.4792C1.21071 13.1041 1 12.5954 1 12.065C1 11.5346 1.21071 11.0259 1.58579 10.6508C1.96086 10.2757 2.46957 10.065 3 10.065H3.09C3.42099 10.0573 3.74198 9.95012 4.01428 9.75751C4.28658 9.5649 4.49858 9.29574 4.63 8.985C4.76619 8.68338 4.80693 8.34795 4.74732 8.02297C4.68772 7.69799 4.53081 7.39808 4.29 7.165L4.23 7.105C4.04405 6.91925 3.89653 6.69868 3.79588 6.45588C3.69523 6.21308 3.64343 5.95283 3.64343 5.69C3.64343 5.42717 3.69523 5.16692 3.79588 4.92412C3.89653 4.68132 4.04405 4.46075 4.23 4.275C4.41575 4.08905 4.63632 3.94153 4.87912 3.84088C5.12192 3.74023 5.38217 3.68843 5.645 3.68843C5.90783 3.68843 6.16808 3.74023 6.41088 3.84088C6.65368 3.94153 6.87425 4.08905 7.06 4.275L7.12 4.335C7.35054 4.56554 7.64982 4.72019 7.97422 4.779C8.29862 4.83782 8.63319 4.79752 8.935 4.663H9C9.53043 4.663 10.0391 4.45229 10.4142 4.07722C10.7893 3.70214 11 3.19343 11 2.663C11 2.13257 10.7893 1.62386 10.4142 1.24878C10.0391 0.873715 9.53043 0.663 9 0.663H8.91C8.57901 0.655343 8.25802 0.54812 7.98572 0.355509C7.71342 0.162898 7.50142 -0.106258 7.37 -0.417C7.23381 -0.718619 7.19307 -1.05405 7.25268 -1.37903C7.31228 -1.70401 7.46919 -2.00392 7.71 -2.237L7.77 -2.297C7.95575 -2.48295 8.10327 -2.70352 8.20392 -2.94632C8.30457 -3.18912 8.35637 -3.44937 8.35637 -3.7122C8.35637 -3.97503 8.30457 -4.23528 8.20392 -4.47808C8.10327 -4.72088 7.95575 -4.94145 7.77 -5.1272C7.58425 -5.31315 7.36368 -5.46067 7.12088 -5.56132C6.87808 -5.66197 6.61783 -5.71377 6.355 -5.71377C6.09217 -5.71377 5.83192 -5.66197 5.58912 -5.56132C5.34632 -5.46067 5.12575 -5.31315 4.94 -5.1272L4.88 -5.0672C4.64946 -4.83666 4.35018 -4.68201 4.02578 -4.6232C3.70138 -4.56438 3.36681 -4.60468 3.065 -4.7382H3C2.46957 -4.7382 1.96086 -4.52749 1.58579 -4.15241C1.21071 -3.77734 1 -3.26863 1 -2.7382C1 -2.20777 1.21071 -1.69906 1.58579 -1.32398C1.96086 -0.948915 2.46957 -0.7382 3 -0.7382H3.09C3.42099 -0.745857 3.74198 -0.85308 4.01428 -1.04569C4.28658 -1.2383 4.49858 -1.50746 4.63 -1.8182C4.76619 -2.11982 4.80693 -2.45525 4.74732 -2.78023C4.68772 -3.10521 4.53081 -3.40512 4.29 -3.6382L4.23 -3.6982C4.04405 -3.88395 3.89653 -4.10452 3.79588 -4.34732C3.69523 -4.59012 3.64343 -4.85037 3.64343 -5.1132C3.64343 -5.37603 3.69523 -5.63628 3.79588 -5.87908C3.89653 -6.12188 4.04405 -6.34245 4.23 -6.5282C4.41575 -6.71415 4.63632 -6.86167 4.87912 -6.96232C5.12192 -7.06297 5.38217 -7.11477 5.645 -7.11477C5.90783 -7.11477 6.16808 -7.06297 6.41088 -6.96232C6.65368 -6.86167 6.87425 -6.71415 7.06 -6.5282L7.12 -6.4682C7.35054 -6.23766 7.64982 -6.08301 7.97422 -6.0242C8.29862 -5.96538 8.63319 -6.00568 8.935 -6.1392H9C9.53043 -6.1392 10.0391 -5.92849 10.4142 -5.55341C10.7893 -5.17834 11 -4.66963 11 -4.1392C11 -3.60877 10.7893 -3.10006 10.4142 -2.72498C10.0391 -2.34992 9.53043 -2.1392 9 -2.1392Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="mobile-nav-label">Settings</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -3935,35 +3935,35 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
       e.preventDefault()
       e.stopPropagation()
     }
-
+    
     if (!college || (!college.aisheCode && !college.name)) {
       alert('Error: Invalid college data')
       return
     }
-
+    
     if (isLoadingFollow || isFollowing) {
       return // Prevent multiple clicks
     }
-
+    
     setIsLoadingFollow(true)
-
+    
     try {
       // Follow the college
       const result = await followCollege(college)
-
+      
       if (result?.success) {
         setIsFollowing(true)
-
+        
         // Add current user to members list immediately
         const userMember = {
           id: user?.id || user?._id || `user-${Date.now()}`,
           name: getUserDisplayName(),
           avatar: getUserAvatar()
         }
-
+        
         setMembers(prev => {
-          const exists = prev.find(m =>
-            m.id === userMember.id ||
+          const exists = prev.find(m => 
+            m.id === userMember.id || 
             (m.name === userMember.name && m.avatar === userMember.avatar)
           )
           if (!exists) {
@@ -3976,21 +3976,21 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
           }
           return prev
         })
-
+        
         // Reload followers count and members from API
         try {
           const [followersResponse, followersListResponse] = await Promise.all([
             getCollegeFollowersCount(college),
             getCollegeFollowers(college)
           ])
-
+          
           if (followersResponse.success) {
             setCollegeData(prev => ({
               ...prev,
               totalMembers: followersResponse.count || 0
             }))
           }
-
+          
           if (followersListResponse.success && followersListResponse.members) {
             setMembers(followersListResponse.members)
             setCollegeData(prev => ({
@@ -4001,7 +4001,7 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
         } catch (error) {
           console.error('Error loading followers:', error)
         }
-
+        
         // Call parent handler to add to chats
         if (onFollowCollege) {
           await onFollowCollege(college)
@@ -4024,7 +4024,7 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
       e.stopPropagation()
     }
     if (isLoadingFollow || !isFollowing) return // Prevent multiple clicks
-
+    
     setIsLoadingFollow(true)
     if (onUnfollowCollege) {
       const result = await onUnfollowCollege(college)
@@ -4115,13 +4115,13 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
       {/* Back Button Header */}
       {showBackButton && onBack && (
         <div className="college-profile-back-header">
-          <button
-            className="college-profile-back-btn"
+          <button 
+            className="college-profile-back-btn" 
             onClick={onBack}
             title="Back"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -4143,17 +4143,17 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
 
         {/* Action Buttons */}
         <div className="college-action-buttons">
-          <button
+          <button 
             type="button"
-            className={isFollowing ? "btn-join-campus btn-remove-campus" : "btn-join-campus"}
+            className={isFollowing ? "btn-join-campus btn-remove-campus" : "btn-join-campus"} 
             onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
-
+              
               if (isLoadingFollow) {
                 return
               }
-
+              
               try {
                 if (isFollowing) {
                   await handleUnfollowCollege(e)
@@ -4166,9 +4166,9 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
               }
             }}
             disabled={isLoadingFollow}
-            style={{
-              pointerEvents: isLoadingFollow ? 'none' : 'auto',
-              position: 'relative',
+            style={{ 
+              pointerEvents: isLoadingFollow ? 'none' : 'auto', 
+              position: 'relative', 
               zIndex: 100,
               cursor: isLoadingFollow ? 'not-allowed' : 'pointer',
               minWidth: '100px',
@@ -4177,9 +4177,9 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
           >
             {isLoadingFollow ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
           </button>
-          <button
+          <button 
             type="button"
-            className="btn-join-chat"
+            className="btn-join-chat" 
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
@@ -4188,9 +4188,9 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
           >
             Join Chat
           </button>
-          <button
+          <button 
             type="button"
-            className="btn-invite animated-invite-btn"
+            className="btn-invite animated-invite-btn" 
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
@@ -4218,7 +4218,7 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
 
         {/* Total Members Toggle */}
         <div className="college-members-section">
-          <button
+          <button 
             className="members-toggle"
             onClick={handleToggleMembers}
           >
@@ -4235,8 +4235,8 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
               ) : members.length > 0 ? (
                 <div className="members-list-whatsapp">
                   {members.map((member, index) => (
-                    <div
-                      key={member.id || index}
+                    <div 
+                      key={member.id || index} 
                       className="member-item-whatsapp"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -4255,9 +4255,9 @@ const CollegeProfileView = ({ college, user, onJoinChat, onFollowCollege, onUnfo
                       style={{ cursor: onViewStudentProfile ? 'pointer' : 'default' }}
                     >
                       <div className="member-avatar-whatsapp">
-                        <img
-                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`}
-                          alt={member.name || 'Member'}
+                        <img 
+                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`} 
+                          alt={member.name || 'Member'} 
                         />
                       </div>
                       <div className="member-name-whatsapp">{member.name || 'Member'}</div>
@@ -4348,26 +4348,26 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
       e.preventDefault()
       e.stopPropagation()
     }
-
+    
     if (!groupData?.id) {
       alert('Error: Invalid group data')
       return
     }
-
+    
     if (isLoadingJoin || isMember) {
       return
     }
-
+    
     setIsLoadingJoin(true)
-
+    
     try {
       // Add current user as member
       const userId = String(user?.id || user?._id || '')
       const response = await addMembersToGroup(groupData.id, [userId])
-
+      
       if (response?.success) {
         setIsMember(true)
-
+        
         // Reload group details
         const groupResponse = await getGroupDetails(groupData.id)
         if (groupResponse.success && groupResponse.group) {
@@ -4375,17 +4375,17 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
           const memberIds = (groupResponse.group.members || []).map(m => String(m.userId || m.id || ''))
           setIsMember(memberIds.includes(userId))
         }
-
+        
         // Call parent handler
         if (onJoinGroup) {
           await onJoinGroup(groupData)
         }
-
+        
         // Reload groups list
         if (onReloadGroups) {
           await onReloadGroups()
         }
-
+        
         // Reload groups list
         if (loadGroups) {
           loadGroups()
@@ -4408,25 +4408,25 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
       e.stopPropagation()
     }
     if (isLoadingJoin || !isMember) return
-
+    
     setIsLoadingJoin(true)
-
+    
     try {
       const response = await leaveGroupAPI(groupData.id)
       if (response?.success) {
         setIsMember(false)
-
+        
         // Reload group details
         const groupResponse = await getGroupDetails(groupData.id)
         if (groupResponse.success && groupResponse.group) {
           setGroupData(groupResponse.group)
         }
-
+        
         // Call parent handler
         if (onLeaveGroup) {
           await onLeaveGroup(groupData)
         }
-
+        
         // Reload groups list
         if (onReloadGroups) {
           await onReloadGroups()
@@ -4449,13 +4449,13 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
     <div className="college-profile-view">
       {showBackButton && onBack && (
         <div className="college-profile-back-header">
-          <button
-            className="college-profile-back-btn"
+          <button 
+            className="college-profile-back-btn" 
             onClick={onBack}
             title="Back"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -4476,17 +4476,17 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
 
         {/* Action Buttons */}
         <div className="college-action-buttons">
-          <button
+          <button 
             type="button"
-            className={isMember ? "btn-join-campus btn-remove-campus" : "btn-join-campus"}
+            className={isMember ? "btn-join-campus btn-remove-campus" : "btn-join-campus"} 
             onClick={async (e) => {
               e.preventDefault()
               e.stopPropagation()
-
+              
               if (isLoadingJoin) {
                 return
               }
-
+              
               try {
                 if (isMember) {
                   await handleLeaveGroup(e)
@@ -4499,9 +4499,9 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
               }
             }}
             disabled={isLoadingJoin}
-            style={{
-              pointerEvents: isLoadingJoin ? 'none' : 'auto',
-              position: 'relative',
+            style={{ 
+              pointerEvents: isLoadingJoin ? 'none' : 'auto', 
+              position: 'relative', 
               zIndex: 100,
               cursor: isLoadingJoin ? 'not-allowed' : 'pointer',
               minWidth: '100px',
@@ -4512,9 +4512,9 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
           </button>
           {isMember && (
             <>
-              <button
+              <button 
                 type="button"
-                className="btn-join-chat"
+                className="btn-join-chat" 
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -4523,9 +4523,9 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
               >
                 Join Chat
               </button>
-              <button
+              <button 
                 type="button"
-                className="btn-invite animated-invite-btn"
+                className="btn-invite animated-invite-btn" 
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -4557,7 +4557,7 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
 
         {/* Total Members Toggle */}
         <div className="college-members-section">
-          <button
+          <button 
             className="members-toggle"
             onClick={handleToggleMembers}
           >
@@ -4574,8 +4574,8 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
               ) : members.length > 0 ? (
                 <div className="members-list-whatsapp">
                   {members.map((member, index) => (
-                    <div
-                      key={member.id || index}
+                    <div 
+                      key={member.id || index} 
                       className="member-item-whatsapp"
                       onClick={(e) => {
                         e.stopPropagation()
@@ -4590,9 +4590,9 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
                       style={{ cursor: onViewStudentProfile ? 'pointer' : 'default' }}
                     >
                       <div className="member-avatar-whatsapp">
-                        <img
-                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`}
-                          alt={member.name || 'Member'}
+                        <img 
+                          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&size=50&background=00a8ff&color=fff`} 
+                          alt={member.name || 'Member'} 
                         />
                       </div>
                       <div className="member-name-whatsapp">{member.name || 'Member'}</div>
@@ -4672,10 +4672,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     if (ida === idb) return 0
     return ida < idb ? -1 : 1
   }
-
+  
   // Top 5 emojis for quick reactions
   const quickEmojis = ['👍', '❤️', '😂', '😮', '😥']
-
+  
   // Cleanup function for block message timeout
   const clearBlockMessageTimeout = () => {
     if (blockMessageTimeoutRef.current) {
@@ -4683,7 +4683,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       blockMessageTimeoutRef.current = null
     }
   }
-
+  
   // Set block message with auto-clear (production-safe)
   const setBlockMessageWithTimeout = (message) => {
     clearBlockMessageTimeout() // Clear any existing timeout
@@ -4693,7 +4693,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       blockMessageTimeoutRef.current = null
     }, 5000)
   }
-
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -4707,7 +4707,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
       // Stop typing when component unmounts
       // Note: collegeId and isTyping are captured in closure
-    }
+      }
   }, [isTyping]) // Add isTyping to dependencies
 
   // Update mobile detection on resize
@@ -4727,8 +4727,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     return (
       <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
-          <button
-            className="chat-header-back-btn"
+          <button 
+            className="chat-header-back-btn" 
             onClick={() => {
               if (selectionMode) {
                 handleExitSelectionMode()
@@ -4738,7 +4738,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -4760,8 +4760,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday'
     } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
         day: 'numeric',
         year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
       })
@@ -4771,7 +4771,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Fetch sender profiles
   const fetchSenderProfiles = async (senderIds) => {
     const uniqueSenderIds = [...new Set(senderIds)]
-    const profilesToFetch = uniqueSenderIds.filter(id =>
+    const profilesToFetch = uniqueSenderIds.filter(id => 
       id && !senderProfiles[id] && String(id) !== String(user?.id || user?._id || '')
     )
 
@@ -4801,7 +4801,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         if (profile) {
           // Ensure userId is stored as string for consistent lookup
           const userIdKey = String(profile.userId || '')
-
+          
           // Process profile picture URL - if it's a relative path, keep it as is
           // (will be processed when rendering)
           let profilePicture = profile.profilePicture
@@ -4809,7 +4809,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             // If it's not a URL and not a relative path, it might be invalid
             profilePicture = null
           }
-
+          
           newProfiles[userIdKey] = {
             displayName: profile.displayName,
             profilePicture: profilePicture,
@@ -4843,24 +4843,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           // Format messages for display
           const formattedMessages = response.messages.map(msg => {
             const formattedMsg = {
-              id: msg.id,
-              text: msg.text,
-              sender: msg.senderName,
-              senderId: msg.senderId,
-              time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              }),
-              date: formatDate(new Date(msg.timestamp)),
-              isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
-              timestamp: new Date(msg.timestamp),
+            id: msg.id,
+            text: msg.text,
+            sender: msg.senderName,
+            senderId: msg.senderId,
+            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatDate(new Date(msg.timestamp)),
+            isOwn: String(msg.senderId) === String(user?.id || user?._id || ''),
+            timestamp: new Date(msg.timestamp),
               replyTo: msg.replyTo || null,
               replyToData: null, // Will be populated below
-              readBy: msg.readBy ? msg.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
-              deliveredTo: msg.deliveredTo ? msg.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
+            readBy: msg.readBy ? msg.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
+            deliveredTo: msg.deliveredTo ? msg.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
             }
-
+            
             // If this message has a replyTo, find the replied-to message in the same response
             if (msg.replyTo) {
               const repliedMsg = response.messages.find(m => m.id === msg.replyTo)
@@ -4874,10 +4874,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 }
               }
             }
-
+            
             return formattedMsg
           })
-
+          
           // Filter out messages from blocked users
           const currentUserId = String(user?.id || user?._id || '')
           const filteredMessages = formattedMessages.filter(msg => {
@@ -4886,23 +4886,23 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             // Check if sender is blocked (will be checked async)
             return true // Will filter after loading blocked users
           })
-
+          
           // Sort messages by timestamp to ensure correct order
           const sortedMessages = filteredMessages.sort(compareMessages);
-
+          
           setMessages(sortedMessages)
-
+          
           console.log(`📥 Loaded ${sortedMessages.length} messages for college: ${collegeId}`);
-
+          
           // Mark all unread messages as read when opening the chat
           const socketInstance = getSocket()
           if (socketInstance?.connected) {
             const currentUserId = String(user?.id || user?._id || '')
             // Mark all messages that are not from the user and not already read
-            const unreadMessages = sortedMessages.filter(msg =>
+            const unreadMessages = sortedMessages.filter(msg => 
               !msg.isOwn && !msg.readBy?.some(r => String(r.userId) === currentUserId)
             )
-
+            
             // Mark all unread messages as read
             unreadMessages.forEach((msg, index) => {
               // Mark as read with a small delay to avoid overwhelming the server
@@ -4910,11 +4910,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 markMessageRead(msg.id, collegeId)
               }, 50 * index) // Stagger the requests (50ms apart)
             })
-
+            
             // Immediately update unread count in chat list to 0
             if (unreadMessages.length > 0) {
-              setChats(prev => prev.map(c =>
-                c.collegeId === collegeId
+              setChats(prev => prev.map(c => 
+                c.collegeId === collegeId 
                   ? { ...c, unreadCount: 0 }
                   : c
               ))
@@ -4924,11 +4924,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               }))
             }
           }
-
+          
           // Fetch profiles for all unique senders
           const senderIds = formattedMessages.map(msg => msg.senderId).filter(Boolean)
           await fetchSenderProfiles(senderIds)
-
+          
           // Scroll to bottom after messages are loaded and DOM is updated
           setTimeout(() => {
             if (messagesEndRef.current) {
@@ -4974,7 +4974,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     fetchActiveCount()
     // Refresh every 5 minutes (fallback in case real-time updates fail)
     const interval = setInterval(fetchActiveCount, 5 * 60 * 1000)
-
+    
     // Listen for real-time active count updates
     const handleActiveCountUpdate = (data) => {
       if (data.collegeId === collegeId) {
@@ -4982,7 +4982,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
     }
     onCollegeActiveCountUpdate(handleActiveCountUpdate)
-
+    
     return () => {
       clearInterval(interval)
       // Remove listener is handled by socketService cleanup
@@ -4993,9 +4993,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   useEffect(() => {
     if (!collegeId || chat.type !== 'college') return
 
-    // Track recent successful message sends to suppress false error warnings
-    const recentSuccessfulSends = new Set();
-    const MAX_TRACK_TIME = 5000; // Track for 5 seconds
+      // Track recent successful message sends to suppress false error warnings
+      const recentSuccessfulSends = new Set();
+      const MAX_TRACK_TIME = 5000; // Track for 5 seconds
 
     // Ensure socket is connected and join room
     const setupSocket = async () => {
@@ -5026,24 +5026,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Set up error handler - don't remove optimistic messages on socket errors
     // The message might still be saved on the server
     const handleSocketError = (error) => {
-      const errorMessage = error?.message || '';
-
-      // If we have recent successful sends, suppress the error warning
-      // This handles the case where an error is emitted but message was actually saved
-      if (recentSuccessfulSends.size > 0 &&
-        (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message'))) {
-        // Silently ignore - message was successfully sent
-        return;
-      }
-
-      // Don't log generic "Failed to send message" errors as errors if messages are working
-      // This prevents false positive error logs when messages are actually being sent successfully
-      if (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message')) {
-        // Log as warning instead of error since message might still be saved
-        console.warn('⚠️ Socket error (message may still be saved):', errorMessage);
-      } else {
-        console.error('Socket error in college chat:', error);
-      }
+        const errorMessage = error?.message || '';
+        
+        // If we have recent successful sends, suppress the error warning
+        // This handles the case where an error is emitted but message was actually saved
+        if (recentSuccessfulSends.size > 0 && 
+            (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message'))) {
+          // Silently ignore - message was successfully sent
+          return;
+        }
+        
+        // Don't log generic "Failed to send message" errors as errors if messages are working
+        // This prevents false positive error logs when messages are actually being sent successfully
+        if (errorMessage.includes('Failed to send message') || errorMessage.includes('Failed to save message')) {
+          // Log as warning instead of error since message might still be saved
+          console.warn('⚠️ Socket error (message may still be saved):', errorMessage);
+        } else {
+          console.error('Socket error in college chat:', error);
+        }
       // Don't remove optimistic messages - they might still be saved
       // The message will be loaded from backend on refresh
     }
@@ -5054,14 +5054,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         // Check if sender is blocked
         const senderIdStr = String(message.senderId)
         const currentUserId = String(user?.id || user?._id || '')
-
+        
         // Don't show messages from blocked users (unless it's own message)
         if (senderIdStr !== currentUserId && blockedUsers.has(senderIdStr)) {
           return // Skip blocked user's messages
         }
-
+        
         const isOwn = String(message.senderId) === String(user?.id || user?._id || '')
-
+        
         // If this is our own message, track it as a successful send to suppress false errors
         if (isOwn && message.id) {
           recentSuccessfulSends.add(message.id);
@@ -5070,10 +5070,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             recentSuccessfulSends.delete(message.id);
           }, MAX_TRACK_TIME);
         }
-
+        
         // Prefer deterministic optimistic replacement if server echoed a clientMessageId
         setMessages(prev => {
-
+          
           // Check for duplicate first
           const existingIndex = prev.findIndex(m => m.id === message.id)
           if (existingIndex !== -1) {
@@ -5086,10 +5086,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 text: message.text,
                 sender: message.senderName,
                 senderId: message.senderId,
-                time: new Date(message.timestamp).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
+                time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
                   minute: '2-digit',
-                  hour12: true
+                  hour12: true 
                 }),
                 date: formatDate(new Date(message.timestamp)),
                 isOwn: isOwn,
@@ -5160,7 +5160,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               return newMessages
             }
           }
-
+          
           // SIMPLE MATCHING: Find optimistic message by text + sender + recent time
           // This works for both normal and reply messages
           const optimisticIndex = prev.findIndex(m => {
@@ -5172,7 +5172,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             const timeDiff = Math.abs(new Date(m.timestamp) - new Date(message.timestamp))
             return timeDiff < 60000
           })
-
+          
           console.log('🔍 Matching check:', {
             messageText: message.text,
             messageId: message.id,
@@ -5186,12 +5186,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               timestamp: m.timestamp
             }))
           })
-
+          
           if (optimisticIndex !== -1) {
             // Replace optimistic with real message
             const optimisticMsg = prev[optimisticIndex]
             const newMessages = [...prev]
-
+            
             // Preserve replyToData from optimistic message
             let replyToData = optimisticMsg.replyToData || null
             if (message.replyTo && !replyToData) {
@@ -5206,17 +5206,17 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                 }
               }
             }
-
+            
             newMessages[optimisticIndex] = {
               id: message.id,
               clientMessageId: message.clientMessageId || optimisticMsg.clientMessageId || null,
               text: message.text,
               sender: message.senderName,
               senderId: message.senderId,
-              time: new Date(message.timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
+              time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
                 minute: '2-digit',
-                hour12: true
+                hour12: true 
               }),
               date: formatDate(new Date(message.timestamp)),
               isOwn: isOwn,
@@ -5226,49 +5226,49 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               readBy: message.readBy ? message.readBy.map(r => ({ userId: String(r.userId || r.userId), readAt: r.readAt })) : [],
               deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: String(d.userId || d.userId), deliveredAt: d.deliveredAt })) : []
             }
-
+            
             if (isOwn && onMessageSent && message.collegeId) {
               onMessageSent(message.collegeId, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
             }
-
+            
             console.log('✅ Replaced optimistic message with real message:', message.id)
             return newMessages
           }
-
+          
           // New message from someone else (or our own that didn't match)
           // For our own messages, make sure we remove any optimistic messages to prevent duplicates
           // If it's our own message, remove any optimistic messages with the same text to avoid duplicates
-          const filteredPrev = isOwn
+          const filteredPrev = isOwn 
             ? prev.filter(m => {
-              // Remove optimistic messages that match this message
-              if (m.isOptimistic && m.text.trim() === message.text.trim() && String(m.senderId) === String(message.senderId)) {
-                console.log('🗑️ Removing unmatched optimistic message:', m.id, 'for real message:', message.id)
-                return false
-              }
-              return true
-            })
+                // Remove optimistic messages that match this message
+                if (m.isOptimistic && m.text.trim() === message.text.trim() && String(m.senderId) === String(message.senderId)) {
+                  console.log('🗑️ Removing unmatched optimistic message:', m.id, 'for real message:', message.id)
+                  return false
+                }
+                return true
+              })
             : prev
-
-          const formattedMessage = {
-            id: message.id,
-            clientMessageId: message.clientMessageId || null,
-            text: message.text,
-            sender: message.senderName,
-            senderId: message.senderId,
-            time: new Date(message.timestamp).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
-            date: formatDate(new Date(message.timestamp)),
+          
+            const formattedMessage = {
+              id: message.id,
+              clientMessageId: message.clientMessageId || null,
+              text: message.text,
+              sender: message.senderName,
+              senderId: message.senderId,
+              time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+              date: formatDate(new Date(message.timestamp)),
             isOwn: isOwn,
-            timestamp: new Date(message.timestamp),
+              timestamp: new Date(message.timestamp),
             replyTo: message.replyTo || null,
             replyToData: null,
-            readBy: message.readBy ? message.readBy.map(r => ({ userId: r.userId?.toString() || r.userId, readAt: r.readAt })) : [],
-            deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: d.userId?.toString() || d.userId, deliveredAt: d.deliveredAt })) : []
-          }
-
+              readBy: message.readBy ? message.readBy.map(r => ({ userId: r.userId?.toString() || r.userId, readAt: r.readAt })) : [],
+              deliveredTo: message.deliveredTo ? message.deliveredTo.map(d => ({ userId: d.userId?.toString() || d.userId, deliveredAt: d.deliveredAt })) : []
+            }
+          
           // Populate replyToData if needed
           if (formattedMessage.replyTo) {
             const repliedMsg = filteredPrev.find(m => m.id === formattedMessage.replyTo)
@@ -5282,28 +5282,28 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               }
             }
           }
-
-          const newMessages = [...filteredPrev, formattedMessage].sort(compareMessages)
-
-          if (message.senderId && String(message.senderId) !== String(user?.id || user?._id || '')) {
-            fetchSenderProfiles([message.senderId])
-          }
-
-          return newMessages
+          
+            const newMessages = [...filteredPrev, formattedMessage].sort(compareMessages)
+            
+            if (message.senderId && String(message.senderId) !== String(user?.id || user?._id || '')) {
+              fetchSenderProfiles([message.senderId])
+            }
+            
+            return newMessages
         })
       }
     }
 
     // Set up message listener
     onReceiveMessage(handleReceiveMessage)
-
+    
     // Set up error handler - don't remove optimistic messages on socket errors
     // The message might still be saved on the server
     onSocketError(handleSocketError)
-
+    
     // Get socket instance for all listeners
     const socketInstance = getSocket()
-
+    
     // Listen for message sent confirmation - just log it, don't update IDs
     // We'll match by text/sender/time when receiveMessage arrives
     const handleMessageSent = (data) => {
@@ -5319,7 +5319,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       // Don't update optimistic messages here - let receiveMessage handle it
       // This avoids race conditions and timing issues
     }
-
+    
     if (socketInstance) {
       socketInstance.on('messageSent', handleMessageSent)
     }
@@ -5398,9 +5398,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           type: 'blocked'
         })
       }
-
+      
       socketInstance.on('messageBlocked', handleBlockedMessage)
-
+      
       return () => {
         // Cleanup: remove listeners when component unmounts or collegeId changes
         if (socketInstance) {
@@ -5430,7 +5430,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
   const handleClearChat = async () => {
     if (!collegeId) return
-
+    
     try {
       setClearing(true)
       setClearError(null)
@@ -5438,7 +5438,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       if (response.success) {
         setMessages([])
         setShowClearConfirm(false)
-
+        
         // Update chat list immediately to show "No messages yet"
         if (onMessageSent) {
           // Pass null timestamp to indicate cleared state - this will update timestamp to current time
@@ -5477,24 +5477,24 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const handleInputChange = (e) => {
     const value = e.target.value
     setMessageInput(value)
-
+    
     if (!collegeId) return
-
+    
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = null
     }
-
+    
     // If user is typing and not already marked as typing
     if (value.trim().length > 0) {
       if (!isTyping) {
-        setIsTyping(true)
-        emitTyping(collegeId, true)
-      }
-
-      // Set timeout to stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(true)
+      emitTyping(collegeId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
         emitTyping(collegeId, false)
         typingTimeoutRef.current = null
@@ -5521,7 +5521,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Trim only leading/trailing whitespace, preserve newlines in the middle
     let messageText = messageInput.trimStart().trimEnd()
     if (!messageText || !collegeId) return
-
+    
     // Stop typing indicator
     if (isTyping) {
       setIsTyping(false)
@@ -5551,10 +5551,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       text: messageText,
       sender: user?.profile?.displayName || user?.email?.split('@')[0] || 'You',
       senderId: user?.id || user?._id || '',
-      time: new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
+      time: new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
         minute: '2-digit',
-        hour12: true
+        hour12: true 
       }),
       date: formatDate(new Date()),
       isOwn: true,
@@ -5570,7 +5570,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     // Add optimistic message immediately
     setMessages(prev => [...prev, optimisticMessage])
     setMessageInput('')
-
+    
     // Clear reply after storing replyToId and adding to messages
     if (replyingTo) {
       setReplyingTo(null)
@@ -5590,19 +5590,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               const timeout = setTimeout(() => {
                 reject(new Error('Socket connection timeout'))
               }, 5000)
-
+              
               socketInstance.once('connect', () => {
                 clearTimeout(timeout)
                 resolve()
               })
-
+              
               socketInstance.once('connect_error', (error) => {
                 clearTimeout(timeout)
                 reject(error)
               })
             }
           })
-
+          
           // Join room after connection
           joinCollegeRoom(collegeId)
           await new Promise(resolve => setTimeout(resolve, 300)) // Wait a bit for join
@@ -5622,23 +5622,23 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       socketInstance = getSocket()
       if (socketInstance && socketInstance.connected) {
         // Use stored replyToId (already captured above)
-
+        
         // Use async/await for better error handling
         try {
           await sendMessage(messageText, collegeId, replyToId, clientMessageId)
           console.log('✅ Message sent via socket', replyToId ? `(replying to: ${replyToId})` : '')
-
+          
           // Clear reply after sending
           if (replyingTo) {
             setReplyingTo(null)
           }
-
-          // Update chat list immediately (optimistic update)
+        
+        // Update chat list immediately (optimistic update)
           // Message is just sent, so no delivery/read status yet
-          if (onMessageSent && collegeId) {
+        if (onMessageSent && collegeId) {
             onMessageSent(collegeId, messageText, new Date(), true, [], [])
           }
-
+          
           // Don't remove optimistic message - it will be replaced when receiveMessage is received
           // If there's a socket error, the message might still be saved on the server
         } catch (sendError) {
@@ -5662,7 +5662,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       console.error('Error sending message:', error)
       // Only remove if it's a connection error
       if (error.message?.includes('not connected') || error.message?.includes('timeout')) {
-        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
       }
     }
   }
@@ -5696,7 +5696,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Format last seen time for display
   const formatLastSeen = (lastSeenDate) => {
     if (!lastSeenDate) return ''
-
+    
     const now = new Date()
     const lastSeen = new Date(lastSeenDate)
     const diffMs = now - lastSeen
@@ -5709,14 +5709,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     if (diffHours < 24) return `Last seen ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
     if (diffDays === 1) return 'Last seen yesterday'
     if (diffDays < 7) return `Last seen ${diffDays} days ago`
-
+    
     // For older dates, show actual date
     return `Last seen ${lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: lastSeen.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })}`
   }
 
   // Calculate display status for college chat (shows active students count)
   // Note: LiveChatView is only for college chats, not direct messages
-  const displayStatus = typingText || (collegeActiveCount !== null
+  const displayStatus = typingText || (collegeActiveCount !== null 
     ? `${collegeActiveCount} student${collegeActiveCount !== 1 ? 's' : ''} active today`
     : 'Loading...')
   // Check if college is verified
@@ -5740,20 +5740,20 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Handle message click (desktop - for double-click detection)
   const handleMessageClick = (e, message) => {
     if (isMobile) return
-
+    
     // Prevent default browser behavior (including context menu)
     e.preventDefault()
     e.stopPropagation()
-
+    
     // If in selection mode, toggle selection
     if (selectionMode) {
       handleToggleSelection(message.id)
       return
     }
-
+    
     const currentTime = Date.now()
     const timeDiff = currentTime - lastClickTime.current
-
+    
     // Check if this is a double-click (within 300ms and same message)
     if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
       // Double-click detected - automatically enter selection mode (WhatsApp-like)
@@ -5768,12 +5768,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       // Single click - store for potential double-click
       lastClickTime.current = currentTime
       lastClickedMessage.current = message
-
+      
       // Clear timer if exists
       if (doubleClickTimer.current) {
         clearTimeout(doubleClickTimer.current)
       }
-
+      
       // If no double-click within 300ms, clear selection
       doubleClickTimer.current = setTimeout(() => {
         lastClickTime.current = 0
@@ -5799,14 +5799,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   // Long-press selection (mobile) + swipe-to-reply (mobile)
   const handleMessageTouchStart = (e, message) => {
     if (!isMobile || selectionMode) return
-
+    
     // Don't start long-press on interactive elements
     const target = e.target
-    if (target.closest('.message-reply-info') ||
-      target.closest('.message-reply') ||
-      target.closest('.message-selection-checkbox') ||
-      target.closest('button') ||
-      target.closest('a')) {
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
 
@@ -5820,10 +5820,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       swipedMessageRef.current = message
       isSwipingRef.current = false
     }
-
+    
     // Store which message is being long-pressed
     longPressMessageId.current = message.id
-
+    
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
@@ -5834,7 +5834,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-
+        
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
@@ -5843,12 +5843,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       longPressMessageId.current = null
     }, 500) // 500ms long-press
   }
-
+  
   // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
-
+    
     // Toggle selection for this message
     const newSelected = new Set(selectedItems)
     if (newSelected.has(messageId)) {
@@ -5857,12 +5857,12 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       newSelected.add(messageId)
     }
     setSelectedItems(newSelected)
-
+    
     // If no messages selected, exit selection mode
     if (newSelected.size === 0) {
       setSelectionMode(false)
     }
-
+    
     // Haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate(30)
@@ -5940,7 +5940,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setSwipeOffset(0)
     }
   }
-
+  
   // Handle quick emoji reaction (mobile)
   const handleQuickEmojiClick = (emoji) => {
     if (selectedMessage) {
@@ -5951,7 +5951,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setShowMessageHeader(false)
     }
   }
-
+  
   // Handle reply button click
   const handleReplyClick = () => {
     if (selectedMessage) {
@@ -5969,7 +5969,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }, 100)
     }
   }
-
+  
   // Handle select button
   // Handle select button - enter selection mode
   const handleSelectClick = () => {
@@ -5981,7 +5981,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       setSelectedMessage(null)
     }
   }
-
+  
   // Toggle item selection in selection mode
   const handleToggleSelection = (itemId) => {
     setSelectedItems(prev => {
@@ -5998,18 +5998,18 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       return newSet
     })
   }
-
+  
   // Exit selection mode
   const handleExitSelectionMode = () => {
     setSelectionMode(false)
     setSelectedItems(new Set())
   }
-
+  
   // Copy selected items
   const handleCopySelected = () => {
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     if (selectedMessages.length === 0) return
-
+    
     const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
     navigator.clipboard.writeText(textToCopy).then(() => {
       // Show feedback
@@ -6020,25 +6020,25 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       alert('Failed to copy messages')
     })
   }
-
+  
   // Delete selected items for me (permanently delete from database)
   const handleDeleteSelectedForMe = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const currentUserId = String(user?.id || user?._id || '')
     const collegeId = chat?.collegeId || college?.aisheCode || college?.name
-
+    
     try {
       // Permanently delete all selected messages
       const deletePromises = selectedMessages.map(msg => deleteMessage(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list with the most recent remaining message
       if (updatedMessages.length > 0 && collegeId && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -6068,7 +6068,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && collegeId && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -6093,28 +6093,28 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
     }
   }
-
+  
   // Delete selected items for all (only own messages - permanently delete from database)
   const handleDeleteSelectedForAll = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const ownMessages = selectedMessages.filter(msg => msg.isOwn)
     const currentUserId = String(user?.id || user?._id || '')
     const collegeId = chat?.collegeId || college?.aisheCode || college?.name
-
+    
     if (ownMessages.length === 0) return // Should not happen, but safety check
-
+    
     try {
       // Permanently delete own messages for all
       const deletePromises = ownMessages.map(msg => deleteMessageForAll(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
-      handleExitSelectionMode()
-
+    handleExitSelectionMode()
+      
       // Update chat list with the most recent remaining message
       if (updatedMessages.length > 0 && collegeId && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -6144,7 +6144,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && collegeId && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -6169,7 +6169,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       }
     }
   }
-
+  
   // Cancel reply
   const handleCancelReply = () => {
     setReplyingTo(null)
@@ -6221,10 +6221,10 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
     try {
       setDeleting(true)
-      const response = deleteForAll
+      const response = deleteForAll 
         ? await deleteMessageForAll(selectedMessage.id)
         : await deleteMessage(selectedMessage.id)
-
+      
       if (response.success) {
         // Remove message from local state
         const updatedMessages = messages.filter(m => m.id !== selectedMessage.id)
@@ -6233,16 +6233,16 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setDeleteForAll(false)
-
+        
         // Update chat list - find the previous message to update last message
         const currentUserId = String(user?.id || user?._id || '')
         const collegeId = chat?.collegeId || college?.aisheCode || college?.name
-
+        
         if (updatedMessages.length > 0 && collegeId && onMessageSent) {
           // Get the most recent remaining message
           const lastMessage = updatedMessages[updatedMessages.length - 1]
           const isOwn = String(lastMessage.senderId) === currentUserId
-
+          
           // Update chat list with the previous message
           onMessageSent(
             collegeId,
@@ -6281,7 +6281,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       if (selectionMode) {
         return
       }
-
+      
       if (showActionMenu && actionMenuRef.current && !actionMenuRef.current.contains(e.target) && !e.target.closest('.message-content')) {
         setShowActionMenu(false)
         setSelectedMessage(null)
@@ -6337,40 +6337,40 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         const isOnlyOwn = hasOwnMessages && !hasOtherMessages
         const isOnlyOthers = !hasOwnMessages && hasOtherMessages
         const isHybrid = hasOwnMessages && hasOtherMessages
-
+        
         return (
-          <div className="selection-mode-bar">
-            <div className="selection-mode-info">
-              <span>{selectedItems.size} selected</span>
-            </div>
-            <div className="selection-mode-actions">
-              <button
-                className="selection-mode-btn"
-                onClick={handleCopySelected}
-                title="Copy"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
-
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+              
               {/* Delete buttons based on selection type */}
               {isOnlyOwn && (
                 <>
-                  <button
-                    className="selection-mode-btn"
+            <button 
+              className="selection-mode-btn"
                     onClick={handleDeleteSelectedForMe}
                     title="Delete for me"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
                     <span>Delete for me</span>
-                  </button>
-                  <button
+            </button>
+                  <button 
                     className="selection-mode-btn"
                     onClick={handleDeleteSelectedForAll}
                     title="Delete for all"
@@ -6383,9 +6383,9 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                   </button>
                 </>
               )}
-
+              
               {(isOnlyOthers || isHybrid) && (
-                <button
+                <button 
                   className="selection-mode-btn"
                   onClick={handleDeleteSelectedForMe}
                   title="Delete for me"
@@ -6397,26 +6397,26 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                   <span>Delete for me</span>
                 </button>
               )}
-
-              <button
-                className="selection-mode-btn"
-                onClick={handleExitSelectionMode}
-                title="Cancel"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                <span>Cancel</span>
-              </button>
-            </div>
+              
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
           </div>
+        </div>
         )
       })()}
       {/* Message Action Header (WhatsApp-style) */}
       {showMessageHeader && selectedMessage && !selectionMode && (
         <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleReplyClick}
             title="Reply"
@@ -6426,7 +6426,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
             </svg>
           </button>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleCopyMessage}
             title="Copy"
@@ -6436,29 +6436,29 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
-          <button
-            className="action-header-btn"
-            onClick={handleDeleteForMe}
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForMe}
             title="Delete"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
           {isOwnMessage && (
-            <button
-              className="action-header-btn"
-              onClick={handleDeleteForAll}
-              title="Delete for all"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForAll}
+                title="Delete for all"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
           )}
-          <button
+          <button 
             className="action-header-btn action-header-close"
             onClick={() => {
               setShowMessageHeader(false)
@@ -6476,106 +6476,106 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
       <div className="chat-header-bar">
         <>
           {/* WhatsApp-like back button */}
-          <button
-            className="chat-header-back-btn"
-            onClick={() => {
-              if (selectionMode) {
-                handleExitSelectionMode()
-              } else {
-                onBack()
-              }
-            }}
-            title="Back"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <div
-            className="chat-header-avatar"
-            onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
-            style={!isDirectMessage && college ? { cursor: 'pointer' } : {}}
-          >
-            <img src={displayAvatar} alt={displayName} />
-          </div>
-          <div
-            className="chat-header-info"
-            onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
-            style={!isDirectMessage && college ? { cursor: 'pointer', flex: 1 } : { flex: 1 }}
-          >
-            <div className="chat-header-name-row">
-              <h3>{displayName}</h3>
-              {!isDirectMessage && (
-                <div className="verified-badge-blue-inline" title="Verified College">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                      <linearGradient id="verifiedGradientChat" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#1DA1F2" />
-                        <stop offset="100%" stopColor="#0084CC" />
-                      </linearGradient>
-                    </defs>
-                    <circle cx="12" cy="12" r="11" fill="url(#verifiedGradientChat)" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="0.5" />
-                    <path d="M7 12l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </svg>
-                </div>
-              )}
-              {!isDirectMessage && verificationStatus?.status === 'verified' && (
-                <div className="verified-badge-blue-inline" title="Verified Student">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="12" fill="#1DA1F2" />
-                    <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
-            </div>
-            <span className={`chat-status ${typingText ? 'typing' : ''}`}>
-              {typingText ? (
-                <>
-                  <span className="typing-dots">
-                    <span>.</span><span>.</span><span>.</span>
-                  </span>
-                  {typingText}
-                </>
-              ) : (
-                <>
-                  {!isDirectMessage && onlineUsers.size > 0 && (
-                    <span className="online-indicator"></span>
-                  )}
-                  {displayStatus}
-                </>
-              )}
-            </span>
-          </div>
-          {/* Invite Button - Only for college chats */}
-          {!isDirectMessage && college && (
-            <button
-              className="invite-header-btn animated-invite-btn"
-              onClick={() => setShowInviteModal(true)}
-              title="Invite friends to join this college"
+            <button 
+              className="chat-header-back-btn"
+              onClick={() => {
+                if (selectionMode) {
+                  handleExitSelectionMode()
+                } else {
+                  onBack()
+                }
+              }}
+              title="Back"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="8.5" cy="7" r="4"></circle>
-                <line x1="20" y1="8" x2="20" y2="14"></line>
-                <line x1="23" y1="11" x2="17" y2="11"></line>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-          )}
-          {/* Clear Chat Button */}
-          <button
-            className="clear-chat-btn"
-            onClick={() => setShowClearConfirm(true)}
-            title="Clear Chat"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18"></path>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
-        </>
+            <div 
+              className="chat-header-avatar" 
+              onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
+              style={!isDirectMessage && college ? { cursor: 'pointer' } : {}}
+            >
+              <img src={displayAvatar} alt={displayName} />
+            </div>
+            <div 
+              className="chat-header-info"
+              onClick={!isDirectMessage && college ? () => onViewProfile && onViewProfile() : undefined}
+              style={!isDirectMessage && college ? { cursor: 'pointer', flex: 1 } : { flex: 1 }}
+            >
+              <div className="chat-header-name-row">
+                <h3>{displayName}</h3>
+                {!isDirectMessage && (
+                  <div className="verified-badge-blue-inline" title="Verified College">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <linearGradient id="verifiedGradientChat" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#1DA1F2" />
+                          <stop offset="100%" stopColor="#0084CC" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="12" cy="12" r="11" fill="url(#verifiedGradientChat)" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="0.5"/>
+                      <path d="M7 12l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                    </svg>
+                  </div>
+                )}
+                {!isDirectMessage && verificationStatus?.status === 'verified' && (
+                  <div className="verified-badge-blue-inline" title="Verified Student">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="12" fill="#1DA1F2"/>
+                      <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <span className={`chat-status ${typingText ? 'typing' : ''}`}>
+                {typingText ? (
+                  <>
+                    <span className="typing-dots">
+                      <span>.</span><span>.</span><span>.</span>
+                    </span>
+                    {typingText}
+                  </>
+                ) : (
+                  <>
+                    {!isDirectMessage && onlineUsers.size > 0 && (
+                      <span className="online-indicator"></span>
+                    )}
+                    {displayStatus}
+                  </>
+                )}
+              </span>
+            </div>
+            {/* Invite Button - Only for college chats */}
+            {!isDirectMessage && college && (
+              <button 
+                className="invite-header-btn animated-invite-btn"
+                onClick={() => setShowInviteModal(true)}
+                title="Invite friends to join this college"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="8.5" cy="7" r="4"></circle>
+                  <line x1="20" y1="8" x2="20" y2="14"></line>
+                  <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+              </button>
+            )}
+            {/* Clear Chat Button */}
+            <button 
+              className="clear-chat-btn"
+              onClick={() => setShowClearConfirm(true)}
+              title="Clear Chat"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </>
       </div>
       {showInviteModal && college && (
         <InviteModal
@@ -6610,7 +6610,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                     <div className="chat-left-col">
                       {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
                       {isMobile && (
-                        <div
+                        <div 
                           className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                           onTouchStart={(e) => {
                             e.preventDefault()
@@ -6626,7 +6626,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                         >
                           {selectedItems.has(message.id) ? (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                             </svg>
                           ) : (
                             <div className="checkbox-circle"></div>
@@ -6635,7 +6635,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       )}
                     </div>
                     <div className="chat-main-col">
-                      <div
+                      <div 
                         className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
                         data-message-id={message.id}
                         style={{ position: 'relative' }}
@@ -6658,203 +6658,207 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
                       >
                         {!message.isOwn && (
                           <div className="message-sender-info">
-                            <div
-                              className="message-sender-avatar"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                e.preventDefault()
-                                if (onViewStudentProfile && message.senderId) {
-                                  console.log('🖱️ Clicked on avatar, senderId:', message.senderId, 'Type:', typeof message.senderId)
-                                  const senderIdStr = String(message.senderId).trim()
-                                  if (senderIdStr && senderIdStr !== 'undefined' && senderIdStr !== 'null') {
-                                    onViewStudentProfile(senderIdStr)
-                                  } else {
-                                    console.error('Invalid senderId:', message.senderId)
-                                    alert('Invalid user ID. Please try again.')
-                                  }
+                        <div 
+                          className="message-sender-avatar"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            if (onViewStudentProfile && message.senderId) {
+                              console.log('🖱️ Clicked on avatar, senderId:', message.senderId, 'Type:', typeof message.senderId)
+                              const senderIdStr = String(message.senderId).trim()
+                              if (senderIdStr && senderIdStr !== 'undefined' && senderIdStr !== 'null') {
+                                onViewStudentProfile(senderIdStr)
+                              } else {
+                                console.error('Invalid senderId:', message.senderId)
+                                alert('Invalid user ID. Please try again.')
+                              }
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <img 
+                            src={(() => {
+                              // Ensure senderId is converted to string for lookup
+                              const senderIdKey = String(message.senderId || '')
+                              const senderProfile = senderProfiles[senderIdKey]
+                              const profilePic = senderProfile?.profilePicture
+                              
+                              if (profilePic) {
+                                // If it's a relative path, prepend the backend URL
+                                if (profilePic.startsWith('/uploads/')) {
+                                  return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
                                 }
-                              }}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <img
-                                src={(() => {
-                                  // Ensure senderId is converted to string for lookup
-                                  const senderIdKey = String(message.senderId || '')
-                                  const senderProfile = senderProfiles[senderIdKey]
-                                  const profilePic = senderProfile?.profilePicture
-
-                                  if (profilePic) {
-                                    // If it's a relative path, prepend the backend URL
-                                    if (profilePic.startsWith('/uploads/')) {
-                                      return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
-                                    }
-                                    // If it's already a full URL, use it as is
-                                    if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
-                                      return profilePic
-                                    }
-                                    // Otherwise, treat as relative path
-                                    return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
-                                  }
-                                  // Fallback to ui-avatars
-                                  const displayName = senderProfile?.displayName || message.sender || 'User'
-                                  return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
-                                })()}
-                                alt={senderProfiles[String(message.senderId || '')]?.displayName || message.sender || 'User'}
-                                onError={(e) => {
-                                  // Fallback to ui-avatars if image fails to load
-                                  const senderIdKey = String(message.senderId || '')
-                                  const displayName = senderProfiles[senderIdKey]?.displayName || message.sender || 'User'
-                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
-                                }}
-                              />
-                            </div>
-                            <div
-                              className="message-sender"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                e.preventDefault()
-                                if (onViewStudentProfile && message.senderId) {
-                                  console.log('🖱️ Clicked on username, senderId:', message.senderId, 'Type:', typeof message.senderId)
-                                  const senderIdStr = String(message.senderId).trim()
-                                  if (senderIdStr && senderIdStr !== 'undefined' && senderIdStr !== 'null') {
-                                    onViewStudentProfile(senderIdStr)
-                                  } else {
-                                    console.error('Invalid senderId:', message.senderId)
-                                    alert('Invalid user ID. Please try again.')
-                                  }
+                                // If it's already a full URL, use it as is
+                                if (profilePic.startsWith('http://') || profilePic.startsWith('https://')) {
+                                  return profilePic
                                 }
-                              }}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
-                            </div>
+                                // Otherwise, treat as relative path
+                                return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profilePic}`
+                              }
+                              // Fallback to ui-avatars
+                              const displayName = senderProfile?.displayName || message.sender || 'User'
+                              return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
+                            })()}
+                            alt={senderProfiles[String(message.senderId || '')]?.displayName || message.sender || 'User'}
+                            onError={(e) => {
+                              // Fallback to ui-avatars if image fails to load
+                              const senderIdKey = String(message.senderId || '')
+                              const displayName = senderProfiles[senderIdKey]?.displayName || message.sender || 'User'
+                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=40&background=00a8ff&color=fff`
+                            }}
+                          />
+                        </div>
+                        <div 
+                          className="message-sender"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            if (onViewStudentProfile && message.senderId) {
+                              console.log('🖱️ Clicked on username, senderId:', message.senderId, 'Type:', typeof message.senderId)
+                              const senderIdStr = String(message.senderId).trim()
+                              if (senderIdStr && senderIdStr !== 'undefined' && senderIdStr !== 'null') {
+                                onViewStudentProfile(senderIdStr)
+                              } else {
+                                console.error('Invalid senderId:', message.senderId)
+                                alert('Invalid user ID. Please try again.')
+                              }
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
+                        </div>
                           </div>
                         )}
-                        {/* Reply indicator when swiping right (mobile) - only for this message */}
-                        {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
-                          <div
-                            className="message-swipe-reply-indicator"
-                            style={{
-                              opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
-                              transform: `translateX(${swipeOffset - 60}px)`
-                            }}
-                          >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="9 10 4 15 9 20"></polyline>
-                              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-                            </svg>
-                          </div>
-                        )}
-                        <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
-                          <div
-                            className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
-                            style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
-                            onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                            onTouchEnd={handleMessageTouchEnd}
-                            onTouchMove={handleMessageTouchMove}
-                            onContextMenu={(e) => {
-                              if (isMobile) {
-                                e.preventDefault()
-                              }
-                            }}
-                          >
-                            {/* Reply Information */}
-                            {message.replyTo && (() => {
-                              // First try to use stored reply data (from optimistic message)
-                              let repliedMessage = message.replyToData
-
-                              // If not available, try to find it in messages array
-                              if (!repliedMessage) {
-                                repliedMessage = messages.find(m => m.id === message.replyTo)
-                              }
-
-                              if (repliedMessage) {
+                    {/* Reply indicator when swiping right (mobile) - only for this message */}
+                    {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
+                    <div 
+                        className="message-swipe-reply-indicator"
+                        style={{ 
+                          opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
+                          transform: `translateX(${swipeOffset - 60}px)`
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 10 4 15 9 20"></polyline>
+                          <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                        </svg>
+                      </div>
+                    )}
+                    <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
+                    <div className={`message-content-wrap ${message.isOwn ? 'sent' : 'received'}`}>
+                    <div 
+                      className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                      onTouchEnd={handleMessageTouchEnd}
+                      onTouchMove={handleMessageTouchMove}
+                      onContextMenu={(e) => {
+                        if (isMobile) {
+                          e.preventDefault()
+                        }
+                      }}
+                    >
+                      {/* Reply Information */}
+                      {message.replyTo && (() => {
+                        // First try to use stored reply data (from optimistic message)
+                        let repliedMessage = message.replyToData
+                        
+                        // If not available, try to find it in messages array
+                        if (!repliedMessage) {
+                          repliedMessage = messages.find(m => m.id === message.replyTo)
+                        }
+                        
+                        if (repliedMessage) {
+                          return (
+                            <div 
+                              className="message-reply-info"
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchEnd={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="message-reply-line"></div>
+                              <div className="message-reply-content">
+                                <span className="message-reply-name">
+                                  {repliedMessage.isOwn ? 'You' : (senderProfiles[repliedMessage.senderId]?.displayName || repliedMessage.sender || 'User')}
+                                </span>
+                                <span className="message-reply-text">{repliedMessage.text}</span>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
+                      <p>{message.text}</p>
+                      <div className="message-footer">
+                        <span className="message-time">{message.time}</span>
+                        {message.isOwn && (
+                          <span className={`message-status ${(() => {
+                            // For college chats, always show single tick (sent status)
+                            if (chat.type === 'college') {
+                              return 'sent'
+                            }
+                            
+                            const readBy = message.readBy || []
+                            const deliveredTo = message.deliveredTo || []
+                            const currentUserId = String(user?.id || user?._id || '')
+                            
+                            // For direct chats, check if read by the other user
+                            const isRead = readBy.some(r => String(r.userId) !== currentUserId)
+                            const isDelivered = deliveredTo.some(d => String(d.userId) !== currentUserId)
+                            
+                            return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
+                          })()}`}>
+                            {(() => {
+                              // For college chats, always show single tick
+                              if (chat.type === 'college') {
                                 return (
-                                  <div
-                                    className="message-reply-info"
-                                    onTouchStart={(e) => e.stopPropagation()}
-                                    onTouchEnd={(e) => e.stopPropagation()}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="message-reply-line"></div>
-                                    <div className="message-reply-content">
-                                      <span className="message-reply-name">
-                                        {repliedMessage.isOwn ? 'You' : (senderProfiles[repliedMessage.senderId]?.displayName || repliedMessage.sender || 'User')}
-                                      </span>
-                                      <span className="message-reply-text">{repliedMessage.text}</span>
-                                    </div>
-                                  </div>
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
                                 )
                               }
-                              return null
+                              
+                              const readBy = message.readBy || []
+                              const deliveredTo = message.deliveredTo || []
+                              const currentUserId = String(user?.id || user?._id || '')
+                              
+                              // Check if message is read by the other user (for direct chats)
+              const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
+              const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
+                              
+                              if (isRead) {
+                                // Blue double checkmark (read)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7"/>
+                                  </svg>
+                                )
+                              } else if (isDelivered) {
+                                // Gray double checkmark (delivered)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              } else {
+                                // Single checkmark (sent)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              }
                             })()}
-                            <p>{message.text}</p>
-                          </div>
-                          <div className="message-footer">
-                            <span className="message-time">{message.time}</span>
-                            {message.isOwn && (
-                              <span className={`message-status ${(() => {
-                                // For college chats, always show single tick (sent status)
-                                if (chat.type === 'college') {
-                                  return 'sent'
-                                }
-
-                                const readBy = message.readBy || []
-                                const deliveredTo = message.deliveredTo || []
-                                const currentUserId = String(user?.id || user?._id || '')
-
-                                // For direct chats, check if read by the other user
-                                const isRead = readBy.some(r => String(r.userId) !== currentUserId)
-                                const isDelivered = deliveredTo.some(d => String(d.userId) !== currentUserId)
-
-                                return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
-                              })()}`}>
-                                {(() => {
-                                  // For college chats, always show single tick
-                                  if (chat.type === 'college') {
-                                    return (
-                                      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0" />
-                                      </svg>
-                                    )
-                                  }
-
-                                  const readBy = message.readBy || []
-                                  const deliveredTo = message.deliveredTo || []
-                                  const currentUserId = String(user?.id || user?._id || '')
-
-                                  // Check if message is read by the other user (for direct chats)
-                                  const isRead = readBy.some(r => String(r.userId || r.userId) !== currentUserId)
-                                  const isDelivered = deliveredTo.some(d => String(d.userId || d.userId) !== currentUserId)
-
-                                  if (isRead) {
-                                    // Blue double checkmark (read)
-                                    return (
-                                      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7" />
-                                      </svg>
-                                    )
-                                  } else if (isDelivered) {
-                                    // Gray double checkmark (delivered)
-                                    return (
-                                      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0" />
-                                      </svg>
-                                    )
-                                  } else {
-                                    // Single checkmark (sent)
-                                    return (
-                                      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0" />
-                                      </svg>
-                                    )
-                                  }
-                                })()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                          </span>
+                        )}
                       </div>
+                    </div>
+                    </div>
+                    </div>
+                      </div>
+                    </div>
+                  </div>
                     </div>
                   </div>
                 </Fragment>
@@ -6867,7 +6871,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
       {/* Mobile Action Menu (Long-press) */}
       {showQuickEmojis && selectedMessage && isMobile && (
-        <div
+        <div 
           ref={quickEmojiRef}
           className="mobile-action-menu"
           style={{
@@ -6875,7 +6879,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             top: `${quickEmojiPosition.y}px`,
           }}
         >
-          <button
+            <button
             className="mobile-action-item"
             onClick={handleReplyClick}
           >
@@ -6884,7 +6888,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
             </svg>
             <span>Reply</span>
-          </button>
+            </button>
           <button
             className="mobile-action-item"
             onClick={handleCopyMessage}
@@ -6895,29 +6899,29 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Copy</span>
           </button>
-          <button
-            className="mobile-action-item"
-            onClick={handleDeleteForMe}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
+              <button 
+                className="mobile-action-item"
+                onClick={handleDeleteForMe}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
             <span>Delete</span>
-          </button>
+              </button>
           {isOwnMessage && (
-            <button
-              className="mobile-action-item"
-              onClick={handleDeleteForAll}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              <span>Delete for all</span>
-            </button>
+              <button 
+                className="mobile-action-item"
+                onClick={handleDeleteForAll}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete for all</span>
+              </button>
           )}
-          <button
+          <button 
             className="mobile-action-item"
             onClick={(e) => {
               e.stopPropagation()
@@ -6948,7 +6952,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
       {/* WhatsApp-style Action Menu Popup (Desktop) */}
       {showActionMenu && selectedMessage && !isMobile && (
-        <div
+        <div 
           ref={actionMenuRef}
           className="message-action-menu"
           style={{
@@ -6956,8 +6960,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             top: `${actionMenuPosition.y}px`,
           }}
         >
-          <button
-            className="action-menu-item"
+          <button 
+            className="action-menu-item" 
             onClick={() => {
               setShowEmojiPicker(true)
               setShowActionMenu(false)
@@ -6971,8 +6975,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Emoji</span>
           </button>
-          <button
-            className="action-menu-item"
+          <button 
+            className="action-menu-item" 
             onClick={handleReplyClick}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -6981,8 +6985,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Reply</span>
           </button>
-          <button
-            className="action-menu-item"
+          <button 
+            className="action-menu-item" 
             onClick={handleCopyMessage}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -6991,19 +6995,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </svg>
             <span>Copy</span>
           </button>
-          <button
-            className="action-menu-item"
-            onClick={handleDeleteForMe}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
+            <button 
+              className="action-menu-item" 
+              onClick={handleDeleteForMe}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
             <span>Delete</span>
           </button>
           {isOwnMessage && (
-            <button
-              className="action-menu-item"
+            <button 
+              className="action-menu-item" 
               onClick={handleDeleteForAll}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -7013,8 +7017,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               <span>Delete for all</span>
             </button>
           )}
-          <button
-            className="action-menu-item"
+          <button 
+            className="action-menu-item" 
             onClick={(e) => {
               e.stopPropagation()
               handleSelectClick()
@@ -7028,7 +7032,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           </button>
         </div>
       )}
-
+      
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && selectedMessage && (
         <div className="modal-overlay" onClick={() => {
@@ -7045,13 +7049,13 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             </div>
             <div className="modal-content">
               <p className="modal-description">
-                {deleteForAll
+                {deleteForAll 
                   ? 'Are you sure you want to delete this message for everyone? This action cannot be undone.'
                   : 'Are you sure you want to delete this message? This action cannot be undone.'}
               </p>
             </div>
             <div className="modal-footer">
-              <button
+              <button 
                 className="modal-cancel-btn"
                 onClick={() => {
                   setShowDeleteConfirm(false)
@@ -7061,7 +7065,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               >
                 Cancel
               </button>
-              <button
+              <button 
                 className="modal-confirm-btn"
                 onClick={handleConfirmDelete}
                 disabled={deleting}
@@ -7072,7 +7076,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           </div>
         </div>
       )}
-
+      
       {/* Clear Chat Confirmation Modal */}
       {showClearConfirm && (
         <div className="modal-overlay" onClick={() => {
@@ -7096,7 +7100,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               )}
             </div>
             <div className="modal-footer">
-              <button
+              <button 
                 className="modal-cancel-btn"
                 onClick={() => {
                   setShowClearConfirm(false)
@@ -7106,7 +7110,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
               >
                 Cancel
               </button>
-              <button
+              <button 
                 className="modal-confirm-btn"
                 onClick={handleClearChat}
                 disabled={clearing}
@@ -7117,14 +7121,14 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           </div>
         </div>
       )}
-
+      
       {blockMessage && (
         <div className={`block-message ${blockMessage.type === 'blocked' ? 'block-message-blocked' : 'block-message-error'}`}>
           <span className="block-message-icon">⚠️</span>
           <span className="block-message-text">{blockMessage.text}</span>
         </div>
       )}
-
+      
       {/* Reply Preview */}
       {replyingTo && (
         <div className="reply-preview">
@@ -7148,7 +7152,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
           </button>
         </div>
       )}
-
+      
       <form className="chat-input-area" onSubmit={handleSendMessage}>
         <button
           type="button"
@@ -7247,7 +7251,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   useEffect(() => {
     const loadMessages = async () => {
       if (!groupId) return
-
+      
       try {
         setLoading(true)
         const response = await fetchGroupMessages(groupId, 200)
@@ -7257,10 +7261,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             text: msg.text,
             sender: msg.senderName,
             senderId: msg.senderId,
-            time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-              hour: 'numeric',
+            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
               minute: '2-digit',
-              hour12: true
+              hour12: true 
             }),
             date: formatChatTimestamp(new Date(msg.timestamp)),
             timestamp: new Date(msg.timestamp),
@@ -7271,11 +7275,11 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             deliveredTo: msg.deliveredTo || [],
           }))
           setMessages(formattedMessages)
-
+          
           // Fetch sender profiles
           const senderIds = [...new Set(formattedMessages.map(m => m.senderId))]
           await fetchSenderProfiles(senderIds)
-
+          
           // Mark all unread messages as read when opening group chat (similar to college chat)
           const currentUserId = String(user?.id || user?._id || '')
           const unreadMessages = formattedMessages.filter(msg => {
@@ -7284,7 +7288,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             const readBy = msg.readBy || []
             return !readBy.some(r => String(r.userId) === currentUserId)
           })
-
+          
           // Mark messages as read (staggered to avoid overwhelming the server)
           if (unreadMessages.length > 0 && groupId) {
             unreadMessages.forEach((msg, index) => {
@@ -7292,7 +7296,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 markGroupMessageRead(msg.id, groupId)
               }, 50 * index) // Stagger the requests (50ms apart)
             })
-
+            
             // Immediately update unread count in groups list to 0
             // This will be called from parent component via onMessageSent callback
             // But we also update it here to ensure it's reset immediately
@@ -7316,7 +7320,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         setLoading(false)
       }
     }
-
+    
     loadMessages()
   }, [groupId, user])
 
@@ -7346,7 +7350,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           return null
         })
       )
-
+      
       const newProfiles = {}
       profiles.forEach(profile => {
         if (profile) {
@@ -7387,10 +7391,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           text: data.message.text,
           sender: data.message.senderName,
           senderId: data.message.senderId,
-          time: new Date(data.message.timestamp).toLocaleTimeString('en-US', {
-            hour: 'numeric',
+          time: new Date(data.message.timestamp).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
             minute: '2-digit',
-            hour12: true
+            hour12: true 
           }),
           date: formatChatTimestamp(new Date(data.message.timestamp)),
           timestamp: new Date(data.message.timestamp),
@@ -7405,7 +7409,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           if (prev.find(m => m.id === newMessage.id)) return prev
           return [...prev, newMessage].sort(compareMessages)
         })
-
+        
         // Fetch sender profile if not cached
         if (newMessage.senderId && !senderProfiles[String(newMessage.senderId)]) {
           fetchSenderProfiles([newMessage.senderId])
@@ -7465,7 +7469,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Handle clear chat
   const handleClearChat = async () => {
     if (!groupId) return
-
+    
     try {
       setClearing(true)
       setClearError(null)
@@ -7473,7 +7477,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       if (response && response.success) {
         setMessages([])
         setShowClearConfirm(false)
-
+        
         // Reload messages to ensure deleted ones are filtered out
         try {
           const messagesResponse = await fetchGroupMessages(groupId, 200)
@@ -7483,10 +7487,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               text: msg.text,
               sender: msg.senderName,
               senderId: msg.senderId,
-              time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
+              time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
                 minute: '2-digit',
-                hour12: true
+                hour12: true 
               }),
               date: formatChatTimestamp(new Date(msg.timestamp)),
               timestamp: new Date(msg.timestamp),
@@ -7503,7 +7507,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           // Still show empty messages if reload fails
           setMessages([])
         }
-
+        
         // Update chat list immediately to show "No messages yet"
         if (onMessageSent) {
           // Pass null timestamp to indicate cleared state - this will update timestamp to current time
@@ -7541,20 +7545,20 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Handle message click (desktop - for double-click detection)
   const handleMessageClick = (e, message) => {
     if (isMobile) return
-
+    
     // Prevent default browser behavior
     e.preventDefault()
     e.stopPropagation()
-
+    
     // If in selection mode, toggle selection
     if (selectionMode) {
       handleToggleSelection(message.id)
       return
     }
-
+    
     const currentTime = Date.now()
     const timeDiff = currentTime - lastClickTime.current
-
+    
     // Check if this is a double-click (within 300ms and same message)
     if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
       // Double-click detected - show action header
@@ -7566,12 +7570,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       // Single click - store for potential double-click
       lastClickTime.current = currentTime
       lastClickedMessage.current = message
-
+      
       // Clear timer if exists
       if (doubleClickTimer.current) {
         clearTimeout(doubleClickTimer.current)
       }
-
+      
       // If no double-click within 300ms, clear selection
       doubleClickTimer.current = setTimeout(() => {
         lastClickTime.current = 0
@@ -7594,20 +7598,20 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
     if (!isMobile || selectionMode) return
-
+    
     // Don't start long-press on interactive elements
     const target = e.target
-    if (target.closest('.message-reply-info') ||
-      target.closest('.message-reply') ||
-      target.closest('.message-selection-checkbox') ||
-      target.closest('button') ||
-      target.closest('a')) {
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
-
+    
     // Store which message is being long-pressed
     longPressMessageId.current = message.id
-
+    
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
@@ -7618,7 +7622,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-
+        
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
@@ -7627,12 +7631,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       longPressMessageId.current = null
     }, 500) // 500ms long-press
   }
-
+  
   // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
-
+    
     // Toggle selection for this message
     const newSelected = new Set(selectedItems)
     if (newSelected.has(messageId)) {
@@ -7641,12 +7645,12 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
       newSelected.add(messageId)
     }
     setSelectedItems(newSelected)
-
+    
     // If no messages selected, exit selection mode
     if (newSelected.size === 0) {
       setSelectionMode(false)
     }
-
+    
     // Haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate(30)
@@ -7730,7 +7734,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   const handleCopySelected = () => {
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     if (selectedMessages.length === 0) return
-
+    
     const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
     navigator.clipboard.writeText(textToCopy).then(() => {
       alert(`Copied ${selectedMessages.length} message(s)`)
@@ -7756,19 +7760,19 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Delete selected items for me (mark as deleted for user only)
   const handleDeleteSelectedForMe = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
-
+    
     try {
       // Mark all selected messages as deleted for this user only
       const deletePromises = selectedMessages.map(msg => deleteGroupMessage(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -7797,22 +7801,22 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   // Delete selected items for all (only own messages)
   const handleDeleteSelectedForAll = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const ownMessages = selectedMessages.filter(msg => msg.isOwn)
-
+    
     if (ownMessages.length === 0) return
-
+    
     try {
       // Delete own messages for all
       const deletePromises = ownMessages.map(msg => deleteGroupMessageForAll(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -7861,10 +7865,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
 
     try {
       setDeleting(true)
-      const response = deleteForAll
+      const response = deleteForAll 
         ? await deleteGroupMessageForAll(selectedMessage.id)
         : await deleteGroupMessage(selectedMessage.id)
-
+      
       if (response.success) {
         // Remove message from local state
         const updatedMessages = messages.filter(m => m.id !== selectedMessage.id)
@@ -7873,7 +7877,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         setShowMessageHeader(false)
         setSelectedMessage(null)
         setDeleteForAll(false)
-
+        
         // Update chat list
         if (updatedMessages.length > 0 && onMessageSent) {
           const lastMessage = updatedMessages[updatedMessages.length - 1]
@@ -7908,8 +7912,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
     return (
       <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
-          <button
-            className="chat-header-back-btn"
+          <button 
+            className="chat-header-back-btn" 
             onClick={() => {
               if (selectionMode) {
                 handleExitSelectionMode()
@@ -7919,7 +7923,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -7933,8 +7937,8 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
   return (
     <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
       <div className="chat-header-bar">
-        <button
-          className="chat-header-back-btn"
+        <button 
+          className="chat-header-back-btn" 
           onClick={() => {
             if (selectionMode) {
               handleExitSelectionMode()
@@ -7944,17 +7948,17 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <div
-          className="chat-header-avatar"
+        <div 
+          className="chat-header-avatar" 
           onClick={onViewProfile}
           style={{ cursor: 'pointer' }}
         >
           <img src={groupAvatar} alt={groupName} />
         </div>
-        <div
+        <div 
           className="chat-header-info"
           onClick={onViewProfile}
           style={{ cursor: 'pointer', flex: 1 }}
@@ -7966,7 +7970,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         </div>
         {/* Invite Button */}
         {onInvite && (
-          <button
+          <button 
             className="invite-header-btn animated-invite-btn"
             onClick={onInvite}
             title="Invite friends to join this group"
@@ -7980,7 +7984,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
           </button>
         )}
         {/* Clear Chat Button */}
-        <button
+        <button 
           className="clear-chat-btn"
           onClick={() => setShowClearConfirm(true)}
           title="Clear Chat"
@@ -8005,55 +8009,29 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         const isOnlyOwn = hasOwnMessages && !hasOtherMessages
         const isOnlyOthers = !hasOwnMessages && hasOtherMessages
         const isHybrid = hasOwnMessages && hasOtherMessages
-
+        
         return (
-          <div className="selection-mode-bar">
-            <div className="selection-mode-info">
-              <span>{selectedItems.size} selected</span>
-            </div>
-            <div className="selection-mode-actions">
-              <button
-                className="selection-mode-btn"
-                onClick={handleCopySelected}
-                title="Copy"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
-
-              {/* Delete buttons based on selection type */}
-              {isOnlyOwn && (
-                <>
-                  <button
-                    className="selection-mode-btn"
-                    onClick={handleDeleteSelectedForMe}
-                    title="Delete for me"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                    </svg>
-                    <span>Delete for me</span>
-                  </button>
-                  <button
-                    className="selection-mode-btn"
-                    onClick={handleDeleteSelectedForAll}
-                    title="Delete for all"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                    </svg>
-                    <span>Delete for all</span>
-                  </button>
-                </>
-              )}
-
-              {(isOnlyOthers || isHybrid) && (
-                <button
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+              
+            {/* Delete buttons based on selection type */}
+            {isOnlyOwn && (
+              <>
+                <button 
                   className="selection-mode-btn"
                   onClick={handleDeleteSelectedForMe}
                   title="Delete for me"
@@ -8062,29 +8040,55 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                   </svg>
-                  <span>Delete</span>
+                  <span>Delete for me</span>
                 </button>
-              )}
-
-              <button
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForAll}
+                  title="Delete for all"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for all</span>
+                </button>
+              </>
+            )}
+              
+            {(isOnlyOthers || isHybrid) && (
+              <button 
                 className="selection-mode-btn"
-                onClick={handleExitSelectionMode}
-                title="Cancel"
+                onClick={handleDeleteSelectedForMe}
+                title="Delete for me"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                 </svg>
-                <span>Cancel</span>
+                <span>Delete</span>
               </button>
-            </div>
+            )}
+              
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
           </div>
+        </div>
         )
       })()}
       {/* Message Action Header (WhatsApp-style) */}
       {showMessageHeader && selectedMessage && !selectionMode && (
         <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleReplyClick}
             title="Reply"
@@ -8094,7 +8098,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
             </svg>
           </button>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleCopyMessage}
             title="Copy"
@@ -8104,29 +8108,29 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
-          <button
-            className="action-header-btn"
-            onClick={handleDeleteForMe}
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForMe}
             title="Delete"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-            </svg>
-          </button>
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+              </button>
           {selectedMessage?.isOwn && (
-            <button
-              className="action-header-btn"
-              onClick={handleDeleteForAll}
-              title="Delete for all"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-              </svg>
-            </button>
+              <button 
+                className="action-header-btn"
+                onClick={handleDeleteForAll}
+                title="Delete for all"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+              </button>
           )}
-          <button
+          <button 
             className="action-header-btn action-header-close"
             onClick={() => {
               setShowMessageHeader(false)
@@ -8150,10 +8154,10 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         ) : (
           messages.map((message, index) => {
             const prevMessage = index > 0 ? messages[index - 1] : null
-            const showSender = !prevMessage || prevMessage.senderId !== message.senderId ||
+            const showSender = !prevMessage || prevMessage.senderId !== message.senderId || 
               (message.timestamp - prevMessage.timestamp) > 300000 // 5 minutes
             const senderProfile = senderProfiles[String(message.senderId)]
-            const senderAvatar = senderProfile?.profilePicture ||
+            const senderAvatar = senderProfile?.profilePicture || 
               `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
 
             return (
@@ -8161,7 +8165,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                 <div className="chat-left-col">
                   {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
                   {isMobile && (
-                    <div
+                    <div 
                       className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
                       onTouchStart={(e) => {
                         e.preventDefault()
@@ -8177,7 +8181,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     >
                       {selectedItems.has(message.id) ? (
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                         </svg>
                       ) : (
                         <div className="checkbox-circle"></div>
@@ -8186,28 +8190,28 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                   )}
                 </div>
                 <div className="chat-main-col">
-                  <div
+                  <div 
                     className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
                     data-message-id={message.id}
-                    style={{
+                    style={{ 
                       position: 'relative',
                       transform: swipedMessageId === message.id ? `translateX(${swipeOffset}px)` : 'translateX(0)',
                       transition: swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none'
                     }}
                     onClick={(e) => {
-                      // On mobile, prevent click if touch just happened or if in selection mode
-                      if (isMobile) {
-                        if (false) {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          return
-                        }
-                        // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
-                        e.preventDefault()
-                        e.stopPropagation()
-                        return
-                      }
-                      handleMessageClick(e, message)
+                  // On mobile, prevent click if touch just happened or if in selection mode
+                  if (isMobile) {
+                    if (false) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      return
+                    }
+                    // On mobile, only allow clicks for desktop-like behavior (shouldn't happen normally)
+                    e.preventDefault()
+                    e.stopPropagation()
+                    return
+                  }
+                  handleMessageClick(e, message)
                     }}
                     onContextMenu={(e) => !selectionMode && handleMessageContextMenu(e, message)}
                     onTouchStart={(e) => handleMessageTouchStart(e, message)}
@@ -8215,65 +8219,67 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
                     onTouchMove={handleMessageTouchMove}
                   >
                     {!message.isOwn && (
-                      <div className="message-sender-info">
-                        <div className="message-sender-avatar">
-                          <img
-                            src={senderAvatar}
-                            alt={message.sender}
-                            onError={(e) => {
-                              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
-                            }}
-                          />
-                        </div>
-                        {showSender && (
-                          <div className="message-sender">
-                            {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
-                          </div>
-                        )}
+                  <div className="message-sender-info">
+                    <div className="message-sender-avatar">
+                      <img 
+                        src={senderAvatar}
+                        alt={message.sender}
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender)}&size=40&background=00a8ff&color=fff`
+                        }}
+                      />
+                    </div>
+                    {showSender && (
+                      <div className="message-sender">
+                        {senderProfiles[String(message.senderId || '')]?.displayName || message.sender}
                       </div>
                     )}
-                    <div className="message-content">
-                      {message.replyTo && (() => {
-                        const repliedMsg = messages.find(m => m.id === message.replyTo)
-                        if (repliedMsg) {
-                          return (
-                            <div
-                              className="message-reply-info"
-                              onTouchStart={(e) => e.stopPropagation()}
-                              onTouchEnd={(e) => e.stopPropagation()}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="message-reply-line"></div>
-                              <div className="message-reply-content">
-                                <span className="message-reply-name">
-                                  {repliedMsg.isOwn ? 'You' : (senderProfiles[String(repliedMsg.senderId || '')]?.displayName || repliedMsg.sender || 'User')}
-                                </span>
-                                <span className="message-reply-text">{repliedMsg.text}</span>
-                              </div>
-                            </div>
-                          )
-                        }
-                        return null
-                      })()}
-                      <p>{message.text}</p>
-                    </div>
-                    <div className="message-footer">
-                      <span className="message-time">
-                        {new Date(message.timestamp).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}
-                      </span>
-                      {message.isOwn && (
-                        <span className="message-status sent">
-                          <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
                   </div>
+                    )}
+                <div className="message-content">
+                  {message.replyTo && (() => {
+                    const repliedMsg = messages.find(m => m.id === message.replyTo)
+                    if (repliedMsg) {
+                      return (
+                        <div 
+                          className="message-reply-info"
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="message-reply-line"></div>
+                          <div className="message-reply-content">
+                            <span className="message-reply-name">
+                              {repliedMsg.isOwn ? 'You' : (senderProfiles[String(repliedMsg.senderId || '')]?.displayName || repliedMsg.sender || 'User')}
+                            </span>
+                            <span className="message-reply-text">{repliedMsg.text}</span>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                  <p>{message.text}</p>
+                  <div className="message-footer">
+                    <span className="message-time">
+                      {new Date(message.timestamp).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true 
+                      })}
+                    </span>
+                    {message.isOwn && (
+                      <span className="message-status sent">
+                        <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                  </div>
+                </div>
+              </div>
                 </div>
               </div>
             )
@@ -8309,7 +8315,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
         <button
           type="button"
           className="emoji-picker-btn"
-          onClick={() => { }}
+          onClick={() => {}}
           title="Add emoji"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -8355,13 +8361,13 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
             </div>
             <div className="modal-content">
               <p className="modal-description">
-                {deleteForAll
+                {deleteForAll 
                   ? 'Are you sure you want to delete this message for everyone? This action cannot be undone.'
                   : 'Are you sure you want to delete this message? This will only delete it for you. Other members will still see it. This action cannot be undone.'}
               </p>
             </div>
             <div className="modal-footer">
-              <button
+              <button 
                 className="modal-cancel-btn"
                 onClick={() => {
                   setShowDeleteConfirm(false)
@@ -8371,7 +8377,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               >
                 Cancel
               </button>
-              <button
+              <button 
                 className="modal-confirm-btn"
                 onClick={handleConfirmDelete}
                 disabled={deleting}
@@ -8410,7 +8416,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               )}
             </div>
             <div className="modal-footer">
-              <button
+              <button 
                 className="modal-cancel-btn"
                 onClick={() => {
                   setShowClearConfirm(false)
@@ -8420,7 +8426,7 @@ const GroupChatView = ({ chat, group, user, onBack, onViewProfile, onViewStudent
               >
                 Cancel
               </button>
-              <button
+              <button 
                 className="modal-confirm-btn"
                 onClick={handleClearChat}
                 disabled={clearing}
@@ -8482,7 +8488,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const lastClickTime = useRef(0)
   const lastClickedMessage = useRef(null)
   const messageInputRef = useRef(null) // Ref for textarea auto-resize
-
+  
   // Cleanup function for block message timeout
   const clearBlockMessageTimeout = () => {
     if (blockMessageTimeoutRef.current) {
@@ -8490,7 +8496,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       blockMessageTimeoutRef.current = null
     }
   }
-
+  
   // Set block message with auto-clear (production-safe)
   const setBlockMessageWithTimeout = (message) => {
     clearBlockMessageTimeout() // Clear any existing timeout
@@ -8500,7 +8506,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       blockMessageTimeoutRef.current = null
     }, 5000)
   }
-
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -8538,7 +8544,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         // Check if either user has blocked the other
         const isBlocked = blockResponse.blockedByMe || blockResponse.blockedByThem || false
         setIsBlocked(isBlocked)
-
+        
         // Clear block message if messaging is allowed
         if (blockResponse.canMessage) {
           clearBlockMessageTimeout()
@@ -8562,21 +8568,21 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       console.error('Error checking block status:', error)
     }
   }, [otherUserId])
-
+  
   // Listen for block status changes from profile view
   useEffect(() => {
     const handleBlockStatusChange = async () => {
       console.log('🔄 Block status changed event received, refreshing...')
       await refreshBlockStatus()
     }
-
+    
     window.addEventListener('blockStatusChanged', handleBlockStatusChange)
-
+    
     return () => {
       window.removeEventListener('blockStatusChanged', handleBlockStatusChange)
     }
   }, [refreshBlockStatus])
-
+  
   // Also refresh block status when otherUserId changes
   useEffect(() => {
     if (otherUserId) {
@@ -8619,12 +8625,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         if (response.success && response.user?.profile?.lastSeen) {
           const lastSeenDate = new Date(response.user.profile.lastSeen)
           setOtherUserLastSeen(lastSeenDate)
-
+          
           // Check if user is online (last seen within last 30 seconds)
           const now = new Date()
           const diffMs = now - lastSeenDate
           const diffSeconds = Math.floor(diffMs / 1000)
-
+          
           // Consider user online if last seen within 30 seconds
           setIsOtherUserOnline(diffSeconds < 30)
         }
@@ -8647,7 +8653,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         if (response.success && response.user) {
           setOtherUser(response.user)
         }
-
+        
         // Check block status
         await refreshBlockStatus()
       } catch (error) {
@@ -8667,8 +8673,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday'
     } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
         day: 'numeric',
         year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
       })
@@ -8683,7 +8689,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setLoading(false)
         return
       }
-
+      
       try {
         setLoading(true)
         const response = await getDirectMessages(otherUserId)
@@ -8722,27 +8728,27 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               }
             }
             const formattedMsg = {
-              id: msg.id,
-              text: msg.text,
-              sender: msg.senderName,
-              senderId: msg.senderId,
-              time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              }),
-              date: formatDate(new Date(msg.timestamp)),
+            id: msg.id,
+            text: msg.text,
+            sender: msg.senderName,
+            senderId: msg.senderId,
+            time: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: formatDate(new Date(msg.timestamp)),
               isOwn: isOwn,
-              timestamp: new Date(msg.timestamp),
-              replyTo: msg.replyTo || null,
-              replyToData: null, // Will be populated below
-              readBy: msg.readBy || [],
-              deliveredTo: msg.deliveredTo || []
+            timestamp: new Date(msg.timestamp),
+            replyTo: msg.replyTo || null,
+            replyToData: null, // Will be populated below
+            readBy: msg.readBy || [],
+            deliveredTo: msg.deliveredTo || []
             }
-
+            
             return formattedMsg
           })
-
+          
           // Populate replyToData for messages that have replyTo
           const messagesWithReplies = formattedMessages.map(msg => {
             if (msg.replyTo && !msg.replyToData) {
@@ -8759,23 +8765,23 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             }
             return msg
           })
-
+          
           setMessages(messagesWithReplies)
-
+          
           // Update chat list with last message status if it's our message
           if (formattedMessages.length > 0) {
             const lastMessage = formattedMessages[formattedMessages.length - 1]
             if (lastMessage.isOwn && onMessageSent && otherUser) {
               const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-              const userAvatar = otherUser.profile?.profilePicture
-                ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                  : otherUser.profile.profilePicture)
+              const userAvatar = otherUser.profile?.profilePicture 
+                ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                    ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                    : otherUser.profile.profilePicture)
                 : null
               onMessageSent(otherUserId, userName, userAvatar, lastMessage.text, lastMessage.timestamp, true, lastMessage.deliveredTo || [], lastMessage.readBy || [])
             }
           }
-
+          
           // Scroll to bottom after messages are loaded and DOM is updated
           setTimeout(() => {
             if (messagesEndRef.current) {
@@ -8827,7 +8833,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       if (data.userId === otherUserId) {
         setIsOtherUserOnline(false)
         setOtherUserTyping(false)
-
+        
         // Immediately fetch and update last seen when user goes offline
         try {
           const response = await getUserProfile(otherUserId)
@@ -8865,7 +8871,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     const handleNewDirectMessage = (message) => {
       console.log('📬 New direct message received:', message)
       const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
-
+      
       if (String(message.receiverId) === String(user?.id || user?._id || '')) {
         // This is a message for us
         setMessages(prev => {
@@ -8899,26 +8905,26 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               return m
             })
           }
-
-          const formattedMessage = {
-            id: message.id,
-            text: message.text,
-            sender: message.senderName,
-            senderId: message.senderId,
-            time: new Date(message.timestamp).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
-            date: formatDate(new Date(message.timestamp)),
+          
+        const formattedMessage = {
+          id: message.id,
+          text: message.text,
+          sender: message.senderName,
+          senderId: message.senderId,
+          time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          date: formatDate(new Date(message.timestamp)),
             isOwn: isOwnMessage,
-            timestamp: new Date(message.timestamp),
-            replyTo: message.replyTo || null,
+          timestamp: new Date(message.timestamp),
+          replyTo: message.replyTo || null,
             replyToData: null, // Will be populated below if replyTo exists
-            readBy: message.readBy || [],
-            deliveredTo: message.deliveredTo || []
-          }
-
+          readBy: message.readBy || [],
+          deliveredTo: message.deliveredTo || []
+        }
+        
           // Populate replyToData if this message is a reply
           if (formattedMessage.replyTo) {
             const repliedMsg = prev.find(m => m.id === formattedMessage.replyTo)
@@ -8932,16 +8938,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               }
             }
           }
-
-          return [...prev, formattedMessage].sort((a, b) =>
+          
+          return [...prev, formattedMessage].sort((a, b) => 
             new Date(a.timestamp) - new Date(b.timestamp)
           )
         })
-
+        
         // Automatically mark as delivered when we receive it
         console.log('✅ Auto-marking received message as delivered:', message.id)
         markDirectMessageDelivered(message.id)
-
+        
         // Update chat list
         if (onMessageSent) {
           const senderName = message.senderName || 'User'
@@ -8972,18 +8978,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           }
           return newMessages
         }
-
+        
         // Find optimistic message by text and replyTo
-        const optimisticIndex = prev.findIndex(msg =>
-          msg.isOptimistic &&
+        const optimisticIndex = prev.findIndex(msg => 
+          msg.isOptimistic && 
           msg.text === message.text &&
           (msg.replyTo === message.replyTo || (!msg.replyTo && !message.replyTo))
         )
-
+        
         if (optimisticIndex !== -1) {
           const optimisticMsg = prev[optimisticIndex]
           const newMessages = [...prev]
-
+          
           // Preserve replyToData from optimistic message
           let replyToData = optimisticMsg.replyToData || null
           if (message.replyTo && !replyToData) {
@@ -8998,33 +9004,33 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               }
             }
           }
-
+          
           newMessages[optimisticIndex] = {
             ...optimisticMsg,
-            id: message.id,
-            isOptimistic: false,
+              id: message.id,
+              isOptimistic: false,
             replyTo: message.replyTo || optimisticMsg.replyTo || null,
             replyToData: replyToData,
-            deliveredTo: message.deliveredTo || [],
-            readBy: message.readBy || []
-          }
-
+              deliveredTo: message.deliveredTo || [],
+              readBy: message.readBy || []
+            }
+          
           console.log('✅ Replaced optimistic direct message with real message:', message.id, 'replyTo:', message.replyTo)
-
+          
           // Update chat list when message is confirmed
           if (onMessageSent && otherUser) {
             const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-            const userAvatar = otherUser.profile?.profilePicture
-              ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                : otherUser.profile.profilePicture)
+            const userAvatar = otherUser.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
               : null
             onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
           }
-
+          
           return newMessages
         }
-
+        
         // If no optimistic message found, check if this message already exists
         const duplicateIndex = prev.findIndex(m => m.id === message.id)
         if (duplicateIndex === -1) {
@@ -9034,10 +9040,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             text: message.text,
             sender: user?.profile?.displayName || user?.email?.split('@')[0] || 'You',
             senderId: user?.id || user?._id || '',
-            time: new Date(message.timestamp).toLocaleTimeString('en-US', {
-              hour: 'numeric',
+            time: new Date(message.timestamp).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
               minute: '2-digit',
-              hour12: true
+              hour12: true 
             }),
             date: formatDate(new Date(message.timestamp)),
             isOwn: true,
@@ -9047,23 +9053,23 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             deliveredTo: message.deliveredTo || [],
             readBy: message.readBy || []
           }
-
+          
           // Update chat list
           if (onMessageSent && otherUser) {
             const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-            const userAvatar = otherUser.profile?.profilePicture
-              ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                : otherUser.profile.profilePicture)
+            const userAvatar = otherUser.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
               : null
             onMessageSent(otherUserId, userName, userAvatar, message.text, message.timestamp, true, message.deliveredTo || [], message.readBy || [])
           }
-
-          return [...prev, newMessage].sort((a, b) =>
+          
+          return [...prev, newMessage].sort((a, b) => 
             new Date(a.timestamp) - new Date(b.timestamp)
           )
         }
-
+        
         return prev
       })
     }
@@ -9084,18 +9090,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   ...msg,
                   deliveredTo: [...deliveredTo, { userId: otherUserId, deliveredAt: new Date() }]
                 }
-
+                
                 // Update chat list with latest status
                 if (onMessageSent && otherUser) {
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-                  const userAvatar = otherUser.profile?.profilePicture
-                    ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                      ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                      : otherUser.profile.profilePicture)
+                  const userAvatar = otherUser.profile?.profilePicture 
+                    ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        : otherUser.profile.profilePicture)
                     : null
                   onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo, updatedMsg.readBy || [])
                 }
-
+                
                 return updatedMsg
               }
             } else if (data.status === 'read') {
@@ -9107,18 +9113,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   ...msg,
                   readBy: [...readBy, { userId: otherUserId, readAt: new Date() }]
                 }
-
+                
                 // Update chat list with latest status
                 if (onMessageSent && otherUser) {
                   const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-                  const userAvatar = otherUser.profile?.profilePicture
-                    ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                      ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                      : otherUser.profile.profilePicture)
+                  const userAvatar = otherUser.profile?.profilePicture 
+                    ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                        : otherUser.profile.profilePicture)
                     : null
                   onMessageSent(otherUserId, userName, userAvatar, msg.text, msg.timestamp, true, updatedMsg.deliveredTo || [], updatedMsg.readBy)
                 }
-
+                
                 return updatedMsg
               }
             }
@@ -9136,7 +9142,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setOtherUserLastSeen(prev => prev ? new Date(prev) : null)
       }
     }
-
+    
     // Update last seen display every minute for real-time "X minutes ago" updates
     const lastSeenInterval = setInterval(updateLastSeenDisplay, 60000)
 
@@ -9168,24 +9174,24 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   const handleInputChange = (e) => {
     const value = e.target.value
     setMessageInput(value)
-
+    
     if (!otherUserId) return
-
+    
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = null
     }
-
+    
     // If user is typing and not already marked as typing
     if (value.trim().length > 0) {
       if (!isTyping) {
-        setIsTyping(true)
-        emitTypingDirect(otherUserId, true)
-      }
-
-      // Set timeout to stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(true)
+      emitTypingDirect(otherUserId, true)
+    }
+    
+    // Set timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
         emitTypingDirect(otherUserId, false)
         typingTimeoutRef.current = null
@@ -9210,7 +9216,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   // Mark messages as read when they're visible
   useEffect(() => {
     if (!otherUserId || messages.length === 0) return
-
+    
     // Find the last message that's not from current user
     const lastOtherMessage = [...messages].reverse().find(msg => !msg.isOwn)
     if (lastOtherMessage && lastOtherMessage.id !== lastReadMessageId) {
@@ -9226,9 +9232,9 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     // Trim only leading/trailing whitespace, preserve newlines in the middle
     const messageText = messageInput.trimStart().trimEnd()
     console.log('📝 Message text:', messageText, 'Other user ID:', otherUserId)
-
+    
     console.log('🔵 handleSendMessage called', { messageText, otherUserId, isBlocked })
-
+    
     if (!messageText || !otherUserId) {
       console.warn('⚠️ Cannot send message - missing text or otherUserId')
       return
@@ -9246,7 +9252,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
 
     // Refresh block status before sending to ensure it's up to date
     await refreshBlockStatus()
-
+    
     // Check if user is blocked (re-check after refresh)
     if (isBlocked) {
       console.warn('⚠️ Cannot send message - user is blocked')
@@ -9261,10 +9267,10 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       text: messageText,
       sender: user?.profile?.displayName || user?.email?.split('@')[0] || 'You',
       senderId: user?.id || user?._id || '',
-      time: new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
+      time: new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
         minute: '2-digit',
-        hour12: true
+        hour12: true 
       }),
       date: formatDate(new Date()),
       isOwn: true,
@@ -9284,20 +9290,20 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const sent = sendDirectMessageSocket(otherUserId, messageText, replyToId)
       if (sent) {
         console.log('✅ Message sent via Socket.IO. Waiting for confirmation...', replyToId ? `(replying to: ${replyToId})` : '')
-
+        
         // Clear reply after sending
         if (replyingTo) {
           setReplyingTo(null)
         }
-
+        
         // Update chat list immediately (optimistic update)
         // Status will be updated when we receive directMessageSent event
         if (onMessageSent && otherUser) {
           const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-          const userAvatar = otherUser.profile?.profilePicture
-            ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-              : otherUser.profile.profilePicture)
+          const userAvatar = otherUser.profile?.profilePicture 
+            ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                : otherUser.profile.profilePicture)
             : null
           onMessageSent(otherUserId, userName, userAvatar, messageText, new Date(), true, [], [])
         }
@@ -9305,19 +9311,19 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         console.error('❌ Failed to send message - socket not connected')
         // Remove optimistic message on error
         setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id))
-        setBlockMessageWithTimeout({
+          setBlockMessageWithTimeout({
           text: 'Failed to send message. Please check your connection.',
-          type: 'error'
-        })
+            type: 'error'
+          })
       }
     } catch (error) {
       console.error('❌ ERROR sending message:', error)
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id))
-
+      
       // Refresh block status in case it changed
       await refreshBlockStatus()
-
+      
       // Show professional error message
       const errorMessage = error.message || 'Error sending message. Please try again.'
       if (errorMessage.includes('blocked') || errorMessage.includes('cannot send')) {
@@ -9341,14 +9347,14 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       if (response.success) {
         setMessages([])
         setShowClearConfirm(false)
-
+        
         // Update chat list immediately to show "No messages yet"
         if (onMessageSent && otherUser) {
           const userName = otherUser.profile?.displayName || otherUser.email?.split('@')[0] || 'User'
-          const userAvatar = otherUser.profile?.profilePicture
-            ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-              : otherUser.profile.profilePicture)
+          const userAvatar = otherUser.profile?.profilePicture 
+            ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                : otherUser.profile.profilePicture)
             : null
           // Pass null timestamp to indicate cleared state - this will update timestamp to current time
           onMessageSent(
@@ -9390,20 +9396,20 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   // Handle message click (desktop - for double-click detection)
   const handleMessageClick = (e, message) => {
     if (isMobile) return
-
+    
     // Prevent default browser behavior (including context menu)
     e.preventDefault()
     e.stopPropagation()
-
+    
     // If in selection mode, toggle selection
     if (selectionMode) {
       handleToggleSelection(message.id)
       return
     }
-
+    
     const currentTime = Date.now()
     const timeDiff = currentTime - lastClickTime.current
-
+    
     // Check if this is a double-click (within 300ms and same message)
     if (timeDiff < 300 && lastClickedMessage.current?.id === message.id) {
       // Double-click detected - automatically enter selection mode (WhatsApp-like)
@@ -9418,12 +9424,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       // Single click - store for potential double-click
       lastClickTime.current = currentTime
       lastClickedMessage.current = message
-
+      
       // Clear timer if exists
       if (doubleClickTimer.current) {
         clearTimeout(doubleClickTimer.current)
       }
-
+      
       // If no double-click within 300ms, clear selection
       doubleClickTimer.current = setTimeout(() => {
         lastClickTime.current = 0
@@ -9449,20 +9455,20 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   // Simple long-press handler for message selection (mobile only)
   const handleMessageTouchStart = (e, message) => {
     if (!isMobile || selectionMode) return
-
+    
     // Don't start long-press on interactive elements
     const target = e.target
-    if (target.closest('.message-reply-info') ||
-      target.closest('.message-reply') ||
-      target.closest('.message-selection-checkbox') ||
-      target.closest('button') ||
-      target.closest('a')) {
+    if (target.closest('.message-reply-info') || 
+        target.closest('.message-reply') || 
+        target.closest('.message-selection-checkbox') ||
+        target.closest('button') ||
+        target.closest('a')) {
       return
     }
-
+    
     // Store which message is being long-pressed
     longPressMessageId.current = message.id
-
+    
     // Start long-press timer
     longPressTimer.current = setTimeout(() => {
       if (longPressMessageId.current === message.id) {
@@ -9473,7 +9479,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         setSelectedMessage(null)
         setShowQuickEmojis(false)
         setShowActionMenu(false)
-
+        
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate(50)
@@ -9482,12 +9488,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       longPressMessageId.current = null
     }, 500) // 500ms long-press
   }
-
+  
   // Handle selection checkbox tap - ONLY way to select messages
   const handleSelectionCheckboxTap = (e, messageId) => {
     e.preventDefault()
     e.stopPropagation()
-
+    
     // Toggle selection for this message
     const newSelected = new Set(selectedItems)
     if (newSelected.has(messageId)) {
@@ -9496,12 +9502,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       newSelected.add(messageId)
     }
     setSelectedItems(newSelected)
-
+    
     // If no messages selected, exit selection mode
     if (newSelected.size === 0) {
       setSelectionMode(false)
     }
-
+    
     // Haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate(30)
@@ -9555,7 +9561,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       setSelectedMessage(null)
     }
   }
-
+  
   // Toggle item selection in selection mode
   const handleToggleSelection = (itemId) => {
     setSelectedItems(prev => {
@@ -9572,18 +9578,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       return newSet
     })
   }
-
+  
   // Exit selection mode
   const handleExitSelectionMode = () => {
     setSelectionMode(false)
     setSelectedItems(new Set())
   }
-
+  
   // Copy selected items
   const handleCopySelected = () => {
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     if (selectedMessages.length === 0) return
-
+    
     const textToCopy = selectedMessages.map(msg => msg.text).join('\n')
     navigator.clipboard.writeText(textToCopy).then(() => {
       // Show feedback
@@ -9594,35 +9600,35 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       alert('Failed to copy messages')
     })
   }
-
+  
   // Delete selected items for me (mark as deleted for this user only)
   const handleDeleteSelectedForMe = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const currentUserId = String(user?.id || user?._id || '')
-
+    
     try {
       // Mark messages as deleted for this user only (not permanently delete)
       const deletePromises = selectedMessages.map(msg => deleteDirectMessage(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list with the most recent remaining message
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
         const isOwn = String(lastMessage.senderId) === currentUserId
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9636,12 +9642,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       } else if (updatedMessages.length === 0 && onMessageSent) {
         // No messages left, update chat list to show "No messages yet"
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9659,18 +9665,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
         const isOwn = String(lastMessage.senderId) === currentUserId
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9683,12 +9689,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         )
       } else if (updatedMessages.length === 0 && onMessageSent) {
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9706,34 +9712,34 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   // Delete selected items for all (permanently delete from database - only own messages)
   const handleDeleteSelectedForAll = async () => {
     if (selectedItems.size === 0) return
-
+    
     const selectedMessages = messages.filter(msg => selectedItems.has(msg.id))
     const ownMessages = selectedMessages.filter(msg => msg.isOwn)
     const currentUserId = String(user?.id || user?._id || '')
-
+    
     if (ownMessages.length === 0) return // Should not happen, but safety check
-
+    
     try {
       // Permanently delete own messages for everyone
       const deletePromises = ownMessages.map(msg => deleteDirectMessageForAll(msg.id))
       await Promise.all(deletePromises)
-
+      
       // Remove messages from local state
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
-      handleExitSelectionMode()
-
+    handleExitSelectionMode()
+      
       // Update chat list with the most recent remaining message
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
         const isOwn = String(lastMessage.senderId) === currentUserId
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9747,12 +9753,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       } else if (updatedMessages.length === 0 && onMessageSent) {
         // No messages left, update chat list to show "No messages yet"
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9770,18 +9776,18 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       const updatedMessages = messages.filter(m => !selectedItems.has(m.id))
       setMessages(updatedMessages)
       handleExitSelectionMode()
-
+      
       // Update chat list
       if (updatedMessages.length > 0 && onMessageSent) {
         const lastMessage = updatedMessages[updatedMessages.length - 1]
         const isOwn = String(lastMessage.senderId) === currentUserId
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9794,12 +9800,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         )
       } else if (updatedMessages.length === 0 && onMessageSent) {
         const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-        const userAvatar = otherUser?.profile?.profilePicture
-          ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-            ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-            : otherUser.profile.profilePicture)
+        const userAvatar = otherUser?.profile?.profilePicture 
+          ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+              ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+              : otherUser.profile.profilePicture)
           : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`
-
+        
         onMessageSent(
           otherUserId,
           userName,
@@ -9866,36 +9872,36 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     try {
       setDeleting(true);
       // Use the appropriate endpoint based on deleteForAll flag
-      const response = deleteForAll
+      const response = deleteForAll 
         ? await deleteDirectMessageForAll(selectedMessage.id)
         : await deleteDirectMessage(selectedMessage.id);
-
-      if (response.success) {
-        // Remove message from local state
+      
+        if (response.success) {
+          // Remove message from local state
         const updatedMessages = messages.filter(m => m.id !== selectedMessage.id);
         setMessages(updatedMessages);
         setShowDeleteConfirm(false);
         setShowMessageHeader(false);
         setSelectedMessage(null);
         setDeleteForAll(false);
-
+        
         // Update chat list - find the previous message to update last message
         const currentUserId = String(user?.id || user?._id || '');
-
+        
         if (updatedMessages.length > 0) {
           // Get the most recent remaining message
           const lastMessage = updatedMessages[updatedMessages.length - 1];
           const isOwn = String(lastMessage.senderId) === currentUserId;
-
+          
           // Update chat list with the previous message
           if (onMessageSent) {
             const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User';
-            const userAvatar = otherUser?.profile?.profilePicture
-              ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                : otherUser.profile.profilePicture)
+            const userAvatar = otherUser?.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
               : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`;
-
+            
             onMessageSent(
               otherUserId,
               userName,
@@ -9911,12 +9917,12 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
           // No messages left, update chat list to show "No messages yet"
           if (onMessageSent) {
             const userName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User';
-            const userAvatar = otherUser?.profile?.profilePicture
-              ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-                ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-                : otherUser.profile.profilePicture)
+            const userAvatar = otherUser?.profile?.profilePicture 
+              ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+                  ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+                  : otherUser.profile.profilePicture)
               : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=50&background=00a8ff&color=fff`;
-
+            
             onMessageSent(
               otherUserId,
               userName,
@@ -9976,7 +9982,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
       document.addEventListener('click', handleClickOutside, true)
       document.addEventListener('touchstart', handleClickOutside, true)
     }, 200)
-
+    
     return () => {
       clearTimeout(timeoutId)
       document.removeEventListener('click', handleClickOutside, true)
@@ -10002,8 +10008,8 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     return (
       <div className={`live-chat-view ${selectionMode ? 'selection-mode-active' : ''}`}>
         <div className="chat-header-bar">
-          <button
-            className="chat-header-back-btn"
+          <button 
+            className="chat-header-back-btn" 
             onClick={() => {
               if (selectionMode) {
                 handleExitSelectionMode()
@@ -10013,7 +10019,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
@@ -10025,16 +10031,16 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
   }
 
   const displayName = otherUser?.profile?.displayName || otherUser?.email?.split('@')[0] || 'User'
-  const displayAvatar = otherUser?.profile?.profilePicture
-    ? (otherUser.profile.profilePicture.startsWith('/uploads/')
-      ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
-      : otherUser.profile.profilePicture)
+  const displayAvatar = otherUser?.profile?.profilePicture 
+    ? (otherUser.profile.profilePicture.startsWith('/uploads/') 
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${otherUser.profile.profilePicture}`
+        : otherUser.profile.profilePicture)
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&size=50&background=00a8ff&color=fff`
 
   // Format last seen time for display (real-time updates for private chats only)
   const formatLastSeen = (lastSeenDate) => {
     if (!lastSeenDate) return ''
-
+    
     const now = new Date()
     const lastSeen = new Date(lastSeenDate)
     const diffMs = now - lastSeen
@@ -10049,21 +10055,21 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
     if (diffHours < 24) return `Last seen ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
     if (diffDays === 1) return 'Last seen yesterday'
     if (diffDays < 7) return `Last seen ${diffDays} days ago`
-
+    
     // For older dates, show actual date
     return `Last seen ${lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: lastSeen.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })}`
   }
-
+  
   // Real-time last seen update effect
   useEffect(() => {
     if (!otherUserLastSeen || isOtherUserOnline) return
-
+    
     // Update last seen display every minute for real-time "X minutes ago" updates
     const interval = setInterval(() => {
       // Force re-render by updating state (triggers formatLastSeen recalculation)
       setOtherUserLastSeen(prev => prev ? new Date(prev) : null)
     }, 60000)
-
+    
     return () => clearInterval(interval)
   }, [otherUserLastSeen, isOtherUserOnline])
 
@@ -10080,55 +10086,29 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         const isOnlyOwn = hasOwnMessages && !hasOtherMessages
         const isOnlyOthers = !hasOwnMessages && hasOtherMessages
         const isHybrid = hasOwnMessages && hasOtherMessages
-
+        
         return (
-          <div className="selection-mode-bar">
-            <div className="selection-mode-info">
-              <span>{selectedItems.size} selected</span>
-            </div>
-            <div className="selection-mode-actions">
-              <button
-                className="selection-mode-btn"
-                onClick={handleCopySelected}
-                title="Copy"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
-
-              {/* Delete buttons based on selection type */}
-              {isOnlyOwn && (
-                <>
-                  <button
-                    className="selection-mode-btn"
-                    onClick={handleDeleteSelectedForMe}
-                    title="Delete for me"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    <span>Delete for me</span>
-                  </button>
-                  <button
-                    className="selection-mode-btn"
-                    onClick={handleDeleteSelectedForAll}
-                    title="Delete for all"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    <span>Delete for all</span>
-                  </button>
-                </>
-              )}
-
-              {(isOnlyOthers || isHybrid) && (
-                <button
+        <div className="selection-mode-bar">
+          <div className="selection-mode-info">
+            <span>{selectedItems.size} selected</span>
+          </div>
+          <div className="selection-mode-actions">
+            <button 
+              className="selection-mode-btn"
+              onClick={handleCopySelected}
+              title="Copy"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+              
+            {/* Delete buttons based on selection type */}
+            {isOnlyOwn && (
+              <>
+                <button 
                   className="selection-mode-btn"
                   onClick={handleDeleteSelectedForMe}
                   title="Delete for me"
@@ -10139,27 +10119,53 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
                   </svg>
                   <span>Delete for me</span>
                 </button>
-              )}
-
-              <button
+                <button 
+                  className="selection-mode-btn"
+                  onClick={handleDeleteSelectedForAll}
+                  title="Delete for all"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>Delete for all</span>
+                </button>
+              </>
+            )}
+            
+            {(isOnlyOthers || isHybrid) && (
+              <button 
                 className="selection-mode-btn"
-                onClick={handleExitSelectionMode}
-                title="Cancel"
+                onClick={handleDeleteSelectedForMe}
+                title="Delete for me"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-                <span>Cancel</span>
+                <span>Delete for me</span>
               </button>
-            </div>
+            )}
+            
+            <button 
+              className="selection-mode-btn"
+              onClick={handleExitSelectionMode}
+              title="Cancel"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Cancel</span>
+            </button>
           </div>
+        </div>
         )
       })()}
       {/* Message Action Header (WhatsApp-style) */}
       {showMessageHeader && selectedMessage && !selectionMode && (
         <div className="message-action-header" onClick={handleActionHeaderClick} onMouseDown={(e) => e.stopPropagation()}>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleReplyClick}
             title="Reply"
@@ -10169,7 +10175,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
             </svg>
           </button>
-          <button
+          <button 
             className="action-header-btn"
             onClick={handleCopyMessage}
             title="Copy"
@@ -10180,7 +10186,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
             </svg>
           </button>
           {isOwnMessage && (
-            <button
+            <button 
               className="action-header-btn"
               onClick={handleDeleteForMe}
               title="Delete for me"
@@ -10191,7 +10197,7 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
               </svg>
             </button>
           )}
-          <button
+          <button 
             className="action-header-btn action-header-close"
             onClick={() => {
               setShowMessageHeader(false)
@@ -10207,554 +10213,554 @@ const DirectChatView = ({ otherUserId, user, onBack, onViewProfile, onMessageSen
         </div>
       )}
       <div className={`live-chat-view ${showMessageHeader || selectionMode ? 'has-action-header' : ''} ${selectionMode ? 'selection-mode-active' : ''}`}>
-        <div className="chat-header-bar">
-          <button
-            className="chat-header-back-btn"
-            onClick={() => {
-              if (selectionMode) {
-                handleExitSelectionMode()
-              } else {
-                onBack()
-              }
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <div
-            className="chat-header-avatar"
-            onClick={() => onViewProfile && onViewProfile(otherUserId)}
-            style={{ cursor: 'pointer' }}
-          >
-            <img src={displayAvatar} alt={displayName} />
-          </div>
-          <div className="chat-header-info" style={{ flex: 1 }}>
-            <div className="chat-header-name-row">
-              <h3>{displayName}</h3>
-            </div>
-            <span className={`chat-status ${otherUserTyping ? 'typing' : ''}`}>
-              {otherUserTyping ? (
-                <>
-                  <span className="typing-dots">
-                    <span>.</span><span>.</span><span>.</span>
-                  </span>
-                  typing...
-                </>
-              ) : (
-                isOtherUserOnline
-                  ? 'Online'
-                  : (otherUserLastSeen ? formatLastSeen(otherUserLastSeen) : '')
-              )}
-            </span>
-          </div>
-          <button
-            className="clear-chat-btn"
-            onClick={() => setShowClearConfirm(true)}
-            title="Clear Chat"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18"></path>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
+      <div className="chat-header-bar">
+        <button 
+          className="chat-header-back-btn" 
+          onClick={() => {
+            if (selectionMode) {
+              handleExitSelectionMode()
+            } else {
+              onBack()
+            }
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <div 
+          className="chat-header-avatar" 
+          onClick={() => onViewProfile && onViewProfile(otherUserId)}
+          style={{ cursor: 'pointer' }}
+        >
+          <img src={displayAvatar} alt={displayName} />
         </div>
-        <div className="chat-messages-area">
-          {loading ? (
-            <div className="loading-messages">Loading messages...</div>
-          ) : messages.length === 0 ? (
-            <div className="no-messages">No messages yet. Start the conversation!</div>
-          ) : (
-            (() => {
-              let lastDate = null
-              return messages.map((message) => {
-                const showDate = message.date !== lastDate
-                if (showDate) lastDate = message.date
-                return (
-                  <Fragment key={message.id}>
-                    {showDate && (
-                      <div className="chat-row date-row" key={`date-${message.id}`}>
-                        <div className="chat-left-col" />
-                        <div className="chat-main-col">
-                          <div className="date-separator">
-                            <span>{message.date}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
-                      <div className="chat-left-col">
-                        {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
-                        {isMobile && (
-                          <div
-                            className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
-                            onTouchStart={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                            }}
-                            onTouchEnd={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              if (selectionMode) {
-                                handleSelectionCheckboxTap(e, message.id)
-                              }
-                            }}
-                          >
-                            {selectedItems.has(message.id) ? (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                              </svg>
-                            ) : (
-                              <div className="checkbox-circle"></div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+        <div className="chat-header-info" style={{ flex: 1 }}>
+          <div className="chat-header-name-row">
+            <h3>{displayName}</h3>
+          </div>
+          <span className={`chat-status ${otherUserTyping ? 'typing' : ''}`}>
+            {otherUserTyping ? (
+              <>
+                <span className="typing-dots">
+                  <span>.</span><span>.</span><span>.</span>
+                </span>
+                typing...
+              </>
+            ) : (
+              isOtherUserOnline 
+                ? 'Online' 
+                : (otherUserLastSeen ? formatLastSeen(otherUserLastSeen) : '')
+            )}
+          </span>
+        </div>
+        <button 
+          className="clear-chat-btn"
+          onClick={() => setShowClearConfirm(true)}
+          title="Clear Chat"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+      <div className="chat-messages-area">
+        {loading ? (
+          <div className="loading-messages">Loading messages...</div>
+        ) : messages.length === 0 ? (
+          <div className="no-messages">No messages yet. Start the conversation!</div>
+        ) : (
+          (() => {
+            let lastDate = null
+            return messages.map((message) => {
+              const showDate = message.date !== lastDate
+              if (showDate) lastDate = message.date
+              return (
+                <Fragment key={message.id}>
+                  {showDate && (
+                    <div className="chat-row date-row" key={`date-${message.id}`}>
+                      <div className="chat-left-col" />
                       <div className="chat-main-col">
-                        <div
-                          className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
-                          data-message-id={message.id}
-                          style={{ position: 'relative' }}
-                          onMouseEnter={() => !selectionMode && handleMessageHover(message)}
-                          onMouseLeave={() => !selectionMode && handleMessageUnhover()}
-                          onClick={(e) => {
-                            // On mobile, completely block all click events - use touch events only
-                            if (isMobile) {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              e.stopImmediatePropagation()
-                              return false
-                            }
-                            handleMessageClick(e, message)
-                          }}
-                          onTouchStart={(e) => handleMessageTouchStart(e, message)}
-                          onTouchEnd={handleMessageTouchEnd}
-                          onTouchMove={handleMessageTouchMove}
-                          onContextMenu={(e) => {
-                            if (!selectionMode) {
-                              e.preventDefault()
-                              e.stopPropagation()
-                            }
-                          }}
-                        >
-                          {/* Reply indicator when swiping right (mobile) - only for this message */}
-                          {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
-                            <div
-                              className="message-swipe-reply-indicator"
-                              style={{
-                                opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
-                                transform: `translateX(${swipeOffset - 60}px)`
-                              }}
-                            >
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="9 10 4 15 9 20"></polyline>
-                                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-                              </svg>
-                            </div>
-                          )}
-                          <div
-                            className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
-                            style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
-                            onTouchStart={(e) => {
-                              if (!selectionMode) {
-                                handleMessageTouchStart(e, message)
-                              }
-                              // In selection mode, pointer-events: none will let touch pass through to parent
-                            }}
-                            onTouchEnd={(e) => {
-                              if (!selectionMode) {
-                                handleMessageTouchEnd(e)
-                              }
-                            }}
-                            onTouchMove={(e) => {
-                              if (!selectionMode) {
-                                handleMessageTouchMove(e)
-                              }
-                            }}
-                            onClick={(e) => {
-                              if (selectionMode) {
-                                // In selection mode, let click pass through to parent
-                                e.stopPropagation()
-                              }
-                            }}
-                            onContextMenu={(e) => {
-                              if (!selectionMode) {
-                                e.preventDefault()
-                                e.stopPropagation()
-                              }
-                            }}
-                          >
-                            {/* Reply Information */}
-                            {message.replyTo && (() => {
-                              // First try to use stored reply data (from optimistic message)
-                              let repliedMessage = message.replyToData
-
-                              // If not available, try to find it in messages array
-                              if (!repliedMessage) {
-                                repliedMessage = messages.find(m => m.id === message.replyTo)
-                              }
-
-                              if (repliedMessage) {
-                                return (
-                                  <div
-                                    className="message-reply-info"
-                                    onTouchStart={(e) => e.stopPropagation()}
-                                    onTouchEnd={(e) => e.stopPropagation()}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="message-reply-line"></div>
-                                    <div className="message-reply-content">
-                                      <span className="message-reply-name">
-                                        {repliedMessage.isOwn ? 'You' : displayName}
-                                      </span>
-                                      <span className="message-reply-text">{repliedMessage.text}</span>
-                                    </div>
-                                  </div>
-                                )
-                              }
-                              return null
-                            })()}
-                            <p>{message.text}</p>
-                            <div className="message-footer">
-                              <span className="message-time">{message.time}</span>
-                              {message.isOwn && (
-                                <span className={`message-status ${(() => {
-                                  const readBy = message.readBy || []
-                                  const deliveredTo = message.deliveredTo || []
-                                  const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
-                                  const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
-                                  return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
-                                })()}`}>
-                                  {(() => {
-                                    const readBy = message.readBy || []
-                                    const deliveredTo = message.deliveredTo || []
-                                    const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
-                                    const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
-
-                                    if (isRead) {
-                                      // Blue double checkmark (read)
-                                      return (
-                                        <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7" />
-                                        </svg>
-                                      )
-                                    } else if (isDelivered) {
-                                      // Gray double checkmark (delivered)
-                                      return (
-                                        <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0" />
-                                        </svg>
-                                      )
-                                    } else {
-                                      // Gray single checkmark (sent)
-                                      return (
-                                        <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                          <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0" />
-                                        </svg>
-                                      )
-                                    }
-                                  })()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                        <div className="date-separator">
+                          <span>{message.date}</span>
                         </div>
                       </div>
                     </div>
-                  </Fragment>
-                )
-              })
-            })()
+                  )}
+                  <div className={`chat-row message-row ${message.isOwn ? 'sent' : 'received'} ${selectionMode ? 'selection-mode' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selected' : ''}`}>
+                    <div className="chat-left-col">
+                      {/* Selection Checkbox - always in DOM on mobile (no-rewrite); CSS toggles visibility */}
+                      {isMobile && (
+                        <div 
+                          className={`message-selection-checkbox ${selectedItems.has(message.id) ? 'selected' : ''}`}
+                          onTouchStart={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            if (selectionMode) {
+                              handleSelectionCheckboxTap(e, message.id)
+                            }
+                          }}
+                        >
+                          {selectedItems.has(message.id) ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                            </svg>
+                          ) : (
+                            <div className="checkbox-circle"></div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="chat-main-col">
+                      <div 
+                        className={`message ${message.isOwn ? 'own-message' : 'other-message'} ${selectedMessage?.id === message.id ? 'selected-message' : ''} ${hoveredMessage?.id === message.id ? 'hovered-message' : ''} ${selectionMode && selectedItems.has(message.id) ? 'selection-selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+                        data-message-id={message.id}
+                        style={{ position: 'relative' }}
+                        onMouseEnter={() => !selectionMode && handleMessageHover(message)}
+                        onMouseLeave={() => !selectionMode && handleMessageUnhover()}
+                        onClick={(e) => {
+                          // On mobile, completely block all click events - use touch events only
+                          if (isMobile) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            e.stopImmediatePropagation()
+                            return false
+                          }
+                          handleMessageClick(e, message)
+                        }}
+                        onTouchStart={(e) => handleMessageTouchStart(e, message)}
+                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchMove={handleMessageTouchMove}
+                        onContextMenu={(e) => {
+                          if (!selectionMode) {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }
+                        }}
+                      >
+                        {/* Reply indicator when swiping right (mobile) - only for this message */}
+                    {isMobile && swipeOffset > 20 && swipedMessageId === message.id && (
+                    <div 
+                        className="message-swipe-reply-indicator"
+                        style={{ 
+                          opacity: Math.min(Math.abs(swipeOffset) / 100, 1),
+                          transform: `translateX(${swipeOffset - 60}px)`
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 10 4 15 9 20"></polyline>
+                          <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                        </svg>
+                      </div>
+                    )}
+                    <div 
+                      className={`message-content ${swipeOffset > 0 && swipedMessageId === message.id ? 'swiping' : ''}`}
+                      style={swipeOffset > 0 && swipedMessageId === message.id ? { transform: `translateX(${swipeOffset}px)` } : {}}
+                      onTouchStart={(e) => {
+                        if (!selectionMode) {
+                          handleMessageTouchStart(e, message)
+                        }
+                        // In selection mode, pointer-events: none will let touch pass through to parent
+                      }}
+                      onTouchEnd={(e) => {
+                        if (!selectionMode) {
+                          handleMessageTouchEnd(e)
+                        }
+                      }}
+                      onTouchMove={(e) => {
+                        if (!selectionMode) {
+                          handleMessageTouchMove(e)
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (selectionMode) {
+                          // In selection mode, let click pass through to parent
+                          e.stopPropagation()
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (!selectionMode) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }
+                      }}
+                    >
+                      {/* Reply Information */}
+                      {message.replyTo && (() => {
+                        // First try to use stored reply data (from optimistic message)
+                        let repliedMessage = message.replyToData
+                        
+                        // If not available, try to find it in messages array
+                        if (!repliedMessage) {
+                          repliedMessage = messages.find(m => m.id === message.replyTo)
+                        }
+                        
+                        if (repliedMessage) {
+                          return (
+                            <div 
+                              className="message-reply-info"
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchEnd={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="message-reply-line"></div>
+                              <div className="message-reply-content">
+                                <span className="message-reply-name">
+                                  {repliedMessage.isOwn ? 'You' : displayName}
+                                </span>
+                                <span className="message-reply-text">{repliedMessage.text}</span>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
+                      <p>{message.text}</p>
+                      <div className="message-footer">
+                        <span className="message-time">{message.time}</span>
+                        {message.isOwn && (
+                          <span className={`message-status ${(() => {
+                            const readBy = message.readBy || []
+                            const deliveredTo = message.deliveredTo || []
+                            const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                            const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                            return isRead ? 'read' : isDelivered ? 'delivered' : 'sent'
+                          })()}`}>
+                            {(() => {
+                              const readBy = message.readBy || []
+                              const deliveredTo = message.deliveredTo || []
+                              const isRead = readBy.some(r => String(r.userId) === String(otherUserId))
+                              const isDelivered = deliveredTo.some(d => String(d.userId) === String(otherUserId))
+                              
+                              if (isRead) {
+                                // Blue double checkmark (read)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#4FC3F7"/>
+                                  </svg>
+                                )
+                              } else if (isDelivered) {
+                                // Gray double checkmark (delivered)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              } else {
+                                // Gray single checkmark (sent)
+                                return (
+                                  <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.063-.51z" fill="#8696A0"/>
+                                  </svg>
+                                )
+                              }
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                      </div>
+                    </div>
+                  </div>
+                </Fragment>
+              )
+            })
+          })()
+        )}
+        <div ref={messagesEndRef}></div>
+      </div>
+
+      {/* Mobile Action Menu (Long-press) */}
+      {showQuickEmojis && selectedMessage && isMobile && (
+        <div 
+          ref={quickEmojiRef}
+          className="mobile-action-menu"
+          style={{
+            left: `${quickEmojiPosition.x}px`,
+            top: `${quickEmojiPosition.y}px`,
+          }}
+        >
+          <button 
+            className="mobile-action-item"
+            onClick={handleReplyClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+            <span>Reply</span>
+          </button>
+          <button 
+            className="mobile-action-item"
+            onClick={handleCopyMessage}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="mobile-action-item"
+              onClick={handleDeleteForMe}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete for me</span>
+            </button>
           )}
-          <div ref={messagesEndRef}></div>
-        </div>
-
-        {/* Mobile Action Menu (Long-press) */}
-        {showQuickEmojis && selectedMessage && isMobile && (
-          <div
-            ref={quickEmojiRef}
-            className="mobile-action-menu"
-            style={{
-              left: `${quickEmojiPosition.x}px`,
-              top: `${quickEmojiPosition.y}px`,
-            }}
+          <button 
+            className="mobile-action-item"
+            onClick={handleSelectClick}
           >
-            <button
-              className="mobile-action-item"
-              onClick={handleReplyClick}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 10 4 15 9 20"></polyline>
-                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-              </svg>
-              <span>Reply</span>
-            </button>
-            <button
-              className="mobile-action-item"
-              onClick={handleCopyMessage}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span>Copy</span>
-            </button>
-            {isOwnMessage && (
-              <button
-                className="mobile-action-item"
-                onClick={handleDeleteForMe}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-                <span>Delete for me</span>
-              </button>
-            )}
-            <button
-              className="mobile-action-item"
-              onClick={handleSelectClick}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 11 12 14 22 4"></polyline>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-              </svg>
-              <span>Select</span>
-            </button>
-            <button
-              className="mobile-action-item mobile-action-close"
-              onClick={() => {
-                setShowQuickEmojis(false)
-                setSelectedMessage(null)
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-              <span>Close</span>
-            </button>
-          </div>
-        )}
-
-        {/* WhatsApp-style Action Menu Popup (Desktop) */}
-        {showActionMenu && selectedMessage && !isMobile && (
-          <div
-            ref={actionMenuRef}
-            className="message-action-menu"
-            style={{
-              left: `${actionMenuPosition.x}px`,
-              top: `${actionMenuPosition.y}px`,
-            }}
-          >
-            <button
-              className="action-menu-item"
-              onClick={() => {
-                setShowEmojiPicker(true)
-                setShowActionMenu(false)
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                <line x1="15" y1="9" x2="15.01" y2="9"></line>
-              </svg>
-              <span>Emoji</span>
-            </button>
-            <button
-              className="action-menu-item"
-              onClick={handleReplyClick}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 10 4 15 9 20"></polyline>
-                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-              </svg>
-              <span>Reply</span>
-            </button>
-            <button
-              className="action-menu-item"
-              onClick={handleCopyMessage}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span>Copy</span>
-            </button>
-            {isOwnMessage && (
-              <button
-                className="action-menu-item"
-                onClick={handleDeleteForMe}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-                <span>Delete</span>
-              </button>
-            )}
-            <button
-              className="action-menu-item"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleSelectClick()
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 11 12 14 22 4"></polyline>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-              </svg>
-              <span>Select</span>
-            </button>
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && selectedMessage && (
-          <div className="modal-overlay" onClick={() => {
-            setShowDeleteConfirm(false)
-            setDeleteForAll(false)
-          }}>
-            <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Delete Message</h3>
-                <button className="modal-close-btn" onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setDeleteForAll(false)
-                }}>×</button>
-              </div>
-              <div className="modal-content">
-                <p className="modal-description">
-                  Are you sure you want to delete this message? This action cannot be undone.
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  className="modal-cancel-btn"
-                  onClick={() => {
-                    setShowDeleteConfirm(false)
-                    setDeleteForAll(false)
-                  }}
-                  disabled={deleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="modal-confirm-btn"
-                  onClick={handleConfirmDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reply Preview */}
-        {replyingTo && (
-          <div className="reply-preview">
-            <div className="reply-preview-content">
-              <div className="reply-preview-header">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 10 4 15 9 20"></polyline>
-                  <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
-                </svg>
-                <span className="reply-preview-name">
-                  {replyingTo.isOwn ? 'You' : displayName}
-                </span>
-              </div>
-              <div className="reply-preview-text">{replyingTo.text}</div>
-            </div>
-            <button className="reply-preview-close" onClick={handleCancelReply}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {blockMessage && (
-          <div className={`block-message ${blockMessage.type === 'blocked' ? 'block-message-blocked' : 'block-message-error'}`}>
-            <span className="block-message-icon">⚠️</span>
-            <span className="block-message-text">{blockMessage.text}</span>
-          </div>
-        )}
-        <form className="chat-input-area" onSubmit={handleSendMessage}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Select</span>
+          </button>
           <button
-            type="button"
-            className="emoji-picker-btn"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            disabled={isBlocked}
-            title="Add emoji"
+            className="mobile-action-item mobile-action-close"
+            onClick={() => {
+              setShowQuickEmojis(false)
+              setSelectedMessage(null)
+            }}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>Close</span>
+          </button>
+        </div>
+      )}
+
+      {/* WhatsApp-style Action Menu Popup (Desktop) */}
+      {showActionMenu && selectedMessage && !isMobile && (
+        <div 
+          ref={actionMenuRef}
+          className="message-action-menu"
+          style={{
+            left: `${actionMenuPosition.x}px`,
+            top: `${actionMenuPosition.y}px`,
+          }}
+        >
+          <button 
+            className="action-menu-item" 
+            onClick={() => {
+              setShowEmojiPicker(true)
+              setShowActionMenu(false)
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"></circle>
               <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
               <line x1="9" y1="9" x2="9.01" y2="9"></line>
               <line x1="15" y1="9" x2="15.01" y2="9"></line>
             </svg>
+            <span>Emoji</span>
           </button>
-          <textarea
-            ref={messageInputRef}
-            className="chat-input"
-            placeholder="Type a message"
-            value={messageInput}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            disabled={isBlocked}
-            rows={1}
-          />
-          <button type="submit" className="send-btn" disabled={isBlocked}>Send</button>
-          {showEmojiPicker && (
-            <div ref={emojiPickerRef} className="emoji-picker-container">
-              <EmojiPicker
-                onEmojiClick={onEmojiClick}
-                autoFocusSearch={false}
-                skinTonesDisabled={true}
-                previewConfig={{ showPreview: false }}
-                width="100%"
-                height="350px"
-              />
-            </div>
+          <button 
+            className="action-menu-item" 
+            onClick={handleReplyClick}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 10 4 15 9 20"></polyline>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+            </svg>
+            <span>Reply</span>
+          </button>
+          <button 
+            className="action-menu-item" 
+            onClick={handleCopyMessage}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copy</span>
+          </button>
+          {isOwnMessage && (
+            <button 
+              className="action-menu-item" 
+              onClick={handleDeleteForMe}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Delete</span>
+            </button>
           )}
-        </form>
+          <button 
+            className="action-menu-item" 
+            onClick={(e) => {
+              e.stopPropagation()
+              handleSelectClick()
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Select</span>
+          </button>
+        </div>
+      )}
 
-        {/* Clear Chat Confirmation Modal */}
-        {showClearConfirm && (
-          <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
-            <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Clear Chat</h3>
-                <button className="modal-close-btn" onClick={() => setShowClearConfirm(false)}>×</button>
-              </div>
-              <div className="modal-content">
-                <p className="modal-description">Are you sure you want to delete all chat messages with {displayName}? This action cannot be undone.</p>
-              </div>
-              <div className="modal-footer">
-                <button
-                  className="modal-cancel-btn"
-                  onClick={() => setShowClearConfirm(false)}
-                  disabled={clearing}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="modal-confirm-btn"
-                  onClick={handleClearChat}
-                  disabled={clearing}
-                >
-                  {clearing ? 'Clearing...' : 'Clear Chat'}
-                </button>
-              </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && selectedMessage && (
+        <div className="modal-overlay" onClick={() => {
+          setShowDeleteConfirm(false)
+          setDeleteForAll(false)
+        }}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Message</h3>
+              <button className="modal-close-btn" onClick={() => {
+                setShowDeleteConfirm(false)
+                setDeleteForAll(false)
+              }}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="modal-description">
+                Are you sure you want to delete this message? This action cannot be undone.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="modal-cancel-btn"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteForAll(false)
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Reply Preview */}
+      {replyingTo && (
+        <div className="reply-preview">
+          <div className="reply-preview-content">
+            <div className="reply-preview-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 10 4 15 9 20"></polyline>
+                <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+              </svg>
+              <span className="reply-preview-name">
+                {replyingTo.isOwn ? 'You' : displayName}
+              </span>
+            </div>
+            <div className="reply-preview-text">{replyingTo.text}</div>
+          </div>
+          <button className="reply-preview-close" onClick={handleCancelReply}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {blockMessage && (
+        <div className={`block-message ${blockMessage.type === 'blocked' ? 'block-message-blocked' : 'block-message-error'}`}>
+          <span className="block-message-icon">⚠️</span>
+          <span className="block-message-text">{blockMessage.text}</span>
+        </div>
+      )}
+      <form className="chat-input-area" onSubmit={handleSendMessage}>
+        <button
+          type="button"
+          className="emoji-picker-btn"
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          disabled={isBlocked}
+          title="Add emoji"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+          </svg>
+        </button>
+        <textarea
+          ref={messageInputRef}
+          className="chat-input"
+          placeholder="Type a message"
+          value={messageInput}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          disabled={isBlocked}
+          rows={1}
+        />
+        <button type="submit" className="send-btn" disabled={isBlocked}>Send</button>
+        {showEmojiPicker && (
+          <div ref={emojiPickerRef} className="emoji-picker-container">
+            <EmojiPicker
+              onEmojiClick={onEmojiClick}
+              autoFocusSearch={false}
+              skinTonesDisabled={true}
+              previewConfig={{ showPreview: false }}
+              width="100%"
+              height="350px"
+            />
+          </div>
         )}
+      </form>
+
+      {/* Clear Chat Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
+          <div className="confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Clear Chat</h3>
+              <button className="modal-close-btn" onClick={() => setShowClearConfirm(false)}>×</button>
+            </div>
+            <div className="modal-content">
+              <p className="modal-description">Are you sure you want to delete all chat messages with {displayName}? This action cannot be undone.</p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="modal-cancel-btn"
+                onClick={() => setShowClearConfirm(false)}
+                disabled={clearing}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleClearChat}
+                disabled={clearing}
+              >
+                {clearing ? 'Clearing...' : 'Clear Chat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )
@@ -10865,17 +10871,17 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
             currentUserId: currentUserId,
             viewedColleges: viewedColleges.length,
             currentColleges: currentColleges.length,
-            viewedCollegesList: viewedColleges.map(c => ({
-              id: c.id,
-              name: c.name,
-              aisheCode: c.aisheCode,
-              identifier: c.identifier
+            viewedCollegesList: viewedColleges.map(c => ({ 
+              id: c.id, 
+              name: c.name, 
+              aisheCode: c.aisheCode, 
+              identifier: c.identifier 
             })),
-            currentCollegesList: currentColleges.map(c => ({
-              id: c.id,
-              name: c.name,
-              aisheCode: c.aisheCode,
-              identifier: c.identifier
+            currentCollegesList: currentColleges.map(c => ({ 
+              id: c.id, 
+              name: c.name, 
+              aisheCode: c.aisheCode, 
+              identifier: c.identifier 
             }))
           })
 
@@ -10887,32 +10893,32 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                 const match = String(viewedCollege.id).trim() === String(currentCollege.id).trim()
                 if (match) return true
               }
-
+              
               // Use identifier if available (normalized aisheCode or name)
               if (viewedCollege.identifier && currentCollege.identifier) {
                 const match = String(viewedCollege.identifier).trim().toLowerCase() === String(currentCollege.identifier).trim().toLowerCase()
                 if (match) return true
               }
-
+              
               // Match by aisheCode if both have it (case-insensitive)
               if (viewedCollege.aisheCode && currentCollege.aisheCode) {
                 const match = String(viewedCollege.aisheCode).trim().toLowerCase() === String(currentCollege.aisheCode).trim().toLowerCase()
                 if (match) return true
               }
-
+              
               // Match by name if both have it (case-insensitive)
               if (viewedCollege.name && currentCollege.name) {
                 const match = String(viewedCollege.name).trim().toLowerCase() === String(currentCollege.name).trim().toLowerCase()
                 if (match) return true
               }
-
+              
               return false
             })
-
+            
             if (isCommon) {
               console.log(`✅ Found common college: ${viewedCollege.name} (${viewedCollege.aisheCode || 'no code'})`)
             }
-
+            
             return isCommon
           })
 
@@ -10967,7 +10973,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
     setSelectedImageFile(file)
     setShowCropModal(true)
     setPictureError(null)
-
+    
     // Reset input
     if (profilePictureInputRef.current) {
       profilePictureInputRef.current.value = ''
@@ -10983,7 +10989,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
       setPictureError(null)
 
       const response = await uploadProfilePicture(croppedFile)
-
+      
       if (response.success) {
         // Always refresh user data to get updated profile picture
         try {
@@ -10995,7 +11001,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
         } catch (authError) {
           console.error('Error refreshing user data after upload:', authError)
         }
-
+        
         // Also call the callback if provided
         if (onProfileUpdate) {
           await onProfileUpdate()
@@ -11030,7 +11036,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
         displayName: editForm.displayName.trim(),
         bio: editForm.bio.trim() || undefined,
       })
-
+      
       if (response.success) {
         setIsEditing(false)
         if (onProfileUpdate) {
@@ -11050,7 +11056,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
   const handleBlockUser = async () => {
     const userId = user?.id || user?._id
     if (!userId) return
-
+    
     try {
       setBlockLoading(true)
       const response = await blockUser(userId)
@@ -11067,7 +11073,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
   const handleUnblockUser = async () => {
     const userId = user?.id || user?._id
     if (!userId) return
-
+    
     try {
       setBlockLoading(true)
       const response = await unblockUser(userId)
@@ -11117,7 +11123,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
       setUploadSuccess(false)
 
       const response = await uploadCollegeId(file)
-
+      
       if (response.success) {
         setUploadSuccess(true)
         setUploadError(null)
@@ -11168,10 +11174,10 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
   })
 
   // Safe variable assignments with defaults
-  const isVerified = isOwnProfile
+  const isVerified = isOwnProfile 
     ? (verificationStatus?.status === 'verified' || false)
     : (user?.profile?.verification?.status === 'verified' || false)
-  const isPending = isOwnProfile
+  const isPending = isOwnProfile 
     ? (verificationStatus?.status === 'pending' || false)
     : (user?.profile?.verification?.status === 'pending' || false)
   const isNotSubmitted = isOwnProfile
@@ -11201,7 +11207,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                     style={{ display: 'none' }}
                     id="profile-picture-upload"
                   />
-                  <button
+                  <button 
                     className="photo-upload-btn-new"
                     onClick={() => profilePictureInputRef.current?.click()}
                     disabled={uploadingPicture}
@@ -11213,7 +11219,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
               )}
             </div>
             {isOwnProfile && !isVerified && (
-              <button
+              <button 
                 className="get-verified-btn"
                 onClick={() => setShowVerificationModal(true)}
               >
@@ -11233,7 +11239,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
               type="text"
               className="username-input"
               value={editForm.displayName}
-              onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
+              onChange={(e) => setEditForm({...editForm, displayName: e.target.value})}
               placeholder="Username"
             />
           ) : (
@@ -11260,12 +11266,12 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                   className="bio-input-new"
                   placeholder="Tell us about yourself..."
                   value={editForm.bio}
-                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
                   maxLength={500}
                   rows={4}
                 />
                 <div className="bio-char-count-new">{editForm.bio.length}/500</div>
-                <button
+                <button 
                   className="save-bio-btn"
                   onClick={handleEditProfile}
                   disabled={uploading || !editForm.displayName.trim()}
@@ -11298,14 +11304,14 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
           }
           return shouldShow ? (
             <div className="profile-action-buttons-new" style={{ display: 'flex', visibility: 'visible' }}>
-              <button
+              <button 
                 className="block-btn"
                 onClick={isBlocked ? handleUnblockUser : handleBlockUser}
                 disabled={blockLoading}
               >
                 {blockLoading ? '...' : (isBlocked ? 'Unblock' : 'block')}
               </button>
-              <button
+              <button 
                 className="message-btn"
                 onClick={handleMessageClick}
                 disabled={isBlocked}
@@ -11325,7 +11331,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
             ) : commonColleges.length > 0 ? (
               <div className="common-groups-list">
                 {commonColleges.map((college, index) => (
-                  <div
+                  <div 
                     key={college.aisheCode || college.name || index}
                     className="common-group-item"
                     onClick={() => {
@@ -11336,7 +11342,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                     }}
                     style={{ cursor: 'pointer' }}
                   >
-                    <img
+                    <img 
                       src={getCollegeLogoUrl(college, 40)}
                       alt={college.name}
                       className="common-group-logo"
@@ -11359,7 +11365,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
         {/* Edit Profile Link - Only shown to own profile */}
         {isOwnProfile && !isEditing && (
           <div className="edit-profile-link-section">
-            <button
+            <button 
               className="edit-profile-link"
               onClick={() => setIsEditing(true)}
             >
@@ -11371,7 +11377,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
         {/* Edit Form Actions */}
         {isEditing && (
           <div className="edit-form-actions-new">
-            <button
+            <button 
               className="cancel-edit-btn"
               onClick={() => {
                 setIsEditing(false)
@@ -11412,7 +11418,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
                 style={{ display: 'none' }}
                 id="college-id-upload-modal"
               />
-              <button
+              <button 
                 className="upload-id-btn"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
@@ -11430,7 +11436,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
               )}
             </div>
             <div className="modal-footer">
-              <button
+              <button 
                 className="modal-submit-btn"
                 onClick={() => {
                   if (uploadSuccess || isPending) {
@@ -11449,7 +11455,7 @@ const StudentProfileView = ({ user, verificationStatus, isOwnProfile = true, cur
           </div>
         </div>
       )}
-
+      
       {/* Profile Picture Crop Modal */}
       {showCropModal && selectedImageFile && (
         <ProfilePictureCropModal
@@ -11482,66 +11488,66 @@ const SettingsView = ({ theme, onToggleTheme, notificationsEnabled, onToggleNoti
 
   return (
     <>
-      <div className="settings-view">
-        <div className="view-header">
-          <button className="back-btn" onClick={onBack}>←</button>
-          <h2>Settings</h2>
-        </div>
-        <div className="settings-content">
-          <div className="settings-section">
-            <h3>Appearance</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Theme</span>
-                <span className="settings-item-desc">Switch between dark and light mode</span>
-              </div>
-              <button className="toggle-btn" onClick={onToggleTheme}>
-                {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
-              </button>
+    <div className="settings-view">
+      <div className="view-header">
+        <button className="back-btn" onClick={onBack}>←</button>
+        <h2>Settings</h2>
+      </div>
+      <div className="settings-content">
+        <div className="settings-section">
+          <h3>Appearance</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Theme</span>
+              <span className="settings-item-desc">Switch between dark and light mode</span>
             </div>
+            <button className="toggle-btn" onClick={onToggleTheme}>
+              {theme === 'dark' ? '🌗 Dark' : '☀️ Light'}
+            </button>
           </div>
-          <div className="settings-section">
-            <h3>Notifications</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Enable Notifications</span>
-                <span className="settings-item-desc">Receive alerts for new messages</span>
-              </div>
-              <button
-                className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`}
+        </div>
+        <div className="settings-section">
+          <h3>Notifications</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Enable Notifications</span>
+              <span className="settings-item-desc">Receive alerts for new messages</span>
+            </div>
+              <button 
+                className={`toggle-btn ${notificationsEnabled ? 'active' : ''}`} 
                 onClick={() => handleToggleNotifications(!notificationsEnabled)}
               >
-                {notificationsEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
+              {notificationsEnabled ? 'ON' : 'OFF'}
+            </button>
           </div>
-          <div className="settings-section">
-            <h3>Privacy</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Privacy Settings</span>
-                <span className="settings-item-desc">Manage your privacy preferences</span>
-              </div>
+        </div>
+        <div className="settings-section">
+          <h3>Privacy</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Privacy Settings</span>
+              <span className="settings-item-desc">Manage your privacy preferences</span>
+            </div>
               <button className="btn-secondary" onClick={handlePrivacySettings}>Manage</button>
-            </div>
           </div>
-          <div className="settings-section">
-            <h3>Account</h3>
-            <div className="settings-item">
-              <div className="settings-item-info">
-                <span className="settings-item-label">Change Password</span>
-                <span className="settings-item-desc">Update your account password</span>
-              </div>
+        </div>
+        <div className="settings-section">
+          <h3>Account</h3>
+          <div className="settings-item">
+            <div className="settings-item-info">
+              <span className="settings-item-label">Change Password</span>
+              <span className="settings-item-desc">Update your account password</span>
+            </div>
               <button className="btn-secondary" onClick={handleChangePassword}>Change</button>
-            </div>
           </div>
-          <div className="settings-section">
-            <div className="settings-item">
-              <button className="btn-danger" onClick={onLogout}>Logout</button>
-            </div>
+        </div>
+        <div className="settings-section">
+          <div className="settings-item">
+            <button className="btn-danger" onClick={onLogout}>Logout</button>
           </div>
         </div>
       </div>
+    </div>
       {showPrivacyModal && (
         <PrivacySettingsModal
           onClose={() => setShowPrivacyModal(false)}
