@@ -2666,6 +2666,8 @@
   min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-start;
+  max-width: 100%;
+  overflow: visible;
 }
 
 /* Selection mode - no padding needed since we removed the indicator */
@@ -2697,18 +2699,19 @@
 
 .message-content {
   max-width: 70%;
-  width: auto;
+  width: fit-content;
   padding: 8px 12px;
   border-radius: 12px;
   position: relative;
   user-select: text;
-  min-width: 0;
-  flex: 0 1 auto;
+  min-width: 60px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   word-break: break-word;
   overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .message-footer {
