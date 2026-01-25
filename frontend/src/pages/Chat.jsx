@@ -5295,11 +5295,11 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
 
     // Set up message listener
-    const cleanupReceiveMessage = onReceiveMessage(handleReceiveMessage)
+    onReceiveMessage(handleReceiveMessage)
 
     // Set up error handler - don't remove optimistic messages on socket errors
     // The message might still be saved on the server
-    const cleanupSocketError = onSocketError(handleSocketError)
+    onSocketError(handleSocketError)
 
     // Get socket instance for all listeners
     const socketInstance = getSocket()
@@ -5345,7 +5345,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         }
       }
     }
-    const cleanupUserTyping = onUserTyping(handleUserTyping)
+    onUserTyping(handleUserTyping)
 
     // Set up online/offline listeners
     const handleUserOnline = (data) => {
@@ -5368,8 +5368,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         })
       }
     }
-    const cleanupUserOnline = onUserOnline(handleUserOnline)
-    const cleanupUserOffline = onUserOffline(handleUserOffline)
+    onUserOnline(handleUserOnline)
+    onUserOffline(handleUserOffline)
 
     // Set up read receipt listener
     const handleMessageRead = (data) => {
@@ -5388,7 +5388,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
         }))
       }
     }
-    const cleanupMessageRead = onMessageRead(handleMessageRead)
+    onMessageRead(handleMessageRead)
 
     // Set up blocked message listener
     if (socketInstance) {
@@ -5403,19 +5403,13 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
       return () => {
         // Cleanup: remove listeners when component unmounts or collegeId changes
-        console.log('🧹 Cleaning up socket listeners for college:', collegeId)
-
-        // Use cleanup functions returned by listener setup
-        cleanupReceiveMessage()
-        cleanupSocketError()
-        cleanupUserTyping()
-        cleanupUserOnline()
-        cleanupUserOffline()
-        cleanupMessageRead()
-
-        // Manually remove listeners that don't have cleanup functions
         if (socketInstance) {
+          socketInstance.off('receiveMessage', handleReceiveMessage)
           socketInstance.off('messageBlocked', handleBlockedMessage)
+          socketInstance.off('userTyping', handleUserTyping)
+          socketInstance.off('userOnline', handleUserOnline)
+          socketInstance.off('userOffline', handleUserOffline)
+          socketInstance.off('messageRead', handleMessageRead)
           socketInstance.off('messageSent', handleMessageSent)
         }
       }

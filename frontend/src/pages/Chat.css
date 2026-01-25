@@ -2666,6 +2666,8 @@
   min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-start;
+  max-width: 100%;
+  overflow: visible;
 }
 
 /* Selection mode - no padding needed since we removed the indicator */
@@ -6097,4 +6099,51 @@
 .mobile-action-close {
   border-top: 2px solid var(--panel-border, #2a3942);
   color: var(--btn-danger, #e74c3c);
+}
+
+/* ===== NUCLEAR OPTION - FORCE FIX FOR MESSAGE WIDTH ===== */
+
+/* Force message content to fit content size */
+.message-content {
+  max-width: 70% !important;
+  width: fit-content !important;
+  padding: 8px 12px !important;
+  flex: 0 0 auto !important;
+  min-width: 60px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure own messages align properly */
+.own-message .message-content,
+.message.own-message .message-content {
+  margin-left: auto !important;
+  align-self: flex-end !important;
+}
+
+/* Fix message wrapper */
+.message {
+  max-width: 100% !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  overflow: visible !important;
+}
+
+/* Ensure message text doesn't override */
+.message-content p {
+  margin: 0 !important;
+  word-break: break-word !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
+}
+
+/* Fix footer positioning */
+.message-footer {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  margin-top: 2px !important;
 }
