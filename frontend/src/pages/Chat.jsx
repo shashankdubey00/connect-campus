@@ -4629,6 +4629,9 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
 
 // Live Chat View Component
 const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfile, user, verificationStatus, onMessageSent }) => {
+  // Get college ID first so it's available for hooks
+  const collegeId = college?.aisheCode || chat?.collegeId || college?.name
+
   const [messageInput, setMessageInput] = useState('')
   const [messages, setMessages] = useState([])
 
@@ -4831,7 +4834,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   }, [])
 
   // Get college ID
-  const collegeId = college?.aisheCode || chat?.collegeId || college?.name
+
 
   // Safety check: if no collegeId, show error message
   if (!collegeId && chat?.type === 'college') {
