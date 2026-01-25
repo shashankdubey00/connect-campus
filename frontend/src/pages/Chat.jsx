@@ -92,17 +92,6 @@ const Chat = () => {
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartX = useRef(0)
   const resizeStartWidth = useRef(400)
-  // When user selects a college, save it (Fix 1)
-  const handleCollegeSelect = (college) => {
-    setCollegeId(college._id || college.aisheCode);
-    setSelectedCollege(college);
-    // SAVE TO LOCALSTORAGE
-    localStorage.setItem('lastSelectedCollege', college._id || college.aisheCode);
-    localStorage.setItem('lastSelectedCollegeName', college.name);
-    // Trigger existing join logic
-    handleJoinLiveChat(college);
-  };
-
   // FIX 1: Persist collegeId to Survive Refresh
   useEffect(() => {
     // Restore last selected college from localStorage on mount
@@ -116,6 +105,20 @@ const Chat = () => {
       // setSelectedCollege({ _id: lastCollegeId, name: lastCollegeName });
     }
   }, []); // Run once on mount
+
+  // When user selects a college, save it
+  const handleCollegeSelect = (college) => {
+    console.log('✅ Selected college:', college.name);
+    setCollegeId(college._id || college.aisheCode);
+    setSelectedCollege(college);
+
+    // SAVE TO LOCALSTORAGE
+    localStorage.setItem('lastSelectedCollege', college._id || college.aisheCode);
+    localStorage.setItem('lastSelectedCollegeName', college.name);
+
+    // UI Logic: Open the chat
+    handleJoinLiveChat(college);
+  };
 
   // Effect to restore selection once chats are loaded
   useEffect(() => {
@@ -1307,42 +1310,31 @@ const Chat = () => {
     }
 
     // FIX 3: Clear Unread Count When Opening Chat
-    console.log('🏫 Opening chat:', chat.name);
+    console.log('🏫 Opening college chat:', chat.name);
 
-    saveNavigationState() // Save current state before navigating
-    setSelectedChat(chat)
+    // Set the selected college
+    const collegeIdVal = chat.collegeId || chat.college?._id || chat.id;
+    setCollegeId(collegeIdVal);
+    setSelectedChat(chat);
+    setSelectedCollege(chat.college || user?.profile?.college);
 
-    // Save to localStorage (Fix 1 part)
-    const collegeId = chat.collegeId || chat.college?.aisheCode || chat.college?.name;
-    if (collegeId) {
-      localStorage.setItem('lastSelectedCollege', collegeId);
-      localStorage.setItem('lastSelectedCollegeName', chat.name);
-    }
+    // Save to localStorage
+    localStorage.setItem('lastSelectedCollege', collegeIdVal);
+    localStorage.setItem('lastSelectedCollegeName', chat.name);
 
-    // CLEAR UNREAD COUNT FOR THIS CHAT
+    // CLEAR UNREAD COUNT FOR THIS COLLEGE
     setChats(prev => prev.map(c =>
       c.id === chat.id
         ? { ...c, unreadCount: 0 }  // ✅ Clear unread when opening
         : c
     ));
 
-    if (collegeId) {
-      setUnreadCounts(prev => ({ ...prev, [collegeId]: 0 }));
+    // Also update separate status if needed
+    if (chat.collegeId) {
+      setUnreadCounts(prev => ({ ...prev, [chat.collegeId]: 0 }));
     }
 
-    if (chat.type === 'college') {
-      const college = chat.college || user?.profile?.college
-      setSelectedCollege(college)
-      setView('live-chat')
-    } else if (chat.type === 'direct') {
-      // For direct messages, open direct chat view
-      if (chat.userId) {
-        setSelectedStudent({ id: chat.userId })
-        setView('direct-chat')
-      } else {
-        console.error('Direct chat selected but userId is missing:', chat)
-      }
-    }
+    setView('live-chat');
     if (isMobileView) {
       setShowChatList(false)
     }
@@ -1722,28 +1714,24 @@ const Chat = () => {
   const updateChatListOnMessage = (collegeId, messageText, messageTimestamp, isOwnMessage, senderId) => {
     console.log('📬 Updating chat list:', { collegeId, isOwnMessage, senderId });
 
-    setChats(prev => prev.map(chat => {
-      // Logic for matching college
-      const isMatch = chat.collegeId === collegeId || chat.id === `college-${collegeId}`;
-
-      if (isMatch) {
+    setChats(prev => prev.map(college => { // Using variable 'college' inside map as per user's snippet
+      if (college.collegeId === collegeId || college._id === collegeId) {
         // Calculate new unread count
         const newUnreadCount = isOwnMessage
           ? 0  // Reset to 0 for own messages
-          : (selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0) + 1);  // Increment for received messages (if not currently open)
+          : (college.unreadCount || 0) + 1;  // Increment for received messages
 
         console.log(`${isOwnMessage ? '📤' : '📥'} Message ${isOwnMessage ? 'sent' : 'received'}, unread: ${newUnreadCount}`);
 
         return {
-          ...chat,
+          ...college,
           lastMessage: messageText,
           lastMessageTime: messageTimestamp,
           timestamp: formatChatTimestamp(messageTimestamp),
-          lastMessageIsOwn: isOwnMessage,
           unreadCount: newUnreadCount  // ✅ FIXED: Only increment for received messages
         };
       }
-      return chat;
+      return college;
     }));
   };
 
