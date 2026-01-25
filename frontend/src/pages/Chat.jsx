@@ -1855,7 +1855,24 @@ const Chat = () => {
       // Listen for global chat list updates (for real-time updates across all systems)
       const handleChatListUpdate = (data) => {
         if (data.type === 'college') {
-          const isOwnMessage = String(data.senderId) === String(user?.id || user?._id || '')
+          // Fix: Use localStorage to reliably identify current user for notifications/unread count
+          let currentUserId = user?.id || user?._id;
+
+          // Fallback to localStorage if user object is not available
+          if (!currentUserId) {
+            try {
+              const storedUser = localStorage.getItem('user');
+              if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                currentUserId = parsed._id || parsed.id;
+              }
+            } catch (e) {
+              console.error('Error parsing user from localStorage:', e);
+            }
+          }
+
+          const isOwnMessage = String(data.senderId) === String(currentUserId || '');
+
           updateChatListOnMessage(
             data.collegeId,
             data.messageText,
@@ -4614,6 +4631,67 @@ const GroupProfileView = ({ group, user, onJoinChat, onJoinGroup, onLeaveGroup, 
 const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfile, user, verificationStatus, onMessageSent }) => {
   const [messageInput, setMessageInput] = useState('')
   const [messages, setMessages] = useState([])
+
+  // Fix for: Messages disappear on refresh - Fetch messages when component loads
+  useEffect(() => {
+    const fetchMessagesData = async () => {
+      if (!collegeId) return;
+
+      try {
+        const endpoint = `/api/messages/college/${encodeURIComponent(collegeId)}`;
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+        // Get token from common storage keys
+        const token = localStorage.getItem('userToken') || localStorage.getItem('token') || localStorage.getItem('authToken');
+
+        const response = await fetch(`${apiUrl}${endpoint}`, {
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.messages)) {
+            // Format messages to match the expected structure
+            // We need to map the backend format to the frontend format used in rendering
+            const currentUserId = String(user?.id || user?._id || '');
+
+            const formattedMessages = data.messages.map(msg => ({
+              id: msg.id || msg._id,
+              text: msg.text,
+              sender: msg.senderName,
+              senderId: msg.senderId,
+              time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }),
+              date: new Date(msg.timestamp).toLocaleDateString(), // simplified date
+              isOwn: String(msg.senderId) === currentUserId,
+              timestamp: new Date(msg.timestamp),
+              replyTo: msg.replyTo,
+              readBy: msg.readBy || [],
+              deliveredTo: msg.deliveredTo || []
+            }));
+
+            setMessages(prev => {
+              // Merge with existing messages to prevent overwriting optimistic ones if any
+              // But since this is "on refresh", prev should be empty or initial.
+              // Logic to merge: prefer fetched messages but keep optimistic ones?
+              // Simple replace is safer for "disappear on refresh" fix.
+              return formattedMessages;
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch messages:', error);
+      }
+    };
+
+    fetchMessagesData();
+  }, [collegeId, user?._id]);
   const [loading, setLoading] = useState(true)
   const [selectedMessage, setSelectedMessage] = useState(null)
   const [showActionMenu, setShowActionMenu] = useState(false)
