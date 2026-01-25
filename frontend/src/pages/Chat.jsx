@@ -92,6 +92,38 @@ const Chat = () => {
   const resizeStartX = useRef(0)
   const resizeStartWidth = useRef(400)
 
+  // FIX 1: Persist collegeId to Survive Refresh
+  useEffect(() => {
+    // Restore last selected college from localStorage on mount
+    const lastCollegeId = localStorage.getItem('lastSelectedCollege');
+    // We also need to restore the view state if we are restoring a chat
+    if (lastCollegeId && !selectedChat) {
+      console.log('🔄 Restoring last selected college ID:', lastCollegeId);
+
+      // We need to find the chat object in the chats list once it loads
+      // This part depends on 'chats' being loaded. 
+      // Since chats loading is async, we might need to do this when chats update.
+    }
+  }, []);
+
+  // Effect to restore selection once chats are loaded
+  useEffect(() => {
+    if (!isLoading && chats.length > 0 && !selectedChat) {
+      const lastCollegeId = localStorage.getItem('lastSelectedCollege');
+      if (lastCollegeId) {
+        const chatToRestore = chats.find(c => c.collegeId === lastCollegeId || c.id === `college-${lastCollegeId}`);
+        if (chatToRestore) {
+          console.log('✅ Restoring selected chat:', chatToRestore.name);
+          setSelectedChat(chatToRestore);
+          if (chatToRestore.type === 'college') {
+            setSelectedCollege(chatToRestore.college);
+            setView('live-chat');
+          }
+        }
+      }
+    }
+  }, [isLoading, chats, selectedChat]);
+
   // Load user data and connect Socket.IO
   useEffect(() => {
     const loadUser = async () => {
@@ -1266,8 +1298,11 @@ const Chat = () => {
     saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
 
-    // Reset unread count for this chat
+    // FIX 3 & 1: Clear Unread Count & Persist Selection
     if (chat.collegeId) {
+      // Save persistence
+      localStorage.setItem('lastSelectedCollege', chat.collegeId);
+
       setUnreadCounts(prev => ({
         ...prev,
         [chat.collegeId]: 0
@@ -1736,7 +1771,13 @@ const Chat = () => {
           chat.lastMessageReadBy = readBy || []
           chat.timestamp = formatChatTimestamp(messageTimestamp)
           chat.lastMessageTime = messageTimestamp
-          chat.unreadCount = isOwnMessage || selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0)
+          // Calculate new unread count
+          // FIX 2: Only Show Notifications for Received Messages
+          const newUnreadCount = isOwnMessage
+            ? 0  // Reset to 0 for own messages
+            : (selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0) + 1); // Reset if open, else increment
+
+          chat.unreadCount = newUnreadCount;
 
           // Move to top
           updatedChats.splice(prev.findIndex(c => c.id === existingChat.id), 1)
@@ -1832,8 +1873,18 @@ const Chat = () => {
 
   // Handle new message - update chat list
   const handleNewMessage = useCallback((message) => {
+    // FIX 4: Ensure Socket Event Checks Sender logic
+    console.log('📨 Received message in list handler:', message.id);
+
+    // Get current user ID rigorously
+    const currentUserId = user?._id || user?.id || JSON.parse(localStorage.getItem('user'))?._id;
+
     const collegeId = message.collegeId
-    const isOwnMessage = String(message.senderId) === String(user?.id || user?._id || '')
+    const isOwnMessage = String(message.senderId) === String(currentUserId || '')
+
+    console.log('👤 Current user:', currentUserId);
+    console.log('📬 Message sender:', message.senderId);
+    console.log('🔍 Is own message:', isOwnMessage);
 
     // Update chat list with delivery and read status
     updateChatListOnMessage(
