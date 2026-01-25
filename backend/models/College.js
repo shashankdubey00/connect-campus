@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { normalizeCollegeName } from '../src/utils/normalizeCollegeName.js';
 
 // Using existing schema structure - DO NOT modify
 const collegeSchema = new mongoose.Schema({
@@ -29,6 +30,13 @@ const collegeSchema = new mongoose.Schema({
   }
 }, {
   timestamps: false
+});
+
+collegeSchema.pre('save', function (next) {
+  if (this.name) {
+    this.normalizedSearchText = normalizeCollegeName(this.name);
+  }
+  next();
 });
 
 // Indexes already exist in database - DO NOT recreate
