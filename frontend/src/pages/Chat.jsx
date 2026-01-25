@@ -26,6 +26,7 @@ const Chat = () => {
   const [activeSection, setActiveSection] = useState('chats') // chats, community, settings
   const [selectedChat, setSelectedChat] = useState(null)
   const [selectedCollege, setSelectedCollege] = useState(null)
+  const [collegeId, setCollegeId] = useState(null) // Added for literal Fix 1 adherence
   const [selectedStudent, setSelectedStudent] = useState(null) // For viewing other students' profiles
   const [view, setView] = useState('list') // list, college-profile, live-chat, student-profile, settings, direct-chat, group-profile, group-chat
   const [user, setUser] = useState(null)
@@ -91,20 +92,30 @@ const Chat = () => {
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartX = useRef(0)
   const resizeStartWidth = useRef(400)
+  // When user selects a college, save it (Fix 1)
+  const handleCollegeSelect = (college) => {
+    setCollegeId(college._id || college.aisheCode);
+    setSelectedCollege(college);
+    // SAVE TO LOCALSTORAGE
+    localStorage.setItem('lastSelectedCollege', college._id || college.aisheCode);
+    localStorage.setItem('lastSelectedCollegeName', college.name);
+    // Trigger existing join logic
+    handleJoinLiveChat(college);
+  };
 
   // FIX 1: Persist collegeId to Survive Refresh
   useEffect(() => {
     // Restore last selected college from localStorage on mount
     const lastCollegeId = localStorage.getItem('lastSelectedCollege');
-    // We also need to restore the view state if we are restoring a chat
-    if (lastCollegeId && !selectedChat) {
-      console.log('🔄 Restoring last selected college ID:', lastCollegeId);
+    const lastCollegeName = localStorage.getItem('lastSelectedCollegeName');
 
-      // We need to find the chat object in the chats list once it loads
-      // This part depends on 'chats' being loaded. 
-      // Since chats loading is async, we might need to do this when chats update.
+    if (lastCollegeId && !collegeId) {
+      console.log('🔄 Restoring last selected college:', lastCollegeName);
+      setCollegeId(lastCollegeId);
+      // If you also need to set the college object:
+      // setSelectedCollege({ _id: lastCollegeId, name: lastCollegeName });
     }
-  }, []);
+  }, []); // Run once on mount
 
   // Effect to restore selection once chats are loaded
   useEffect(() => {
@@ -1295,25 +1306,28 @@ const Chat = () => {
       return
     }
 
+    // FIX 3: Clear Unread Count When Opening Chat
+    console.log('🏫 Opening chat:', chat.name);
+
     saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
 
-    // FIX 3 & 1: Clear Unread Count & Persist Selection
-    if (chat.collegeId) {
-      // Save persistence
-      localStorage.setItem('lastSelectedCollege', chat.collegeId);
+    // Save to localStorage (Fix 1 part)
+    const collegeId = chat.collegeId || chat.college?.aisheCode || chat.college?.name;
+    if (collegeId) {
+      localStorage.setItem('lastSelectedCollege', collegeId);
+      localStorage.setItem('lastSelectedCollegeName', chat.name);
+    }
 
-      setUnreadCounts(prev => ({
-        ...prev,
-        [chat.collegeId]: 0
-      }))
+    // CLEAR UNREAD COUNT FOR THIS CHAT
+    setChats(prev => prev.map(c =>
+      c.id === chat.id
+        ? { ...c, unreadCount: 0 }  // ✅ Clear unread when opening
+        : c
+    ));
 
-      // Update chat in list to reset unread count
-      setChats(prev => prev.map(c =>
-        c.collegeId === chat.collegeId
-          ? { ...c, unreadCount: 0 }
-          : c
-      ))
+    if (collegeId) {
+      setUnreadCounts(prev => ({ ...prev, [collegeId]: 0 }));
     }
 
     if (chat.type === 'college') {
@@ -1323,12 +1337,6 @@ const Chat = () => {
     } else if (chat.type === 'direct') {
       // For direct messages, open direct chat view
       if (chat.userId) {
-        // Reset unread count for direct chat
-        setChats(prev => prev.map(c =>
-          c.id === chat.id
-            ? { ...c, unreadCount: 0 }
-            : c
-        ))
         setSelectedStudent({ id: chat.userId })
         setView('direct-chat')
       } else {
@@ -1706,170 +1714,40 @@ const Chat = () => {
           const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
           return timeB - timeA
         })
-      }
-
-      // Update existing chat
-      const updatedChats = [...prev]
-      const chat = { ...updatedChats[chatIndex] }
-
-      // Update last message and timestamp
-      // If messageText is "No messages yet" or messageTimestamp is null, it means chat was cleared
-      if (messageText !== 'No messages yet' && messageTimestamp) {
-        chat.lastMessage = messagePreview
-        chat.lastMessageIsOwn = isOwnMessage
-        chat.lastMessageDeliveredTo = deliveredTo || []
-        chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
-      } else {
-        // When clearing chat, update the message text and set timestamp to now
-        chat.lastMessage = 'No messages yet'
-        chat.lastMessageIsOwn = false
-        chat.lastMessageDeliveredTo = []
-        chat.lastMessageReadBy = []
-        // Update timestamp to current time so it appears at the top when cleared
-        const clearTime = messageTimestamp || new Date()
-        chat.timestamp = formatChatTimestamp(clearTime)
-        chat.lastMessageTime = clearTime
-      }
-
-      // Only increment unread count if message is not from current user and chat is not open
-      if (!isOwnMessage && selectedChat?.id !== chatId) {
-        chat.unreadCount = (chat.unreadCount || 0) + 1
-      } else {
-        chat.unreadCount = 0
-      }
-
-      // Move chat to top (most recent first)
-      updatedChats.splice(chatIndex, 1)
-      updatedChats.unshift(chat)
-
-      // Sort by last message time
-      return updatedChats.sort((a, b) => {
-        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
-        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
-        return timeB - timeA
-      })
-    })
-  }, [selectedChat])
-
-  // Update chat list when message is sent or received
-  const updateChatListOnMessage = useCallback((collegeId, messageText, messageTimestamp, isOwnMessage = false, deliveredTo = [], readBy = []) => {
-    setChats(prev => {
-      const chatIndex = prev.findIndex(c => c.collegeId === collegeId)
-
-      if (chatIndex === -1) {
-        // Chat doesn't exist, try to find college data
-        const existingChat = prev.find(c => c.college?.aisheCode === collegeId || c.college?.name === collegeId)
-        if (existingChat) {
-          // Use existing chat data
-          const updatedChats = [...prev]
-          const chat = { ...existingChat }
-          chat.lastMessage = truncateMessage(messageText)
-          chat.lastMessageIsOwn = isOwnMessage
-          chat.lastMessageDeliveredTo = deliveredTo || []
-          chat.lastMessageReadBy = readBy || []
-          chat.timestamp = formatChatTimestamp(messageTimestamp)
-          chat.lastMessageTime = messageTimestamp
-          // Calculate new unread count
-          // FIX 2: Only Show Notifications for Received Messages
-          const newUnreadCount = isOwnMessage
-            ? 0  // Reset to 0 for own messages
-            : (selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0) + 1); // Reset if open, else increment
-
-          chat.unreadCount = newUnreadCount;
-
-          // Move to top
-          updatedChats.splice(prev.findIndex(c => c.id === existingChat.id), 1)
-          updatedChats.unshift(chat)
-          return updatedChats
-        }
-
-        // If chat doesn't exist and message is sent, create new chat entry
-        // This happens when user sends first message without following
-        if (isOwnMessage && selectedCollege) {
-          const collegeName = selectedCollege.name || 'College Chat'
-          const collegeLogo = getCollegeLogoUrl(selectedCollege, 50)
-
-          const newChat = {
-            id: `college-${collegeId}`,
-            type: 'college',
-            collegeId: collegeId,
-            name: collegeName,
-            avatar: collegeLogo,
-            lastMessage: truncateMessage(messageText),
-            lastMessageIsOwn: isOwnMessage,
-            lastMessageDeliveredTo: deliveredTo || [],
-            lastMessageReadBy: readBy || [],
-            timestamp: formatChatTimestamp(messageTimestamp),
-            lastMessageTime: messageTimestamp,
-            unreadCount: 0,
-            college: selectedCollege
-          }
-
-          // Add to top of list
-          return [newChat, ...prev]
-        }
-
-        // If still not found, return unchanged
         return prev
-      }
-
-      // Update existing chat
-      const updatedChats = [...prev]
-      const chat = { ...updatedChats[chatIndex] }
-
-      // Update last message and timestamp
-      // If messageText is "No messages yet" or messageTimestamp is null, it means chat was cleared
-      if (messageText !== 'No messages yet' && messageTimestamp) {
-        chat.lastMessage = truncateMessage(messageText)
-        chat.lastMessageIsOwn = isOwnMessage
-        chat.lastMessageDeliveredTo = deliveredTo || []
-        chat.lastMessageReadBy = readBy || []
-        chat.timestamp = formatChatTimestamp(messageTimestamp)
-        chat.lastMessageTime = messageTimestamp
-      } else {
-        // When clearing chat, update the message text and set timestamp to now
-        chat.lastMessage = 'No messages yet'
-        chat.lastMessageIsOwn = false
-        chat.lastMessageDeliveredTo = []
-        chat.lastMessageReadBy = []
-        // Update timestamp to current time so it appears at the top when cleared
-        const clearTime = messageTimestamp || new Date()
-        chat.timestamp = formatChatTimestamp(clearTime)
-        chat.lastMessageTime = clearTime
-      }
-
-      // Only increment unread count if:
-      // 1. Message is not from current user
-      // 2. Chat is not currently open
-      if (!isOwnMessage && selectedChat?.collegeId !== collegeId) {
-        chat.unreadCount = (chat.unreadCount || 0) + 1
-        setUnreadCounts(prev => ({
-          ...prev,
-          [collegeId]: (prev[collegeId] || 0) + 1
-        }))
-      } else {
-        // Reset unread if chat is open or message is from user
-        chat.unreadCount = 0
-        setUnreadCounts(prev => ({
-          ...prev,
-          [collegeId]: 0
-        }))
-      }
-
-      // Move chat to top (most recent first)
-      updatedChats.splice(chatIndex, 1)
-      updatedChats.unshift(chat)
-
-      // Sort by last message time to ensure correct order
-      return updatedChats.sort((a, b) => {
-        const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0
-        const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0
-        return timeB - timeA // Most recent first
       })
-    })
-  }, [selectedChat])
+  }, [user, chats, selectedChat])
+
+  // Fix 2: Only Show Notifications for Received Messages
+  const updateChatListOnMessage = (collegeId, messageText, messageTimestamp, isOwnMessage, senderId) => {
+    console.log('📬 Updating chat list:', { collegeId, isOwnMessage, senderId });
+
+    setChats(prev => prev.map(chat => {
+      // Logic for matching college
+      const isMatch = chat.collegeId === collegeId || chat.id === `college-${collegeId}`;
+
+      if (isMatch) {
+        // Calculate new unread count
+        const newUnreadCount = isOwnMessage
+          ? 0  // Reset to 0 for own messages
+          : (selectedChat?.collegeId === collegeId ? 0 : (chat.unreadCount || 0) + 1);  // Increment for received messages (if not currently open)
+
+        console.log(`${isOwnMessage ? '📤' : '📥'} Message ${isOwnMessage ? 'sent' : 'received'}, unread: ${newUnreadCount}`);
+
+        return {
+          ...chat,
+          lastMessage: messageText,
+          lastMessageTime: messageTimestamp,
+          timestamp: formatChatTimestamp(messageTimestamp),
+          lastMessageIsOwn: isOwnMessage,
+          unreadCount: newUnreadCount  // ✅ FIXED: Only increment for received messages
+        };
+      }
+      return chat;
+    }));
+  };
+
+
 
   // Handle new message - update chat list
   const handleNewMessage = useCallback((message) => {
@@ -5214,18 +5092,31 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     }
 
     const handleReceiveMessage = (message) => {
+      console.log('📨 Received message:', message);
+
+      // FIX 4: Get current user ID from multiple sources
+      const currentUserId = user?._id ||
+        user?.id ||
+        JSON.parse(localStorage.getItem('user'))?._id;
+
+      // Check if message is from current user
+      const isOwnMessage = String(message.senderId) === String(currentUserId);
+
+      console.log('👤 Current user:', currentUserId);
+      console.log('📬 Message sender:', message.senderId);
+      console.log('🔍 Is own message:', isOwnMessage);
+
       // Only add message if it's for this college
       if (message.collegeId === collegeId) {
         // Check if sender is blocked
         const senderIdStr = String(message.senderId)
-        const currentUserId = String(user?.id || user?._id || '')
 
         // Don't show messages from blocked users (unless it's own message)
-        if (senderIdStr !== currentUserId && blockedUsers.has(senderIdStr)) {
+        if (senderIdStr !== String(currentUserId) && blockedUsers.has(senderIdStr)) {
           return // Skip blocked user's messages
         }
 
-        const isOwn = String(message.senderId) === String(user?.id || user?._id || '')
+        const isOwn = isOwnMessage;
 
         // If this is our own message, track it as a successful send to suppress false errors
         if (isOwn && message.id) {
