@@ -4633,6 +4633,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [messages, setMessages] = useState([])
 
   // Fix for: Messages disappear on refresh - Fetch messages when component loads
+  // Fix for: Messages disappear on refresh - Fetch messages when component loads
   useEffect(() => {
     const fetchMessagesData = async () => {
       if (!collegeId) return;
@@ -4658,30 +4659,62 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
             // We need to map the backend format to the frontend format used in rendering
             const currentUserId = String(user?.id || user?._id || '');
 
-            const formattedMessages = data.messages.map(msg => ({
-              id: msg.id || msg._id,
-              text: msg.text,
-              sender: msg.senderName,
-              senderId: msg.senderId,
-              time: new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              }),
-              date: new Date(msg.timestamp).toLocaleDateString(), // simplified date
-              isOwn: String(msg.senderId) === currentUserId,
-              timestamp: new Date(msg.timestamp),
-              replyTo: msg.replyTo,
-              readBy: msg.readBy || [],
-              deliveredTo: msg.deliveredTo || []
-            }));
+            // First pass: Basic formatting with safe date handling
+            const preFormattedMessages = data.messages.map(msg => {
+              let messageDate;
+              try {
+                // Ensure timestamp exists and is valid
+                if (!msg.timestamp) throw new Error('No timestamp');
+                messageDate = new Date(msg.timestamp);
+                if (isNaN(messageDate.getTime())) throw new Error('Invalid date');
+              } catch (e) {
+                console.warn('Invalid timestamp for message:', msg.id);
+                messageDate = new Date(); // Fallback to current time
+              }
+
+              return {
+                id: msg.id || msg._id,
+                text: msg.text,
+                sender: msg.senderName,
+                senderId: msg.senderId,
+                time: messageDate.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }),
+                date: messageDate.toLocaleDateString(),
+                isOwn: String(msg.senderId) === currentUserId,
+                timestamp: messageDate,
+                replyTo: msg.replyTo,
+                replyToData: null, // Initial placeholder
+                readBy: msg.readBy || [],
+                deliveredTo: msg.deliveredTo || []
+              };
+            });
+
+            // Second pass: Populate replyToData
+            // We do this in a second pass so we can find the replied-to message in the already formatted list
+            const messagesWithReplies = preFormattedMessages.map(msg => {
+              if (msg.replyTo) {
+                // Try to find the replied message in the current batch
+                const repliedMsg = preFormattedMessages.find(m => m.id === msg.replyTo);
+
+                if (repliedMsg) {
+                  msg.replyToData = {
+                    id: repliedMsg.id,
+                    text: repliedMsg.text,
+                    sender: repliedMsg.sender,
+                    senderId: repliedMsg.senderId,
+                    isOwn: repliedMsg.isOwn
+                    // We don't need full recursion for replyToData
+                  };
+                }
+              }
+              return msg;
+            });
 
             setMessages(prev => {
-              // Merge with existing messages to prevent overwriting optimistic ones if any
-              // But since this is "on refresh", prev should be empty or initial.
-              // Logic to merge: prefer fetched messages but keep optimistic ones?
-              // Simple replace is safer for "disappear on refresh" fix.
-              return formattedMessages;
+              return messagesWithReplies;
             });
           }
         }
