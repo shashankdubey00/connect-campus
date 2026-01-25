@@ -31,14 +31,14 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
     try {
       setLoading(true);
       const response = await fetchMessages(collegeId);
-      
+
       if (response.success && response.messages) {
         const currentUserId = String(user?.id || user?._id || '');
-        
+
         // Format messages
         const formattedMessages = response.messages.map(msg => {
           const formatted = formatMessage(msg, currentUserId);
-          
+
           // Populate reply data if available
           if (msg.replyTo) {
             const repliedMsg = response.messages.find(m => m.id === msg.replyTo);
@@ -52,13 +52,13 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
               };
             }
           }
-          
+
           return formatted;
         });
-        
+
         // Populate any remaining reply data
         const messagesWithReplies = populateReplyData(formattedMessages);
-        
+
         setMessages(messagesWithReplies);
       }
     } catch (error) {
@@ -92,19 +92,19 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
             const timeout = setTimeout(() => {
               reject(new Error('Socket connection timeout'));
             }, 5000);
-            
+
             socketInstance.once('connect', () => {
               clearTimeout(timeout);
               resolve();
             });
-            
+
             socketInstance.once('connect_error', (error) => {
               clearTimeout(timeout);
               reject(error);
             });
           }
         });
-        
+
         // Join room after connection
         joinCollegeRoom(collegeId);
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -117,7 +117,7 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
     try {
       const replyToId = replyingTo ? replyingTo.id : null;
       const sent = sendMessage(messageText, collegeId, replyToId, optimisticMessage.id);
-      
+
       if (!sent) {
         throw new Error('Failed to send message - socket not connected');
       }
@@ -141,21 +141,21 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
   const handleReceiveMessage = (message) => {
     const currentUserId = String(user?.id || user?._id || '');
     const formatted = formatMessage(message, currentUserId);
-    
+
     setMessages(prev => {
       // Check for duplicates
       if (prev.some(m => m.id === message.id)) {
         return prev;
       }
-      
+
       // Check if this replaces an optimistic message
-      const optimisticIndex = prev.findIndex(m => 
-        m.isOptimistic && 
-        m.text === message.text && 
+      const optimisticIndex = prev.findIndex(m =>
+        m.isOptimistic &&
+        m.text === message.text &&
         String(m.senderId) === String(message.senderId) &&
         Math.abs(new Date(m.timestamp) - new Date(message.timestamp)) < 5000
       );
-      
+
       if (optimisticIndex !== -1) {
         // Replace optimistic message with real one
         const newMessages = [...prev];
@@ -165,9 +165,9 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
         };
         return newMessages;
       }
-      
+
       // Add new message
-      return [...prev, formatted].sort((a, b) => 
+      return [...prev, formatted].sort((a, b) =>
         new Date(a.timestamp) - new Date(b.timestamp)
       );
     });
@@ -178,6 +178,8 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
    */
   useEffect(() => {
     if (!collegeId) return;
+
+    let cleanup = null;
 
     // Ensure socket is connected
     const setupSocket = async () => {
@@ -198,10 +200,10 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
       if (socketInstance) {
         // Join college room
         joinCollegeRoom(collegeId);
-        
+
         // Set up message listener
         const unsubscribe = onReceiveMessage(handleReceiveMessage);
-        
+
         // Set up error listener
         const unsubscribeError = onSocketError((error) => {
           console.error('Socket error in college chat:', error);
@@ -209,7 +211,9 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
           // The server will handle retries
         });
 
-        return () => {
+        // Store cleanup function
+        cleanup = () => {
+          console.log('🧹 Cleaning up socket listeners in useCollegeChat for college:', collegeId);
           unsubscribe();
           unsubscribeError();
         };
@@ -217,6 +221,13 @@ export const useCollegeChat = (collegeId, user, onMessageSent) => {
     };
 
     setupSocket();
+
+    // Return cleanup function for useEffect
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
   }, [collegeId]);
 
   /**

@@ -113,9 +113,9 @@ export const sendMessage = (text, collegeId, replyToId = null, clientMessageId =
           resolve(true);
         }
       };
-      
+
       socket.once('error', errorHandler);
-      
+
       // Set timeout to reject if no response (only for connection issues)
       const timeout = setTimeout(() => {
         socket.off('error', errorHandler);
@@ -124,10 +124,10 @@ export const sendMessage = (text, collegeId, replyToId = null, clientMessageId =
         console.warn('⚠️ Message send timeout (message might still be saved)');
         resolve(true);
       }, 10000);
-      
+
       // Listen for successful send (message will be received via receiveMessage)
       socket.emit('sendMessage', { text, collegeId, replyToId, clientMessageId });
-      
+
       // Clear timeout and resolve after a short delay to allow server processing
       setTimeout(() => {
         clearTimeout(timeout);
@@ -144,16 +144,16 @@ export const sendMessage = (text, collegeId, replyToId = null, clientMessageId =
             newSocket.off('error', errorHandler);
             reject(new Error(error.message || 'Failed to send message'));
           };
-          
+
           newSocket.once('error', errorHandler);
           newSocket.emit('sendMessage', { text, collegeId, replyToId, clientMessageId });
-          
+
           setTimeout(() => {
             newSocket.off('error', errorHandler);
             resolve(true);
           }, 100);
         });
-        
+
         newSocket.once('connect_error', (error) => {
           reject(new Error('Failed to reconnect socket'));
         });
@@ -177,21 +177,35 @@ export const onJoinedRoom = (callback) => {
 /**
  * Listen for received messages
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onReceiveMessage = (callback) => {
   if (socket) {
     socket.on('receiveMessage', callback);
+    // Return cleanup function
+    return () => {
+      socket.off('receiveMessage', callback);
+    };
   }
+  // Return no-op cleanup if socket doesn't exist
+  return () => { };
 };
 
 /**
  * Listen for errors
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onSocketError = (callback) => {
   if (socket) {
     socket.on('error', callback);
+    // Return cleanup function
+    return () => {
+      socket.off('error', callback);
+    };
   }
+  // Return no-op cleanup if socket doesn't exist
+  return () => { };
 };
 
 /**
@@ -257,51 +271,66 @@ export const markMessageDelivered = (messageId, collegeId) => {
 /**
  * Listen for typing indicators
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onUserTyping = (callback) => {
   if (socket) {
     socket.on('userTyping', callback);
+    return () => socket.off('userTyping', callback);
   }
+  return () => { };
 };
 
 /**
  * Listen for typing indicators in direct messages
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onUserTypingDirect = (callback) => {
   if (socket) {
     socket.on('userTypingDirect', callback);
+    return () => socket.off('userTypingDirect', callback);
   }
+  return () => { };
 };
 
 /**
  * Listen for user online status
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onUserOnline = (callback) => {
   if (socket) {
     socket.on('userOnline', callback);
+    return () => socket.off('userOnline', callback);
   }
+  return () => { };
 };
 
 /**
  * Listen for user offline status
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onUserOffline = (callback) => {
   if (socket) {
     socket.on('userOffline', callback);
+    return () => socket.off('userOffline', callback);
   }
+  return () => { };
 };
 
 /**
  * Listen for message read receipts
  * @param {Function} callback - Callback function
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onMessageRead = (callback) => {
   if (socket) {
     socket.on('messageRead', callback);
+    return () => socket.off('messageRead', callback);
   }
+  return () => { };
 };
 
 /**
@@ -370,11 +399,14 @@ export const onMessageUpdate = (callback) => {
 /**
  * Listen for college active count updates
  * @param {Function} callback - Callback function(data) where data = { collegeId, activeCount }
+ * @returns {Function} Cleanup function to remove the listener
  */
 export const onCollegeActiveCountUpdate = (callback) => {
   if (socket) {
     socket.on('collegeActiveCountUpdate', callback);
+    return () => socket.off('collegeActiveCountUpdate', callback);
   }
+  return () => { };
 };
 
 /**
@@ -387,9 +419,9 @@ export const joinGroupRoom = (groupId) => {
     console.log('Joining group room:', groupIdStr);
     socket.emit('joinGroupRoom', { groupId: groupIdStr });
   } else {
-    console.warn('Cannot join group room - socket not connected or groupId missing', { 
-      connected: socket?.connected, 
-      groupId 
+    console.warn('Cannot join group room - socket not connected or groupId missing', {
+      connected: socket?.connected,
+      groupId
     });
   }
 };
