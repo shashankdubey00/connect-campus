@@ -94,32 +94,48 @@ const Chat = () => {
   const resizeStartWidth = useRef(400)
 
   // When user selects a college, save it (Fix 1)
-  const handleCollegeSelect = (college) => {
-    console.log('✅ Selected college:', college.name);
-    setCollegeId(college._id || college.aisheCode);
+  const handleCollegeClick = (college) => {
+    console.log('🏫 College selected:', college.name);
+
+    setCollegeId(college._id);
     setSelectedCollege(college);
 
-    // SAVE TO LOCALSTORAGE
-    localStorage.setItem('lastSelectedCollege', college._id || college.aisheCode);
-    localStorage.setItem('lastSelectedCollegeName', college.name);
+    // ✅ SAVE TO LOCALSTORAGE (THIS IS CRITICAL!)
+    localStorage.setItem('selectedCollegeId', college._id);
+    localStorage.setItem('selectedCollegeName', college.name);
+
+    // Clear unread count
+    setChats(prev => prev.map(c =>
+      c._id === college._id ? { ...c, unreadCount: 0 } : c
+    ));
 
     // Trigger existing join logic
     handleJoinLiveChat(college);
   };
 
-  // FIX 1: Persist collegeId to Survive Refresh
-  useEffect(() => {
-    // Restore last selected college from localStorage on mount
-    const lastCollegeId = localStorage.getItem('lastSelectedCollege');
-    const lastCollegeName = localStorage.getItem('lastSelectedCollegeName');
+  // ============================================================
+  // FIX: Persist and restore selected college on page refresh
+  // ============================================================
 
-    if (lastCollegeId && !collegeId) {
-      console.log('🔄 Restoring last selected college:', lastCollegeName);
-      setCollegeId(lastCollegeId);
-      // If you also need to set the college object:
-      // setSelectedCollege({ _id: lastCollegeId, name: lastCollegeName });
+  // Add this near the top of your Chat component, after all useState declarations
+  useEffect(() => {
+    // Restore last selected college from localStorage
+    const savedCollegeId = localStorage.getItem('selectedCollegeId');
+    const savedCollegeName = localStorage.getItem('selectedCollegeName');
+
+    if (savedCollegeId && !collegeId) {
+      console.log('🔄 Restoring college from localStorage:', savedCollegeName);
+      setCollegeId(savedCollegeId);
+
+      // If you also store the full college object in state
+      if (savedCollegeName) {
+        setSelectedCollege({
+          _id: savedCollegeId,
+          name: savedCollegeName
+        });
+      }
     }
-  }, []); // Run once on mount
+  }, []); // Run ONCE on component mount
 
   // Effect to restore selection once chats are loaded
   useEffect(() => {
@@ -421,7 +437,8 @@ const Chat = () => {
       // Clear search query to hide suggestions in desktop view
       setCollegeSearchQuery('')
       saveNavigationState()
-      handleViewCollegeProfile(college)
+      handleCollegeClick(college)
+      setView('live-chat')
     }
   }
 
@@ -1310,36 +1327,20 @@ const Chat = () => {
       return
     }
 
-    // FIX 3: Clear Unread Count When Opening Chat
-    console.log('🏫 Opening chat:', chat.name);
-
-    saveNavigationState() // Save current state before navigating
-    setSelectedChat(chat)
-
-    // Save to localStorage (Fix 1 part)
-    const collegeId = chat.collegeId || chat.college?._id || chat.id;
-    if (collegeId) {
-      localStorage.setItem('lastSelectedCollege', collegeId);
-      localStorage.setItem('lastSelectedCollegeName', chat.name);
-    }
-
-    // CLEAR UNREAD COUNT FOR THIS CHAT
-    setChats(prev => prev.map(c =>
-      c.id === chat.id
-        ? { ...c, unreadCount: 0 }  // ✅ Clear unread when opening
-        : c
-    ));
-
-    if (collegeId) {
-      setUnreadCounts(prev => ({ ...prev, [collegeId]: 0 }));
-    }
-
     if (chat.type === 'college') {
-      const college = chat.college || user?.profile?.college
-      setSelectedCollege(college)
-      setView('live-chat')
+      handleCollegeClick(chat.college || { _id: chat.collegeId, name: chat.name });
+      setView('live-chat');
     } else if (chat.type === 'direct') {
-      // For direct messages, open direct chat view
+      saveNavigationState() // Save current state before navigating
+      setSelectedChat(chat)
+
+      // CLEAR UNREAD COUNT FOR THIS CHAT
+      setChats(prev => prev.map(c =>
+        c.id === chat.id
+          ? { ...c, unreadCount: 0 }
+          : c
+      ));
+
       if (chat.userId) {
         setSelectedStudent({ id: chat.userId })
         setView('direct-chat')
@@ -1347,6 +1348,7 @@ const Chat = () => {
         console.error('Direct chat selected but userId is missing:', chat)
       }
     }
+
     if (isMobileView) {
       setShowChatList(false)
     }
@@ -4612,97 +4614,64 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
   // Fix for: Messages disappear on refresh - Fetch messages when component loads
   // Fix for: Messages disappear on refresh - Fetch messages when component loads
+  // ============================================================
+  // FIX: Fetch college messages whenever collegeId changes
+  // ============================================================
+
   useEffect(() => {
-    const fetchMessagesData = async () => {
-      if (!collegeId) return;
+    const fetchCollegeMessages = async () => {
+      if (!collegeId) {
+        console.log('⚠️ No collegeId, skipping message fetch');
+        return;
+      }
+
+      console.log('📡 Fetching messages for college:', collegeId);
 
       try {
-        const endpoint = `/api/messages/college/${encodeURIComponent(collegeId)}`;
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const endpoint = `/api/messages/college/${encodeURIComponent(collegeId)}`;
 
-        // Get token from common storage keys
-        const token = localStorage.getItem('userToken') || localStorage.getItem('token') || localStorage.getItem('authToken');
+        // Get auth token
+        const token = localStorage.getItem('authToken') ||
+          localStorage.getItem('token');
+
+        console.log('🔑 Using token:', token ? 'Available' : 'Missing');
 
         const response = await fetch(`${apiUrl}${endpoint}`, {
+          method: 'GET',
           credentials: 'include',
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         });
 
+        console.log('📥 Response status:', response.status);
+
         if (response.ok) {
           const data = await response.json();
-          if (data.success && Array.isArray(data.messages)) {
-            // Format messages to match the expected structure
-            // We need to map the backend format to the frontend format used in rendering
-            const currentUserId = String(user?.id || user?._id || '');
+          console.log('✅ Fetched messages:', data);
 
-            // First pass: Basic formatting with safe date handling
-            const preFormattedMessages = data.messages.map(msg => {
-              let messageDate;
-              try {
-                // Ensure timestamp exists and is valid
-                if (!msg.timestamp) throw new Error('No timestamp');
-                messageDate = new Date(msg.timestamp);
-                if (isNaN(messageDate.getTime())) throw new Error('Invalid date');
-              } catch (e) {
-                console.warn('Invalid timestamp for message:', msg.id);
-                messageDate = new Date(); // Fallback to current time
-              }
+          // Handle response format (might be data.messages or just data)
+          const messagesArray = data.messages || data;
 
-              return {
-                id: msg.id || msg._id,
-                text: msg.text,
-                sender: msg.senderName,
-                senderId: msg.senderId,
-                time: messageDate.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                }),
-                date: messageDate.toLocaleDateString(),
-                isOwn: String(msg.senderId) === currentUserId,
-                timestamp: messageDate,
-                replyTo: msg.replyTo,
-                replyToData: null, // Initial placeholder
-                readBy: msg.readBy || [],
-                deliveredTo: msg.deliveredTo || []
-              };
-            });
-
-            // Second pass: Populate replyToData
-            // We do this in a second pass so we can find the replied-to message in the already formatted list
-            const messagesWithReplies = preFormattedMessages.map(msg => {
-              if (msg.replyTo) {
-                // Try to find the replied message in the current batch
-                const repliedMsg = preFormattedMessages.find(m => m.id === msg.replyTo);
-
-                if (repliedMsg) {
-                  msg.replyToData = {
-                    id: repliedMsg.id,
-                    text: repliedMsg.text,
-                    sender: repliedMsg.sender,
-                    senderId: repliedMsg.senderId,
-                    isOwn: repliedMsg.isOwn
-                    // We don't need full recursion for replyToData
-                  };
-                }
-              }
-              return msg;
-            });
-
-            setMessages(prev => {
-              return messagesWithReplies;
-            });
+          if (Array.isArray(messagesArray)) {
+            setMessages(messagesArray);
+            console.log(`✅ Loaded ${messagesArray.length} messages`);
+          } else {
+            console.error('❌ Response is not an array:', data);
           }
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Failed to fetch messages:', errorText);
         }
       } catch (error) {
-        console.error('Failed to fetch messages:', error);
+        console.error('💥 Error fetching messages:', error);
       }
     };
 
-    fetchMessagesData();
-  }, [collegeId, user?._id]);
+    fetchCollegeMessages();
+  }, [collegeId]); // Re-fetch when collegeId changes
   const [loading, setLoading] = useState(true)
   const [selectedMessage, setSelectedMessage] = useState(null)
   const [showActionMenu, setShowActionMenu] = useState(false)
