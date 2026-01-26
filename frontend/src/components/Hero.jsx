@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { verifyAuth } from '../services/authService'
 import { getCollegeDetailUrl } from '../utils/urlHelpers'
+import { normalizeSearchQuery, isAisheCode } from '../utils/searchUtils'
 import CollegeProfileModal from './CollegeProfileModal'
 import './Hero.css'
 
@@ -169,6 +170,13 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
       
       if (selectedDistrict) {
         params.append('district', selectedDistrict)
+      }
+
+      // Log the query for debugging
+      console.log('🔍 Searching for:', query)
+      if (!isAisheCode(query)) {
+        const normalized = normalizeSearchQuery(query)
+        console.log('🔍 Normalized query:', normalized)
       }
 
       const response = await fetch(`${API_BASE_URL}/api/colleges/search?${params}`)

@@ -1,35 +1,34 @@
 /**
- * Normalize college name for search
- * - Remove numeric prefixes (e.g., "100002-")
- * - Expand common Indian college abbreviations
- * - Remove punctuation
- * - Lowercase and normalize spaces
- * 
- * @param {string} name - College name to normalize
- * @returns {string} - Normalized college name
+ * Frontend search utilities to match backend normalization
  */
-export function normalizeCollegeName(name) {
-  if (!name || typeof name !== 'string') {
+
+/**
+ * Normalize search query to match backend normalizeCollegeName logic
+ * This ensures frontend queries match backend normalizedSearchText
+ * @param {string} query - User's search query
+ * @returns {string} - Normalized query
+ */
+export const normalizeSearchQuery = (query) => {
+  if (!query || typeof query !== 'string') {
     return '';
   }
 
-  let normalized = name.trim();
+  let normalized = query.trim();
 
   // Normalize ampersands to word form so "&" and "and" match the same way
   normalized = normalized.replace(/&/g, ' and ');
 
   // Remove numeric prefixes (e.g., "100002-", "12345-", etc.)
-  // Pattern: digits followed by dash/hyphen at the start
   normalized = normalized.replace(/^\d+-?\s*/, '');
 
-  // Expand common Indian college abbreviations
+  // Expand common Indian college abbreviations (same as backend)
   const abbreviations = {
     'PT.': 'Pandit',
     'PT ': 'Pandit ',
     'SRI': 'Sri',
     'J.D.M.V.P.': 'JD MVP',
     'J.D.M.V.P': 'JD MVP',
-    'JDMVP': 'JD MVP', // Special case
+    'JDMVP': 'JD MVP',
     'DR.': 'Doctor',
     'DR ': 'Doctor ',
     'PROF.': 'Professor',
@@ -73,6 +72,30 @@ export function normalizeCollegeName(name) {
   normalized = normalized.replace(/\s+/g, ' ').trim();
 
   return normalized;
-}
+};
 
+/**
+ * Check if a query looks like an AISHE code
+ * @param {string} query - Search query
+ * @returns {boolean} - True if it looks like an AISHE code
+ */
+export const isAisheCode = (query) => {
+  if (!query || typeof query !== 'string') {
+    return false;
+  }
 
+  const trimmed = query.trim();
+
+  // Pattern 1: Letter(s) followed by dash and numbers (e.g., "C-35143")
+  const patternWithPrefix = /^[A-Za-z]+-\d+$/;
+  
+  // Pattern 2: Purely numeric (e.g., "35143")
+  const patternNumeric = /^\d+$/;
+
+  // Pattern 3: Letter(s) followed by numbers without dash (e.g., "C35143")
+  const patternNoDash = /^[A-Za-z]+\d+$/;
+
+  return patternWithPrefix.test(trimmed) || 
+         patternNumeric.test(trimmed) || 
+         patternNoDash.test(trimmed);
+};

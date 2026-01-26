@@ -17,6 +17,7 @@ import ProfilePictureCropModal from '../components/ProfilePictureCropModal'
 import PrivacySettingsModal from '../components/PrivacySettingsModal'
 import { getCollegeLogoUrl } from '../utils/collegeLogo'
 import { getCollegeDetailUrl } from '../utils/urlHelpers'
+import { normalizeSearchQuery, isAisheCode } from '../utils/searchUtils'
 import './Chat.css'
 
 
@@ -97,11 +98,13 @@ const Chat = () => {
   // When user selects a college, save it (Fix 1)
   const handleCollegeSelect = (college) => {
     console.log('✅ Selected college:', college.name);
-    setCollegeId(college._id || college.aisheCode);
+    // Always use aisheCode as canonical identifier
+    const canonicalId = college.aisheCode || college._id;
+    setCollegeId(canonicalId);
     setSelectedCollege(college);
 
-    // SAVE TO LOCALSTORAGE
-    localStorage.setItem('lastSelectedCollege', college._id || college.aisheCode);
+    // SAVE TO LOCALSTORAGE (always use aisheCode if available)
+    localStorage.setItem('lastSelectedCollege', canonicalId);
     localStorage.setItem('lastSelectedCollegeName', college.name);
 
     // Trigger existing join logic
@@ -133,14 +136,26 @@ const Chat = () => {
     if (!isLoading && chats.length > 0 && !selectedChat) {
       const lastCollegeId = localStorage.getItem('lastSelectedCollege');
       if (lastCollegeId) {
-        const chatToRestore = chats.find(c => c.collegeId === lastCollegeId || c.id === `college-${lastCollegeId}`);
+        // Try to find chat by aisheCode first, then by collegeId, then by id
+        const chatToRestore = chats.find(c => 
+          c.college?.aisheCode === lastCollegeId ||
+          c.collegeId === lastCollegeId ||
+          c.id === `college-${lastCollegeId}`
+        );
+        
         if (chatToRestore) {
           console.log('✅ Restoring selected chat:', chatToRestore.name);
           setSelectedChat(chatToRestore);
           if (chatToRestore.type === 'college') {
             setSelectedCollege(chatToRestore.college);
+            // Normalize stored ID to aisheCode if available
+            const canonicalId = chatToRestore.college?.aisheCode || lastCollegeId;
+            setCollegeId(canonicalId);
+            localStorage.setItem('lastSelectedCollege', canonicalId);
             setView('live-chat');
           }
+        } else {
+          console.log('⚠️ Could not restore chat for stored collegeId:', lastCollegeId);
         }
       }
     }
@@ -383,14 +398,22 @@ const Chat = () => {
   const searchColleges = async (query) => {
     try {
       setLoadingCollegeSearch(true)
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const params = new URLSearchParams({ query, limit: '10' })
-
+      
       if (selectedState) {
         params.append('state', selectedState)
       }
-
+      
       if (selectedDistrict) {
         params.append('district', selectedDistrict)
+      }
+
+      // Log the query for debugging
+      console.log('🔍 Chat searching for:', query)
+      if (!isAisheCode(query)) {
+        const normalized = normalizeSearchQuery(query)
+        console.log('🔍 Chat normalized query:', normalized)
       }
 
       const response = await fetch(`${API_BASE_URL}/api/colleges/search?${params}`)
@@ -1323,8 +1346,8 @@ const Chat = () => {
     saveNavigationState() // Save current state before navigating
     setSelectedChat(chat)
 
-    // Save to localStorage (Fix 1 part)
-    const collegeId = chat.collegeId || chat.college?._id || chat.id;
+    // Save to localStorage (Fix 1 part) - use aisheCode if available
+    const collegeId = chat.college?.aisheCode || chat.collegeId || chat.id;
     if (collegeId) {
       localStorage.setItem('lastSelectedCollege', collegeId);
       localStorage.setItem('lastSelectedCollegeName', chat.name);
@@ -4618,13 +4641,19 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
   const [messages, setMessages] = useState([])
 
   // Fix for: Messages disappear on refresh - Fetch messages when component loads
-  // Fix for: Messages disappear on refresh - Fetch messages when component loads
   useEffect(() => {
     const fetchMessagesData = async () => {
-      if (!collegeId) return;
+      // Always use aisheCode as the canonical identifier for API calls
+      let apiCollegeId = collegeId;
+      if (!apiCollegeId && selectedCollege) {
+        apiCollegeId = selectedCollege.aisheCode || selectedCollege._id;
+      }
+      if (!apiCollegeId) return;
+
+      console.log('🔍 Fetching messages for collegeId:', apiCollegeId);
 
       try {
-        const endpoint = `/api/messages/college/${encodeURIComponent(collegeId)}`;
+        const endpoint = `/api/messages/college/${encodeURIComponent(apiCollegeId)}`;
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
         // Get token from common storage keys
@@ -5629,12 +5658,18 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
     e.preventDefault()
     // Trim only leading/trailing whitespace, preserve newlines in the middle
     let messageText = messageInput.trimStart().trimEnd()
-    if (!messageText || !collegeId) return
+
+    // Always use aisheCode as the canonical identifier for API calls
+    let apiCollegeId = collegeId;
+    if (!apiCollegeId && selectedCollege) {
+      apiCollegeId = selectedCollege.aisheCode || selectedCollege._id;
+    }
+    if (!messageText || !apiCollegeId) return
 
     // Stop typing indicator
     if (isTyping) {
       setIsTyping(false)
-      emitTyping(collegeId, false)
+      emitTyping(apiCollegeId, false)
     }
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
@@ -5734,7 +5769,7 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
         // Use async/await for better error handling
         try {
-          await sendMessage(messageText, collegeId, replyToId, clientMessageId)
+          await sendMessage(messageText, apiCollegeId, replyToId, clientMessageId)
           console.log('✅ Message sent via socket', replyToId ? `(replying to: ${replyToId})` : '')
 
           // Clear reply after sending
@@ -5744,8 +5779,8 @@ const LiveChatView = ({ chat, college, onBack, onViewProfile, onViewStudentProfi
 
           // Update chat list immediately (optimistic update)
           // Message is just sent, so no delivery/read status yet
-          if (onMessageSent && collegeId) {
-            onMessageSent(collegeId, messageText, new Date(), true, [], [])
+          if (onMessageSent && apiCollegeId) {
+            onMessageSent(apiCollegeId, messageText, new Date(), true, [], [])
           }
 
           // Don't remove optimistic message - it will be replaced when receiveMessage is received
