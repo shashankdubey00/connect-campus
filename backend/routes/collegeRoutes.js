@@ -79,6 +79,11 @@ router.get('/search', async (req, res) => {
     // Execute query
     const colleges = await searchQuery.select('aisheCode name state district').lean();
 
+    console.log('🔍 Backend returning colleges:', colleges.length);
+    if (colleges.length > 0) {
+      console.log('🔍 Sample college:', colleges[0]);
+    }
+
     res.json({
       success: true,
       count: colleges.length,
