@@ -15,9 +15,6 @@ export function normalizeCollegeName(name) {
 
   let normalized = name.trim();
 
-  // Normalize ampersands to word form so "&" and "and" match the same way
-  normalized = normalized.replace(/&/g, ' and ');
-
   // Remove numeric prefixes (e.g., "100002-", "12345-", etc.)
   // Pattern: digits followed by dash/hyphen at the start
   normalized = normalized.replace(/^\d+-?\s*/, '');

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { verifyAuth } from '../services/authService'
+import { getCollegeDetailUrl } from '../utils/urlHelpers'
 import CollegeProfileModal from './CollegeProfileModal'
 import './Hero.css'
 
@@ -208,7 +209,9 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const handleSuggestionClick = (college) => {
     setSearchQuery(college.name)
     setShowSuggestions(false)
-    openCollegeModal(college)
+    // Navigate to college detail page using aisheCode-based URL
+    const url = getCollegeDetailUrl(college);
+    navigate(url);
   }
 
   const openCollegeModal = (college) => {

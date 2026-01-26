@@ -169,5 +169,92 @@ router.get('/districts', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/colleges/detail/:identifier
+ * Fetch college details by aisheCode, _id, or name
+ * Handles URL-encoded special characters
+ */
+router.get('/detail/:identifier', async (req, res) => {
+  try {
+    // Decode the URL parameter
+    const identifier = decodeURIComponent(req.params.identifier);
+    
+    console.log('Looking up college with identifier:', identifier);
+    
+    let college = null;
+    
+    // Strategy 1: Try to find by aisheCode (RECOMMENDED - most reliable)
+    college = await College.findOne({ aisheCode: identifier });
+    
+    if (college) {
+      console.log('Found by aisheCode');
+      return res.json({
+        success: true,
+        college
+      });
+    }
+    
+    // Strategy 2: Try to find by MongoDB _id (if it's a valid ObjectId)
+    if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      college = await College.findById(identifier);
+      
+      if (college) {
+        console.log('Found by _id');
+        return res.json({
+          success: true,
+          college
+        });
+      }
+    }
+    
+    // Strategy 3: Try exact name match (case-sensitive)
+    college = await College.findOne({ name: identifier });
+    
+    if (college) {
+      console.log('Found by exact name');
+      return res.json({
+        success: true,
+        college
+      });
+    }
+    
+    // Strategy 4: Try case-insensitive name match
+    college = await College.findOne({ 
+      name: { $regex: new RegExp(`^${escapeRegex(identifier)}$`, 'i') }
+    });
+    
+    if (college) {
+      console.log('Found by case-insensitive name');
+      return res.json({
+        success: true,
+        college
+      });
+    }
+    
+    // Not found
+    console.log('College not found with identifier:', identifier);
+    return res.status(404).json({ 
+      success: false,
+      error: 'College not found',
+      identifier
+    });
+    
+  } catch (error) {
+    console.error('Error fetching college details:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Server error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Helper function to escape special regex characters
+ */
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export default router;
 

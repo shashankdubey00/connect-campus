@@ -16,6 +16,7 @@ import GroupInviteModal from '../components/GroupInviteModal'
 import ProfilePictureCropModal from '../components/ProfilePictureCropModal'
 import PrivacySettingsModal from '../components/PrivacySettingsModal'
 import { getCollegeLogoUrl } from '../utils/collegeLogo'
+import { getCollegeDetailUrl } from '../utils/urlHelpers'
 import './Chat.css'
 
 
@@ -105,6 +106,12 @@ const Chat = () => {
 
     // Trigger existing join logic
     handleJoinLiveChat(college);
+  };
+
+  // Navigate to college detail page (aisheCode-based URL)
+  const navigateToCollegeDetail = (college) => {
+    const url = getCollegeDetailUrl(college);
+    navigate(url);
   };
 
   // FIX 1: Persist collegeId to Survive Refresh
