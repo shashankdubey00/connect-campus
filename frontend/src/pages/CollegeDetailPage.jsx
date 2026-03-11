@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { verifyAuth } from '../services/authService';
 import { parseCollegeParam } from '../utils/urlHelpers';
 import './CollegeDetailPage.css';
 
@@ -10,6 +11,38 @@ const CollegeDetailPage = () => {
   const [college, setCollege] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const handleJoinChat = async () => {
+    if (!college) return;
+
+    try {
+      const data = await verifyAuth();
+
+      if (!data.success) {
+        navigate('/login', {
+          state: {
+            college,
+            returnPath: '/chat',
+          },
+        });
+        return;
+      }
+
+      navigate('/chat', {
+        state: {
+          college,
+          openCollegeChat: true,
+        },
+      });
+    } catch (authError) {
+      navigate('/login', {
+        state: {
+          college,
+          returnPath: '/chat',
+        },
+      });
+    }
+  };
 
   useEffect(() => {
     const fetchCollege = async () => {
@@ -115,7 +148,7 @@ const CollegeDetailPage = () => {
           <div className="college-detail-page__actions">
             <button
               className="college-detail-page__btn college-detail-page__btn--primary"
-              onClick={() => navigate(`/chat?college=${encodeURIComponent(college.aisheCode)}`)}
+              onClick={handleJoinChat}
             >
               Join Chat
             </button>
