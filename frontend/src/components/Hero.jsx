@@ -217,9 +217,10 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const handleSuggestionClick = (college) => {
     setSearchQuery(college.name)
     setShowSuggestions(false)
-    // Navigate to college detail page using aisheCode-based URL
-    const url = getCollegeDetailUrl(college);
-    navigate(url);
+    // Pass the selected college through navigation state so detail page
+    // can render immediately without depending on a second lookup.
+    const url = getCollegeDetailUrl(college)
+    navigate(url, { state: { college } })
   }
 
   const openCollegeModal = (college) => {

@@ -1,17 +1,27 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { parseCollegeParam } from '../utils/urlHelpers';
 import './CollegeDetailPage.css';
 
 const CollegeDetailPage = () => {
   const { collegeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [college, setCollege] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchCollege = async () => {
+      const collegeFromState = location.state?.college;
+
+      if (collegeFromState) {
+        setCollege(collegeFromState);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -44,7 +54,7 @@ const CollegeDetailPage = () => {
     if (collegeId) {
       fetchCollege();
     }
-  }, [collegeId]);
+  }, [collegeId, location.state]);
 
   if (loading) {
     return (
@@ -80,7 +90,7 @@ const CollegeDetailPage = () => {
           className="college-detail-page__btn college-detail-page__btn--secondary"
           onClick={() => navigate(-1)}
         >
-          ← Back
+          Back
         </button>
 
         <div className="college-detail-page__card">
