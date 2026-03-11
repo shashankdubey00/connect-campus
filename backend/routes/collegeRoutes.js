@@ -79,11 +79,6 @@ router.get('/search', async (req, res) => {
     // Execute query
     const colleges = await searchQuery.select('aisheCode name state district').lean();
 
-    console.log('🔍 Backend returning colleges:', colleges.length);
-    if (colleges.length > 0) {
-      console.log('🔍 Sample college:', colleges[0]);
-    }
-
     res.json({
       success: true,
       count: colleges.length,
@@ -182,14 +177,18 @@ router.get('/districts', async (req, res) => {
 router.get('/detail/:identifier', async (req, res) => {
   try {
     // Decode the URL parameter
-    const identifier = decodeURIComponent(req.params.identifier);
+    const identifier = decodeURIComponent(req.params.identifier).trim();
     
     console.log('Looking up college with identifier:', identifier);
     
     let college = null;
     
-    // Strategy 1: Try to find by aisheCode (RECOMMENDED - most reliable)
-    college = await College.findOne({ aisheCode: identifier });
+    // Strategy 1: Try to find by aisheCode (case-insensitive, whitespace-tolerant)
+    // This keeps landing-page navigation robust when stored AISHE codes vary in case/spacing.
+    const escapedIdentifier = escapeRegex(identifier);
+    college = await College.findOne({
+      aisheCode: { $regex: new RegExp(`^\\s*${escapedIdentifier}\\s*$`, 'i') }
+    });
     
     if (college) {
       console.log('Found by aisheCode');
@@ -262,4 +261,3 @@ function escapeRegex(string) {
 }
 
 export default router;
-
