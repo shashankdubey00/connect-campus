@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { verifyAuth } from '../services/authService'
-import { getCollegeDetailUrl } from '../utils/urlHelpers'
 import { normalizeSearchQuery, isAisheCode } from '../utils/searchUtils'
 import CollegeProfileModal from './CollegeProfileModal'
 import './Hero.css'
@@ -201,26 +200,40 @@ const Hero = ({ collegeFromState, openModalFromState }) => {
   const handleSearch = (e) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      // If there's a single matching suggestion, open it
+      // Match chat search behavior: selecting a result opens the college profile flow.
       if (suggestions.length === 1) {
-        openCollegeModal(suggestions[0])
+        handleSuggestionClick(suggestions[0])
       } else if (suggestions.length > 0) {
-        // If multiple suggestions, open the first one
-        openCollegeModal(suggestions[0])
+        handleSuggestionClick(suggestions[0])
       } else {
-        // If no suggestions, just close dropdown
         setShowSuggestions(false)
       }
     }
   }
 
-  const handleSuggestionClick = (college) => {
+  const handleSuggestionClick = async (college) => {
     setSearchQuery(college.name)
     setShowSuggestions(false)
-    // Pass the selected college through navigation state so detail page
-    // can render immediately without depending on a second lookup.
-    const url = getCollegeDetailUrl(college)
-    navigate(url, { state: { college } })
+
+    // Reuse the same auth-aware navigation pattern used by college profile cards/chat.
+    if (checkingAuth) return
+
+    if (!user) {
+      navigate('/login', {
+        state: {
+          college,
+          returnPath: '/chat',
+        },
+      })
+      return
+    }
+
+    navigate('/chat', {
+      state: {
+        college,
+        openCollegeChat: true,
+      },
+    })
   }
 
   const openCollegeModal = (college) => {
